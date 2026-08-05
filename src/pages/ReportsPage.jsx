@@ -1,286 +1,146 @@
-import { useState, useEffect } from 'react';
-import { getReports, getMyReports, getProjects } from '../lib/supabase';
-import jsPDF from 'jspdf';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
-const FIELDS = [
-  { key: 'report_date', label: 'Date' },
-  { key: 're_name', label: 'RE Name' },
-  { key: 'project_name', label: 'Project' },
-  { key: 'chainage', label: 'Chainage' },
-  { key: 'status_label', label: 'Status' },
-  { key: 'progress_pct', label: 'Progress %' },
-  { key: 'work_done', label: 'Work Done' },
-  { key: 'labour_count', label: 'Labour' },
-  { key: 'equipment', label: 'Equipment' },
-  { key: 'weather', label: 'Weather' },
-  { key: 'observations', label: 'Observations' },
-  { key: 'challenges', label: 'Challenges' },
-  { key: 'is_urgent', label: 'Urgent Flag' },
-  { key: 'urgent_description', label: 'Urgent Details' },
-  { key: 'urgent_category', label: 'Urgent Category' },
-  { key: 'tomorrow_plan', label: 'Plan for Tomorrow' },
-];
-
-function flattenReport(r) {
-  return {
-    report_date: r.report_date,
-    re_name: r.profiles?.full_name || '',
-    project_name: r.projects?.name || '',
-    chainage: r.chainage || '',
-    status_label: r.is_urgent ? 'URGENT' : r.status,
-    progress_pct: r.progress_pct != null ? `${r.progress_pct}%` : '',
-    work_done: r.work_done || '',
-    labour_count: r.labour_count || '',
-    equipment: r.equipment || '',
-    weather: r.weather || '',
-    observations: r.observations || '',
-    challenges: r.challenges || '',
-    is_urgent: r.is_urgent ? 'YES' : 'No',
-    urgent_description: r.urgent_description || '',
-    urgent_category: r.urgent_category || '',
-    tomorrow_plan: r.tomorrow_plan || '',
-  };
-}
-
-export default function ReportsPage({ currentUser, profile }) {
+export default function ReportsPage({ profile, showToast }) {
   const [reports, setReports] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('list');
-  const [filters, setFilters] = useState({ projectId: '', status: '', dateFrom: '', dateTo: '', urgent: '' });
-  const [checkedFields, setCheckedFields] = useState(FIELDS.map(f => f.key));
-  const [toast, setToast] = useState('');
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterDate, setFilterDate] = useState('');
+  const [expanded, setExpanded] = useState(null);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'engineer';
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => { loadData(); }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    const [{ data: r }, { data: p }] = await Promise.all([
-      isAdmin ? getReports({}) : getMyReports(currentUser.id),
-      getProjects()
+  async function load() {
+    const [repRes, projRes] = await Promise.all([
+      supabase.from('daily_reports')
+        .select('*, projects(name, category), profiles:submitted_by(full_name)')
+        .order('report_date', { ascending: false }).limit(100),
+      supabase.from('projects').select('id, name'),
     ]);
-    if (r) setReports(r);
-    if (p) setProjects(p);
-    setLoading(false);
-  };
+    setReports(repRes.data || []);
+    setProjects(projRes.data || []);
+  }
 
   const filtered = reports.filter(r => {
-    if (filters.projectId && r.project_id !== filters.projectId) return false;
-    if (filters.status === 'urgent' && !r.is_urgent) return false;
-    if (filters.status === 'on-track' && r.is_urgent) return false;
-    if (filters.urgent === 'yes' && !r.is_urgent) return false;
-    if (filters.dateFrom && r.report_date < filters.dateFrom) return false;
-    if (filters.dateTo && r.report_date > filters.dateTo) return false;
+    if (filterProject !== 'all' && r.project_id !== filterProject) return false;
+    if (filterDate && r.report_date !== filterDate) return false;
     return true;
   });
 
-  const toggleField = (key) => {
-    setCheckedFields(f => f.includes(key) ? f.filter(k => k !== key) : [...f, key]);
-  };
-
-  const downloadCSV = () => {
-    const rows = filtered.map(r => {
-      const flat = flattenReport(r);
-      return checkedFields.map(k => `"${String(flat[k] || '').replace(/"/g, '""')}"`).join(',');
-    });
-    const header = checkedFields.map(k => FIELDS.find(f => f.key === k)?.label || k).join(',');
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+  function exportCSV() {
+    const headers = ['Date', 'Project', 'Weather', 'Work Done', 'Progress %', 'Labour', 'Challenges', 'Urgent'];
+    const rows = filtered.map(r => [
+      r.report_date, r.projects?.name, r.weather,
+      `"${(r.work_done || '').replace(/"/g, '""')}"`,
+      r.progress_pct,
+      (r.contractor_labour_skilled || 0) + (r.contractor_labour_unskilled || 0) + (r.subcontractor_labour || 0),
+      `"${(r.challenges || '').replace(/"/g, '""')}"`,
+      r.urgent_flag ? 'YES' : '',
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `RoadSite_Reports_${new Date().toISOString().split('T')[0]}.csv`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `roadsite-reports-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-    setToast(`CSV downloaded — ${filtered.length} reports`);
-    setTimeout(() => setToast(''), 3000);
-  };
-
-  const downloadPDF = () => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth();
-    const margin = 14;
-    let y = margin;
-
-    doc.setFillColor(28, 31, 38);
-    doc.rect(0, 0, pw, 24, 'F');
-    doc.setTextColor(245, 197, 24);
-    doc.setFontSize(14); doc.setFont(undefined, 'bold');
-    doc.text('RoadSite — Daily Field Reports', margin, 15);
-    doc.setTextColor(156, 163, 175);
-    doc.setFontSize(8); doc.setFont(undefined, 'normal');
-    doc.text(`Generated: ${new Date().toLocaleString()}   |   ${filtered.length} reports`, pw - margin, 15, { align: 'right' });
-    y = 32;
-
-    filtered.forEach((r, ri) => {
-      if (ri > 0) {
-        if (y > 260) { doc.addPage(); y = margin; }
-        doc.setDrawColor(220, 220, 220); doc.line(margin, y, pw - margin, y); y += 6;
-      }
-      if (y > 250) { doc.addPage(); y = margin; }
-
-      const color = r.is_urgent ? [153, 27, 27] : [22, 101, 52];
-      doc.setFillColor(...color);
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9); doc.setFont(undefined, 'bold');
-      doc.roundedRect(margin, y - 4, pw - margin * 2, 10, 2, 2, 'F');
-      doc.text(
-        `${r.projects?.name || 'Unknown'}  |  RE: ${r.profiles?.full_name || ''}  |  ${r.is_urgent ? 'URGENT' : 'On track'}  |  ${r.progress_pct ?? '—'}% complete`,
-        margin + 3, y + 2
-      );
-      y += 13;
-
-      const flat = flattenReport(r);
-      const skipKeys = ['re_name', 'project_name', 'status_label', 'progress_pct'];
-      checkedFields.filter(k => !skipKeys.includes(k)).forEach(k => {
-        const val = String(flat[k] || '').trim();
-        if (!val || val === 'No') return;
-        if (y > 270) { doc.addPage(); y = margin; }
-        const label = FIELDS.find(f => f.key === k)?.label || k;
-        doc.setFontSize(7.5); doc.setFont(undefined, 'bold'); doc.setTextColor(100, 100, 100);
-        doc.text(label + ':', margin, y);
-        doc.setFont(undefined, 'normal'); doc.setTextColor(30, 30, 30);
-        const lines = doc.splitTextToSize(val, pw - margin * 2 - 36);
-        doc.text(lines, margin + 36, y);
-        y += Math.max(5, lines.length * 4.5);
-      });
-      y += 4;
-    });
-
-    for (let i = 1; i <= doc.internal.getNumberOfPages(); i++) {
-      doc.setPage(i);
-      doc.setFontSize(7); doc.setTextColor(150, 150, 150);
-      doc.text(`Page ${i} of ${doc.internal.getNumberOfPages()} — RoadSite Field Report System`, pw / 2, doc.internal.pageSize.getHeight() - 6, { align: 'center' });
-    }
-
-    doc.save(`RoadSite_Reports_${new Date().toISOString().split('T')[0]}.pdf`);
-    setToast(`PDF downloaded — ${filtered.length} reports`);
-    setTimeout(() => setToast(''), 3000);
-  };
-
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--gray-400)' }}>Loading reports…</div>;
+    showToast('CSV exported');
+  }
 
   return (
     <div>
-      {toast && <div className="toast success">{toast}</div>}
-
       <div className="page-header">
-        <div><h1>Reports</h1><p>{filtered.length} reports{isAdmin ? ' across all projects' : ' submitted by you'}</p></div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {[['list', 'Report list'], ['export', 'Export data']].map(([key, label]) => (
-          <button key={key} className={`btn ${tab === key ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab(key)}>{label}</button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="card card-sm" style={{ marginBottom: 16 }}>
-        <div className="form-row" style={{ marginBottom: 0 }}>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>Project</label>
-            <select value={filters.projectId} onChange={e => setFilters(f => ({ ...f, projectId: e.target.value }))}>
-              <option value="">All projects</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>Status</label>
-            <select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
-              <option value="">All statuses</option>
-              <option value="urgent">Urgent only</option>
-              <option value="on-track">Non-urgent only</option>
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>From date</label>
-            <input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))} />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label>To date</label>
-            <input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))} />
-          </div>
-        </div>
-      </div>
-
-      {tab === 'list' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  {isAdmin && <th>RE</th>}
-                  <th>Project</th>
-                  <th>Chainage</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                  <th>Submitted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--gray-400)', padding: 30 }}>No reports match your filters.</td></tr>
-                ) : filtered.map(r => (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{r.report_date}</td>
-                    {isAdmin && <td style={{ fontSize: 12 }}>{r.profiles?.full_name}</td>}
-                    <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.projects?.name}</td>
-                    <td style={{ fontSize: 12, color: 'var(--gray-500)' }}>{r.chainage}</td>
-                    <td>
-                      {r.is_urgent
-                        ? <span className="badge badge-urgent">Urgent</span>
-                        : <span className={`badge ${r.status === 'actioned' ? 'badge-actioned' : r.status === 'reviewed' ? 'badge-reviewed' : 'badge-submitted'}`}>{r.status}</span>
-                      }
-                    </td>
-                    <td style={{ fontSize: 12 }}>{r.progress_pct != null ? `${r.progress_pct}%` : '—'}</td>
-                    <td style={{ fontSize: 11, color: 'var(--gray-400)' }}>
-                      {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab === 'export' && (
         <div>
-          <div className="card">
-            <strong style={{ fontSize: 14, display: 'block', marginBottom: 4 }}>Select fields to export</strong>
-            <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 14 }}>{checkedFields.length} of {FIELDS.length} fields selected</p>
-            <div className="field-checks">
-              {FIELDS.map(f => (
-                <label key={f.key} className="field-chk">
-                  <input type="checkbox" checked={checkedFields.includes(f.key)} onChange={() => toggleField(f.key)} />
-                  {f.label}
-                </label>
-              ))}
-            </div>
-          </div>
+          <h2>Daily Reports</h2>
+          <div className="subtitle">{filtered.length} reports</div>
+        </div>
+        <button className="btn btn-secondary" onClick={exportCSV}>Export CSV</button>
+      </div>
 
-          <div className="card card-sm" style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--gray-600)' }}>
-              Exporting <strong>{filtered.length}</strong> reports with <strong>{checkedFields.length}</strong> fields.
-              Adjust filters above to narrow the selection.
-            </p>
-          </div>
+      <div className="filter-bar">
+        <select value={filterProject} onChange={e => setFilterProject(e.target.value)}>
+          <option value="all">All Projects</option>
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
+        {filterDate && <button className="btn btn-sm btn-secondary" onClick={() => setFilterDate('')}>Clear</button>}
+      </div>
 
-          <div className="export-grid">
-            <button className="export-btn-card exp-csv-card" onClick={downloadCSV}>
-              <div className="eb-icon">📊</div>
-              <strong>Download CSV</strong>
-              <span>Excel / Google Sheets</span>
-            </button>
-            <button className="export-btn-card exp-pdf-card" onClick={downloadPDF}>
-              <div className="eb-icon">📄</div>
-              <strong>Download PDF</strong>
-              <span>Print-ready report</span>
-            </button>
-          </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Project</th><th>Submitted By</th><th>Weather</th>
+              <th>Labour</th><th>Progress</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(r => {
+              const totalLabour = (r.contractor_labour_skilled || 0) + (r.contractor_labour_unskilled || 0) + (r.subcontractor_labour || 0);
+              return (
+                <React.Fragment key={r.id}>
+                  <tr style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
+                    <td className="text-mono text-sm">{r.report_date}</td>
+                    <td>{r.projects?.name || '—'}</td>
+                    <td className="text-sm">{r.profiles?.full_name || '—'}</td>
+                    <td>{r.weather}</td>
+                    <td className="text-mono">{totalLabour}</td>
+                    <td>
+                      <div className="flex gap-8" style={{ alignItems: 'center' }}>
+                        <div className="progress-bar" style={{ width: 50 }}>
+                          <div className={`fill ${r.progress_pct >= 80 ? 'green' : r.progress_pct >= 40 ? 'orange' : 'red'}`}
+                            style={{ width: `${r.progress_pct}%` }} />
+                        </div>
+                        <span className="text-mono text-sm">{r.progress_pct}%</span>
+                      </div>
+                    </td>
+                    <td>{r.urgent_flag && <span className="badge badge-danger">Urgent</span>}</td>
+                    <td className="text-muted text-sm">{expanded === r.id ? '▲' : '▼'}</td>
+                  </tr>
+                  {expanded === r.id && (
+                    <tr>
+                      <td colSpan={8} style={{ background: 'var(--bg-surface)', padding: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', fontSize: 13 }}>
+                          <div>
+                            <strong className="text-muted">Work Done:</strong>
+                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.work_done || '—'}</p>
+                          </div>
+                          <div>
+                            <strong className="text-muted">Challenges:</strong>
+                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.challenges || '—'}</p>
+                          </div>
+                          <div>
+                            <strong className="text-muted">Quality Observations:</strong>
+                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.quality_observations || '—'}</p>
+                          </div>
+                          <div>
+                            <strong className="text-muted">Instructions Issued:</strong>
+                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.instructions_issued || '—'}</p>
+                          </div>
+                          {r.rainfall_mm && <div><span className="text-muted">Rainfall:</span> {r.rainfall_mm}mm</div>}
+                          {r.max_temp_c && <div><span className="text-muted">Temp:</span> {r.min_temp_c}°C – {r.max_temp_c}°C</div>}
+                          {r.working_hours && <div><span className="text-muted">Working Hours:</span> {r.working_hours}h</div>}
+                          {r.non_working_reason && <div><span className="text-muted">Non-working:</span> {r.non_working_reason}</div>}
+                          {r.urgent_details && (
+                            <div className="full-width" style={{ gridColumn: '1/-1' }}>
+                              <strong className="text-danger">Urgent:</strong>
+                              <p style={{ marginTop: 4 }}>{r.urgent_details}</p>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="card empty-state mt-16">
+          <div className="icon">☰</div>
+          <p>No reports match your filters</p>
         </div>
       )}
     </div>

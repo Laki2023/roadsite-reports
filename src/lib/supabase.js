@@ -1,146 +1,90 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Check your .env.local file.');
-}
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://gyqmlynozcnzihbsfyfx.supabase.co';
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'sb_publishable_leUaxFyWfgWEpwAGyVIaJQ_SjXXLu1p';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Auth helpers
-export const signUp = async (email, password, fullName) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } }
-  });
-  return { data, error };
+/* Role hierarchy (highest to lowest):
+   admin > pm > engineer > re > inspector > pending
+   Each level can do everything below it. */
+const ROLE_LEVELS = { admin: 6, pm: 5, engineer: 4, re: 3, inspector: 2, pending: 0 };
+
+export function hasRole(userRole, requiredRole) {
+  return (ROLE_LEVELS[userRole] || 0) >= (ROLE_LEVELS[requiredRole] || 0);
+}
+
+export const ROLE_LABELS = {
+  admin: 'Administrator',
+  pm: 'Project Manager',
+  engineer: 'Engineer',
+  re: 'Resident Engineer',
+  inspector: 'Inspector',
+  pending: 'Pending Approval',
 };
 
-export const signIn = async (email, password) => {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  return { data, error };
-};
+export const PROJECT_CATEGORIES = ['Construction', 'Rehabilitation', 'Maintenance'];
 
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  return { error };
-};
+export const FIDIC_EDITIONS = [
+  'Red Book 1987', 'Red Book 1999', 'Red Book 2017',
+  'Pink Book MDB 2010', 'Yellow Book 1999', 'Yellow Book 2017'
+];
 
-export const getProfile = async (userId) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  return { data, error };
-};
+export const PROJECT_PHASES = [
+  'Procurement', 'Mobilization', 'Construction',
+  'Defects Liability', 'Completed', 'Suspended'
+];
 
-export const updateProfile = async (userId, updates) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
-  return { data, error };
-};
+export const LAYER_TYPES = [
+  'Subgrade', 'Improved Subgrade', 'Sub-base', 'Base', 'Prime Coat',
+  'Tack Coat', 'Binder Course', 'Wearing Course', 'Surface Dressing', 'Seal Coat'
+];
 
-// Admin helpers
-export const getAllProfiles = async () => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
-  return { data, error };
-};
+export const LAYER_STATUSES = [
+  'Not Started', 'Material Approved', 'Laying In Progress',
+  'Laid', 'Tested', 'Approved', 'Rejected', 'Rework'
+];
 
-export const approveUser = async (userId, role, adminId) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ role, approved_at: new Date().toISOString(), approved_by: adminId })
-    .eq('id', userId)
-    .select()
-    .single();
-  return { data, error };
-};
+export const TEST_TYPES = [
+  'MDD', 'CBR', 'DCP', 'FWD', 'Marshall Stability', 'Gradation', 'Atterberg Limits',
+  'Moisture Content', 'Sand Equivalent', 'Flakiness Index', 'ACV', 'AIV', 'LAA',
+  'Specific Gravity', 'Bitumen Content', 'Penetration', 'Softening Point',
+  'Compaction (Field)', 'Plate Bearing', 'Benkelman Beam', 'Core Extraction',
+  'Slump Test', 'Cube Crushing', 'Other'
+];
 
-// Projects
-export const getProjects = async () => {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*, profiles:re_assigned(full_name, email)')
-    .order('created_at', { ascending: false });
-  return { data, error };
-};
+export const ISSUE_CATEGORIES = [
+  'Safety', 'Quality', 'Programme', 'Environmental', 'Design',
+  'Contractual', 'Community', 'Materials', 'Equipment', 'Weather', 'General'
+];
 
-export const createProject = async (project) => {
-  const { data, error } = await supabase
-    .from('projects')
-    .insert(project)
-    .select()
-    .single();
-  return { data, error };
-};
-
-export const updateProject = async (id, updates) => {
-  const { data, error } = await supabase
-    .from('projects')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  return { data, error };
-};
-
-// Reports
-export const submitReport = async (report) => {
-  const { data, error } = await supabase
-    .from('daily_reports')
-    .insert(report)
-    .select()
-    .single();
-  return { data, error };
-};
-
-export const getReports = async (filters = {}) => {
-  let query = supabase
-    .from('daily_reports')
-    .select(`
-      *,
-      profiles:submitted_by(full_name, email),
-      projects:project_id(name, contract_number)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (filters.projectId) query = query.eq('project_id', filters.projectId);
-  if (filters.userId) query = query.eq('submitted_by', filters.userId);
-  if (filters.isUrgent) query = query.eq('is_urgent', true);
-  if (filters.status) query = query.eq('status', filters.status);
-  if (filters.dateFrom) query = query.gte('report_date', filters.dateFrom);
-  if (filters.dateTo) query = query.lte('report_date', filters.dateTo);
-
-  const { data, error } = await query;
-  return { data, error };
-};
-
-export const getMyReports = async (userId) => {
-  const { data, error } = await supabase
-    .from('daily_reports')
-    .select(`*, projects:project_id(name, contract_number)`)
-    .eq('submitted_by', userId)
-    .order('created_at', { ascending: false });
-  return { data, error };
-};
-
-export const updateReportStatus = async (reportId, updates) => {
-  const { data, error } = await supabase
-    .from('daily_reports')
-    .update(updates)
-    .eq('id', reportId)
-    .select()
-    .single();
-  return { data, error };
+/* Kenya RDM spec limits for common tests */
+export const SPEC_LIMITS = {
+  'Subgrade': {
+    CBR: { min: 5, unit: '%', ref: 'Kenya RDM Part III, Table 5.1' },
+    MDD: { unit: 'kg/m³', ref: 'BS 1377:Part 4 / KS 02-26' },
+    'Compaction (Field)': { min: 95, unit: '% MDD', ref: 'Kenya RDM Part III, Cl. 5.2' },
+  },
+  'Sub-base': {
+    CBR: { min: 30, unit: '%', ref: 'Kenya RDM Part III, Table 5.2' },
+    'Compaction (Field)': { min: 97, unit: '% MDD', ref: 'Kenya RDM Part III, Cl. 5.3' },
+    'Atterberg Limits': { max: 25, unit: 'PI', ref: 'Kenya RDM Part III, Table 5.2' },
+    Gradation: { ref: 'Kenya RDM Part III, Table 5.2 Envelope' },
+  },
+  'Base': {
+    CBR: { min: 80, unit: '%', ref: 'Kenya RDM Part III, Table 5.3' },
+    'Compaction (Field)': { min: 98, unit: '% MDD', ref: 'Kenya RDM Part III, Cl. 5.4' },
+    'Atterberg Limits': { max: 6, unit: 'PI', ref: 'Kenya RDM Part III, Table 5.3' },
+    LAA: { max: 45, unit: '%', ref: 'Kenya RDM Part III, Table 5.3' },
+  },
+  'Binder Course': {
+    'Marshall Stability': { min: 9, unit: 'kN', ref: 'Kenya RDM Part III, Table 8.1' },
+    'Compaction (Field)': { min: 95, unit: '% Marshall', ref: 'Kenya RDM Part III, Cl. 8.4' },
+    'Bitumen Content': { min: 4.0, max: 7.0, unit: '%', ref: 'Kenya RDM Part III' },
+  },
+  'Wearing Course': {
+    'Marshall Stability': { min: 9, unit: 'kN', ref: 'Kenya RDM Part III, Table 8.1' },
+    'Compaction (Field)': { min: 96, unit: '% Marshall', ref: 'Kenya RDM Part III, Cl. 8.4' },
+    'Bitumen Content': { min: 4.5, max: 7.5, unit: '%', ref: 'Kenya RDM Part III' },
+  },
 };

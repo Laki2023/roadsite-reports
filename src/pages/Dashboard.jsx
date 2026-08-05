@@ -1,227 +1,193 @@
-import { useState, useEffect } from 'react';
-import { getReports, getProjects, updateReportStatus } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { supabase, hasRole } from '../lib/supabase';
 
-function Toast({ msg, type = 'success', onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
-  return <div className={`toast ${type}`}>{msg}</div>;
-}
+export default function Dashboard({ profile, navigateTo }) {
+  const [stats, setStats] = useState({
+    projects: 0, activeProjects: 0, reports: 0, reportsToday: 0,
+    urgentReports: 0, openIssues: 0, testsPending: 0, testsFailed: 0,
+    layersInProgress: 0, staffCount: 0,
+  });
+  const [recentReports, setRecentReports] = useState([]);
+  const [recentIssues, setRecentIssues] = useState([]);
+  const [projectBreakdown, setProjectBreakdown] = useState([]);
 
-export default function Dashboard({ currentUser, profile, onNavigate }) {
-  const [reports, setReports] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-  const [toast, setToast] = useState(null);
+  useEffect(() => { loadDashboard(); }, []);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'engineer';
-  const today = new Date().toISOString().split('T')[0];
+  async function loadDashboard() {
+    const today = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    const filters = isAdmin ? { dateFrom: today } : { userId: currentUser.id, dateFrom: today };
-    const [{ data: r }, { data: p }] = await Promise.all([
-      getReports(filters),
-      getProjects()
+    const [projRes, repRes, repTodayRes, urgentRes, issueRes, testPendRes, testFailRes, layerRes, staffRes] = await Promise.all([
+      supabase.from('projects').select('id, name, status, category, current_phase', { count: 'exact' }),
+      supabase.from('daily_reports').select('id', { count: 'exact' }),
+      supabase.from('daily_reports').select('id', { count: 'exact' }).eq('report_date', today),
+      supabase.from('daily_reports').select('id', { count: 'exact' }).eq('urgent_flag', true).eq('urgent_resolved', false),
+      supabase.from('site_issues').select('id, title, severity, project_id, status', { count: 'exact' }).eq('status', 'Open'),
+      supabase.from('quality_tests').select('id', { count: 'exact' }).eq('result_status', 'Pending'),
+      supabase.from('quality_tests').select('id', { count: 'exact' }).eq('result_status', 'Fail'),
+      supabase.from('pavement_layers').select('id', { count: 'exact' }).eq('layer_status', 'Laying In Progress'),
+      supabase.from('profiles').select('id', { count: 'exact' }).neq('role', 'pending'),
     ]);
-    if (r) setReports(r);
-    if (p) setProjects(p);
-    setLoading(false);
-  };
 
-  const urgentReports = reports.filter(r => r.is_urgent && r.status !== 'actioned');
-  const totalToday = reports.length;
-  const onTrack = reports.filter(r => !r.is_urgent).length;
+    const activeCount = projRes.data?.filter(p => p.status === 'active' || p.current_phase === 'Construction').length || 0;
 
-  const handleAcknowledge = async (reportId) => {
-    const { error } = await updateReportStatus(reportId, {
-      status: 'actioned',
-      reviewed_by: currentUser.id,
-      reviewed_at: new Date().toISOString()
+    setStats({
+      projects: projRes.count || 0,
+      activeProjects: activeCount,
+      reports: repRes.count || 0,
+      reportsToday: repTodayRes.count || 0,
+      urgentReports: urgentRes.count || 0,
+      openIssues: issueRes.count || 0,
+      testsPending: testPendRes.count || 0,
+      testsFailed: testFailRes.count || 0,
+      layersInProgress: layerRes.count || 0,
+      staffCount: staffRes.count || 0,
     });
-    if (!error) {
-      setReports(rs => rs.map(r => r.id === reportId ? { ...r, status: 'actioned' } : r));
-      setToast({ msg: 'Report acknowledged and marked as actioned.' });
+
+    // Category breakdown
+    if (projRes.data) {
+      const cats = {};
+      projRes.data.forEach(p => {
+        const c = p.category || 'Construction';
+        cats[c] = (cats[c] || 0) + 1;
+      });
+      setProjectBreakdown(Object.entries(cats));
     }
-  };
 
-  const statusBadge = (report) => {
-    if (report.is_urgent) return <span className="badge badge-urgent">Urgent</span>;
-    if (report.progress_pct >= 70) return <span className="badge badge-on-track">On track</span>;
-    return <span className="badge badge-attention">Attention</span>;
-  };
+    setRecentIssues((issueRes.data || []).slice(0, 5));
 
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: 60, color: 'var(--gray-400)' }}>Loading reports…</div>
-  );
-
-  if (selected) {
-    const r = selected;
-    return (
-      <div>
-        {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-        <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)} style={{ marginBottom: 16 }}>
-          ← Back to dashboard
-        </button>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div>
-            <h2 style={{ fontSize: 18 }}>{r.projects?.name}</h2>
-            <p style={{ color: 'var(--gray-500)', fontSize: 13, marginTop: 3 }}>
-              RE: {r.profiles?.full_name} · Ch. {r.chainage} · {r.report_date}
-            </p>
-          </div>
-          {statusBadge(r)}
-        </div>
-
-        {r.is_urgent && (
-          <div className="alert-urgent" style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, color: '#991B1B', fontSize: 13, marginBottom: 5 }}>
-              ⚠ Urgent — engineer action required
-            </div>
-            <p style={{ fontSize: 13, color: '#7F1D1D', lineHeight: 1.6 }}>{r.urgent_description}</p>
-            <p style={{ fontSize: 12, color: '#B91C1C', marginTop: 6 }}>Category: {r.urgent_category}</p>
-            {isAdmin && r.status !== 'actioned' && (
-              <button
-                className="btn btn-danger btn-sm"
-                style={{ marginTop: 10 }}
-                onClick={() => handleAcknowledge(r.id)}
-              >
-                Acknowledge & mark actioned
-              </button>
-            )}
-          </div>
-        )}
-
-        {[
-          ['Work carried out', r.work_done],
-          ['Quality observations', r.observations],
-          ['Challenges', r.challenges],
-          ['Plan for tomorrow', r.tomorrow_plan],
-        ].map(([label, val]) => val && (
-          <div key={label} className="card card-sm" style={{ marginBottom: 10 }}>
-            <p className="sec-label" style={{ marginTop: 0 }}>{label}</p>
-            <p style={{ fontSize: 13, color: 'var(--gray-700)', lineHeight: 1.7 }}>{val}</p>
-          </div>
-        ))}
-
-        <div className="card card-sm">
-          <p className="sec-label" style={{ marginTop: 0 }}>Site resources</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {[
-              ['👷', `${r.labour_count} workers`],
-              ['🚜', r.equipment],
-              ['🌤', r.weather],
-              ['📊', `${r.progress_pct}% complete`],
-            ].map(([icon, val]) => val && (
-              <span key={val} style={{ background: 'var(--gray-100)', borderRadius: 999, padding: '4px 12px', fontSize: 12, color: 'var(--gray-700)' }}>
-                {icon} {val}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    // Recent reports
+    const { data: rr } = await supabase.from('daily_reports')
+      .select('id, report_date, project_id, weather, progress_pct, urgent_flag, projects(name)')
+      .order('created_at', { ascending: false }).limit(6);
+    setRecentReports(rr || []);
   }
+
+  const sevColor = { Critical: 'danger', High: 'warning', Medium: 'info', Low: 'muted' };
 
   return (
     <div>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-
       <div className="page-header">
         <div>
-          <h1>Dashboard</h1>
-          <p>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <h2>Dashboard</h2>
+          <div className="subtitle">Welcome back, {profile.full_name.split(' ')[0]}</div>
         </div>
-        {profile?.role === 're' && (
-          <button className="btn btn-yellow" onClick={() => onNavigate('submit')}>
-            + Submit today's report
-          </button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('projects')}>
+          <div className="stat-label">Active Projects</div>
+          <div className="stat-value text-accent">{stats.activeProjects}</div>
+          <div className="stat-sub">{stats.projects} total</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Reports Today</div>
+          <div className="stat-value">{stats.reportsToday}</div>
+          <div className="stat-sub">{stats.reports} total reports</div>
+        </div>
+        {stats.urgentReports > 0 && (
+          <div className="stat-card" style={{ borderColor: 'var(--danger)' }}>
+            <div className="stat-label">Urgent Alerts</div>
+            <div className="stat-value text-danger">{stats.urgentReports}</div>
+            <div className="stat-sub">Require engineer attention</div>
+          </div>
         )}
-      </div>
-
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="sc-val">{totalToday}</div>
-          <div className="sc-label">Reports today</div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('issues')}>
+          <div className="stat-label">Open Issues</div>
+          <div className="stat-value" style={{ color: stats.openIssues > 0 ? 'var(--warning)' : 'var(--success)' }}>
+            {stats.openIssues}
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="sc-val" style={{ color: 'var(--red)' }}>{urgentReports.length}</div>
-          <div className="sc-label">Urgent issues</div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('quality')}>
+          <div className="stat-label">Tests Pending</div>
+          <div className="stat-value">{stats.testsPending}</div>
+          <div className="stat-sub">{stats.testsFailed > 0 && <span className="text-danger">{stats.testsFailed} failed</span>}</div>
         </div>
-        <div className="stat-card">
-          <div className="sc-val" style={{ color: 'var(--green)' }}>{onTrack}</div>
-          <div className="sc-label">On schedule</div>
-        </div>
-        <div className="stat-card">
-          <div className="sc-val">{projects.length}</div>
-          <div className="sc-label">Active projects</div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigateTo('pavement')}>
+          <div className="stat-label">Layers In Progress</div>
+          <div className="stat-value text-accent">{stats.layersInProgress}</div>
         </div>
       </div>
 
-      {urgentReports.length > 0 && (
-        <>
-          <p className="sec-label">🚨 Urgent — action required</p>
-          {urgentReports.map(r => (
-            <div key={r.id} className="alert-urgent" style={{ cursor: 'pointer' }} onClick={() => setSelected(r)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: '#991B1B', fontSize: 13 }}>{r.projects?.name}</div>
-                  <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 2 }}>RE: {r.profiles?.full_name} · Ch. {r.chainage} · {r.urgent_category}</div>
-                </div>
-                <span className="badge badge-urgent">Urgent</span>
-              </div>
-              <p style={{ fontSize: 13, color: '#7F1D1D', marginTop: 8, lineHeight: 1.6 }}>
-                {r.urgent_description?.slice(0, 160)}{r.urgent_description?.length > 160 ? '…' : ''}
-              </p>
-              <div style={{ fontSize: 12, color: '#DC2626', marginTop: 6 }}>Submitted at {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Click to view & action</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Recent Reports */}
+        <div className="card">
+          <div className="card-header">
+            <h3>Recent Reports</h3>
+            <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('reports')}>View all</button>
+          </div>
+          {recentReports.length === 0 ? (
+            <div className="empty-state"><p>No reports yet</p></div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Project</th><th>Weather</th><th>Progress</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {recentReports.map(r => (
+                    <tr key={r.id}>
+                      <td className="text-mono text-sm">{r.report_date}</td>
+                      <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.projects?.name || '—'}
+                      </td>
+                      <td>{r.weather}</td>
+                      <td>
+                        <div className="flex gap-8" style={{ alignItems: 'center' }}>
+                          <div className="progress-bar" style={{ width: 60 }}>
+                            <div className={`fill ${r.progress_pct >= 80 ? 'green' : r.progress_pct >= 40 ? 'orange' : 'red'}`}
+                              style={{ width: `${r.progress_pct}%` }} />
+                          </div>
+                          <span className="text-mono text-sm">{r.progress_pct}%</span>
+                        </div>
+                      </td>
+                      <td>{r.urgent_flag && <span className="badge badge-danger">Urgent</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </>
-      )}
-
-      <p className="sec-label">Today's field reports</p>
-      {reports.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>📋</div>
-          <p style={{ color: 'var(--gray-500)' }}>No reports submitted today yet.</p>
-          {profile?.role === 're' && (
-            <button className="btn btn-yellow" style={{ marginTop: 14 }} onClick={() => onNavigate('submit')}>
-              Submit today's report
-            </button>
           )}
         </div>
-      ) : reports.map(r => (
-        <div
-          key={r.id}
-          className={`report-card${r.is_urgent ? ' urgent' : ''}`}
-          onClick={() => setSelected(r)}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-            <div>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>{r.projects?.name}</div>
-              <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 2 }}>RE: {r.profiles?.full_name} · Ch. {r.chainage}</div>
-            </div>
-            {statusBadge(r)}
+
+        {/* Open Issues */}
+        <div className="card">
+          <div className="card-header">
+            <h3>Open Issues</h3>
+            <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('issues')}>View all</button>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--gray-600)', lineHeight: 1.5 }}>
-            {r.work_done?.slice(0, 120)}{r.work_done?.length > 120 ? '…' : ''}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-            <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>
-              {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <span className={`badge ${r.status === 'actioned' ? 'badge-actioned' : r.status === 'reviewed' ? 'badge-reviewed' : 'badge-submitted'}`} style={{ marginLeft: 'auto', fontSize: 10 }}>
-              {r.status}
-            </span>
-            {r.progress_pct != null && (
-              <span className="badge badge-on-track" style={{ fontSize: 10 }}>{r.progress_pct}% complete</span>
-            )}
+          {recentIssues.length === 0 ? (
+            <div className="empty-state"><p>No open issues — looking good</p></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentIssues.map(iss => (
+                <div key={iss.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)'
+                }}>
+                  <span className={`badge badge-${sevColor[iss.severity] || 'muted'}`}>{iss.severity}</span>
+                  <span style={{ flex: 1, fontSize: 13 }}>{iss.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Project Category Breakdown */}
+      {projectBreakdown.length > 0 && (
+        <div className="card mt-24">
+          <div className="card-header"><h3>Projects by Category</h3></div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            {projectBreakdown.map(([cat, count]) => (
+              <div key={cat} style={{ textAlign: 'center' }}>
+                <div className="text-mono" style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent)' }}>{count}</div>
+                <div className="text-sm text-muted">{cat}</div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

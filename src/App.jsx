@@ -1,199 +1,174 @@
-import { useState, useEffect } from 'react';
-import { supabase, getProfile, signOut } from './lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase, hasRole, ROLE_LABELS } from './lib/supabase';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetail from './pages/ProjectDetail';
 import SubmitReport from './pages/SubmitReport';
 import ReportsPage from './pages/ReportsPage';
-import ProjectsPage from './pages/ProjectsPage';
+import PavementPage from './pages/PavementPage';
+import QualityTestsPage from './pages/QualityTestsPage';
+import IssuesPage from './pages/IssuesPage';
+import StaffPage from './pages/StaffPage';
 import AdminPanel from './pages/AdminPanel';
-import './index.css';
 
-const NAV = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['re', 'engineer', 'admin'] },
-  { key: 'submit', label: 'Submit Report', icon: '📝', roles: ['re', 'engineer', 'admin'] },
-  { key: 'reports', label: 'All Reports', icon: '📋', roles: ['re', 'engineer', 'admin'] },
-  { key: 'projects', label: 'Projects', icon: '🗺', roles: ['re', 'engineer', 'admin'] },
-  { key: 'admin', label: 'Admin Panel', icon: '⚙️', roles: ['admin'] },
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'inspector' },
+  { section: 'Projects' },
+  { key: 'projects', label: 'Projects', icon: '◈', minRole: 'inspector' },
+  { section: 'Field Work' },
+  { key: 'submit-report', label: 'Submit Report', icon: '✎', minRole: 'inspector' },
+  { key: 'reports', label: 'View Reports', icon: '☰', minRole: 'inspector' },
+  { key: 'issues', label: 'Site Issues', icon: '⚠', minRole: 'inspector' },
+  { section: 'Road Engineering' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 're' },
+  { key: 'quality', label: 'Quality Tests', icon: '⬡', minRole: 'inspector' },
+  { section: 'Management' },
+  { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
+  { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'admin' },
 ];
 
-function PendingScreen({ profile, onSignOut }) {
-  return (
-    <div className="pending-screen">
-      <div className="pending-card">
-        <div className="big-icon">⏳</div>
-        <h2>Account pending approval</h2>
-        <p style={{ marginTop: 10 }}>
-          Welcome, <strong>{profile?.full_name}</strong>. Your account has been registered and is
-          awaiting role assignment by the site administrator. You will be able to log in and access
-          the system once your account is approved.
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [page, setPage] = useState('dashboard');
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) fetchProfile(s.user.id);
+      else setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      if (s) fetchProfile(s.user.id);
+      else { setProfile(null); setLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function fetchProfile(uid) {
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    setProfile(data);
+    setLoading(false);
+  }
+
+  function navigateTo(pg, project = null) {
+    setPage(pg);
+    if (project !== undefined) setSelectedProject(project);
+    setSidebarOpen(false);
+  }
+
+  if (loading) return (
+    <div className="auth-page">
+      <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--accent)' }}>◈</div>
+        Loading...
+      </div>
+    </div>
+  );
+
+  if (!session) return <AuthPage onAuth={() => {}} showToast={showToast} />;
+  if (!profile) return (
+    <div className="auth-page">
+      <div className="auth-card" style={{ textAlign: 'center' }}>
+        <h2>Setting up your profile...</h2>
+        <p className="text-muted mt-16">Please wait or refresh the page.</p>
+      </div>
+    </div>
+  );
+  if (profile.role === 'pending') return (
+    <div className="auth-page">
+      <div className="auth-card" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+        <h2>Awaiting Approval</h2>
+        <p className="text-muted mt-16">
+          Your account is pending approval by an administrator.
+          You'll receive access once your role is assigned.
         </p>
-        <p style={{ marginTop: 14, fontSize: 12, color: 'var(--gray-400)' }}>
-          Contact your project administrator if you have been waiting more than 24 hours.
-        </p>
-        <button className="btn btn-ghost" style={{ marginTop: 24 }} onClick={onSignOut}>
-          Sign out
+        <button className="btn btn-secondary mt-24"
+          onClick={() => supabase.auth.signOut()}>
+          Sign Out
         </button>
       </div>
     </div>
   );
-}
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [urgentCount, setUrgentCount] = useState(0);
-
-  useEffect(() => {
-    // Check existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        loadProfile(session.user.id);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Load urgent count for badge
-  useEffect(() => {
-    if (!profile || !['admin', 'engineer'].includes(profile.role)) return;
-    supabase
-      .from('daily_reports')
-      .select('id', { count: 'exact' })
-      .eq('is_urgent', true)
-      .neq('status', 'actioned')
-      .then(({ count }) => setUrgentCount(count || 0));
-  }, [profile]);
-
-  const loadProfile = async (userId) => {
-    const { data } = await getProfile(userId);
-    setProfile(data);
-    setLoading(false);
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    setUser(null);
-    setProfile(null);
-    setPage('dashboard');
-  };
-
-  const navigate = (p) => {
-    setPage(p);
-    setSidebarOpen(false);
-  };
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--asphalt)' }}>
-        <div style={{ textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🛣</div>
-          <p style={{ color: 'var(--gray-400)', fontSize: 14 }}>Loading RoadSite…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) return <AuthPage onAuth={(u) => { setUser(u); loadProfile(u.id); }} />;
-
-  if (profile?.role === 'pending') return <PendingScreen profile={profile} onSignOut={handleSignOut} />;
-
-  const allowedNav = NAV.filter(n => n.roles.includes(profile?.role));
 
   const renderPage = () => {
-    const props = { currentUser: user, profile, onNavigate: navigate };
+    const ctx = { profile, showToast, navigateTo, selectedProject, setSelectedProject };
     switch (page) {
-      case 'dashboard': return <Dashboard {...props} />;
-      case 'submit': return <SubmitReport {...props} />;
-      case 'reports': return <ReportsPage {...props} />;
-      case 'projects': return <ProjectsPage {...props} />;
-      case 'admin': return profile?.role === 'admin' ? <AdminPanel {...props} /> : <Dashboard {...props} />;
-      default: return <Dashboard {...props} />;
+      case 'dashboard': return <Dashboard {...ctx} />;
+      case 'projects': return <ProjectsPage {...ctx} />;
+      case 'project-detail': return <ProjectDetail {...ctx} />;
+      case 'submit-report': return <SubmitReport {...ctx} />;
+      case 'reports': return <ReportsPage {...ctx} />;
+      case 'pavement': return <PavementPage {...ctx} />;
+      case 'quality': return <QualityTestsPage {...ctx} />;
+      case 'issues': return <IssuesPage {...ctx} />;
+      case 'staff': return <StaffPage {...ctx} />;
+      case 'admin': return <AdminPanel {...ctx} />;
+      default: return <Dashboard {...ctx} />;
     }
   };
 
   return (
     <div className="app-shell">
-      {/* Mobile menu button */}
-      <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+        <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>RoadSite Reports</span>
+      </div>
 
-      {/* Overlay for mobile */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 99 }}
-        />
-      )}
+      {/* Sidebar Overlay */}
+      <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
+        onClick={() => setSidebarOpen(false)} />
 
       {/* Sidebar */}
-      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-        <div className="sidebar-logo">
-          <div style={{ fontSize: 24, marginBottom: 6 }}>🛣</div>
-          <h2>RoadSite</h2>
-          <p>Field Reporting System</p>
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-brand">
+          <h1>RoadSite Reports</h1>
+          <div className="brand-sub">v2.0 — Field & Quality</div>
         </div>
-
         <nav className="sidebar-nav">
-          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--gray-500)', textTransform: 'uppercase', padding: '6px 12px', marginBottom: 4 }}>
-            Navigation
-          </p>
-          {allowedNav.map(item => (
-            <button
-              key={item.key}
-              className={`nav-item${page === item.key ? ' active' : ''}`}
-              onClick={() => navigate(item.key)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-              {item.key === 'dashboard' && urgentCount > 0 && (
-                <span className="nav-badge">{urgentCount}</span>
-              )}
-            </button>
-          ))}
-
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '14px 0' }} />
-
-          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--gray-500)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>
-            Role
-          </p>
-          <div style={{ padding: '0 12px' }}>
-            <span className={`badge ${profile?.role === 'admin' ? 'badge-admin' : profile?.role === 'engineer' ? 'badge-engineer' : 'badge-re'}`}>
-              {profile?.role === 're' ? 'Resident Engineer' : profile?.role === 'engineer' ? 'Engineer' : 'Administrator'}
-            </span>
-          </div>
+          {NAV_ITEMS.map((item, i) => {
+            if (item.section) return <div key={i} className="nav-section">{item.section}</div>;
+            if (!hasRole(profile.role, item.minRole)) return null;
+            return (
+              <button key={item.key}
+                className={page === item.key ? 'active' : ''}
+                onClick={() => navigateTo(item.key)}>
+                <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
-
         <div className="sidebar-user">
-          <div className="su-name">{profile?.full_name || user.email}</div>
-          <div className="su-role">{profile?.email}</div>
-          <button className="su-signout" onClick={handleSignOut}>
-            <span>⬡</span> Sign out
+          <div className="user-name">{profile.full_name}</div>
+          <div className="user-role">{ROLE_LABELS[profile.role] || profile.role}</div>
+          <button className="btn btn-secondary btn-sm mt-16" style={{ width: '100%', justifyContent: 'center' }}
+            onClick={() => supabase.auth.signOut()}>
+            Sign Out
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Main Content */}
       <main className="main-content">
         {renderPage()}
       </main>
+
+      {/* Toast */}
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </div>
   );
 }

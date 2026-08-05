@@ -1,217 +1,100 @@
-import { useState } from 'react';
-import { signIn, signUp, supabase } from '../lib/supabase';
+import React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
 
-export default function AuthPage({ onAuth }) {
-  const [mode, setMode] = useState('login');
+export default function AuthPage({ showToast }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' });
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    setSuccess('');
-    if (mode === 'register') {
-      if (!form.fullName.trim()) return setError('Full name is required.');
-      if (form.password.length < 8) return setError('Password must be at least 8 characters.');
-      if (form.password !== form.confirm) return setError('Passwords do not match.');
-    }
     setLoading(true);
     try {
-      if (mode === 'login') {
-        const { data, error } = await signIn(form.email, form.password);
-        if (error) throw error;
-        onAuth(data.user);
+      if (isLogin) {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) throw err;
       } else {
-        const { data, error } = await signUp(form.email, form.password, form.fullName);
-        if (error) throw error;
-        setMode('registered');
+        const { data, error: err } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName } }
+        });
+        if (err) throw err;
+        // Create profile
+        if (data.user) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            full_name: fullName,
+            email,
+            phone,
+            role: 'pending',
+          });
+        }
+        showToast('Account created. Awaiting admin approval.');
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    if (!form.email.trim()) return setError('Please enter your email address first.');
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
-        redirectTo: window.location.origin + '/#reset-password',
-      });
-      if (error) throw error;
-      setSuccess('Password reset link sent! Check your email inbox (and spam folder).');
-    } catch (err) {
-      setError(err.message || 'Failed to send reset email. Please try again.');
-    }
-    setLoading(false);
-  };
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    if (form.password.length < 8) return setError('Password must be at least 8 characters.');
-    if (form.password !== form.confirm) return setError('Passwords do not match.');
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: form.password });
-      if (error) throw error;
-      setSuccess('Password updated successfully! Redirecting to login...');
-      setTimeout(() => { setMode('login'); setSuccess(''); }, 2000);
-    } catch (err) {
-      setError(err.message || 'Failed to update password.');
-    }
-    setLoading(false);
-  };
-
-  if (mode === 'registered') {
-    return (
-      <div className="auth-shell">
-        <div className="auth-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>Registration received</h2>
-          <p style={{ color: 'var(--gray-500)', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
-            Your account has been created and is <strong>pending approval</strong> by the site administrator.
-            You will be notified once your role is assigned and access is granted.
-          </p>
-          <p style={{ color: 'var(--gray-400)', fontSize: 12, marginBottom: 20 }}>
-            Check your email to verify your address first, then wait for admin approval.
-          </p>
-          <button className="btn btn-primary btn-full" onClick={() => setMode('login')}>
-            Back to sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (mode === 'reset-password') {
-    return (
-      <div className="auth-shell">
-        <div className="auth-card">
-          <div className="auth-logo">
-            <div className="logo-icon">🔑</div>
-            <h1>Set New Password</h1>
-            <p>Enter your new password below</p>
-          </div>
-          <form onSubmit={handleResetPassword}>
-            <div className="form-group">
-              <label>New password</label>
-              <input type="password" placeholder="At least 8 characters" value={form.password} onChange={e => set('password', e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label>Confirm new password</label>
-              <input type="password" placeholder="Re-enter your password" value={form.confirm} onChange={e => set('confirm', e.target.value)} required />
-            </div>
-            {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
-            {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
-            <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
-              {loading ? 'Updating...' : 'Update Password'}
-            </button>
-          </form>
-          <div className="divider"><span>or</span></div>
-          <button className="btn btn-ghost btn-full" onClick={() => setMode('login')}>Back to sign in</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (mode === 'forgot') {
-    return (
-      <div className="auth-shell">
-        <div className="auth-card">
-          <div className="auth-logo">
-            <div className="logo-icon">📧</div>
-            <h1>Reset Password</h1>
-            <p>We'll send a reset link to your email</p>
-          </div>
-          <form onSubmit={handleForgotPassword}>
-            <div className="form-group">
-              <label>Email address</label>
-              <input type="email" placeholder="you@example.com" value={form.email} onChange={e => set('email', e.target.value)} required />
-            </div>
-            {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
-            {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
-            <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
-              {loading ? 'Sending...' : 'Send reset link'}
-            </button>
-          </form>
-          <div className="divider"><span>remembered it?</span></div>
-          <button className="btn btn-ghost btn-full" onClick={() => { setMode('login'); setError(''); setSuccess(''); }}>Back to sign in</button>
-        </div>
-      </div>
-    );
   }
 
   return (
-    <div className="auth-shell">
+    <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-logo">
-          <div className="logo-icon">🛣</div>
-          <h1>RoadSite Reports</h1>
-          <p>Resident Engineer Field Reporting System</p>
-        </div>
+        <h1>RoadSite Reports</h1>
+        <p className="auth-sub">Road Construction Field Reporting & Quality Management</p>
+
+        {error && (
+          <div style={{
+            background: 'var(--danger-dim)', color: 'var(--danger)',
+            padding: '10px 14px', borderRadius: 'var(--radius)',
+            fontSize: 13, marginBottom: 16
+          }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
-          {mode === 'register' && (
-            <div className="form-group">
-              <label>Full name</label>
-              <input type="text" placeholder="e.g. James Mwangi" value={form.fullName} onChange={e => set('fullName', e.target.value)} required />
-            </div>
+          {!isLogin && (
+            <>
+              <div className="form-group">
+                <label>Full Name</label>
+                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                  placeholder="e.g. Collins Amayi" required />
+              </div>
+              <div className="form-group">
+                <label>Phone Number</label>
+                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                  placeholder="+254 7XX XXX XXX" />
+              </div>
+            </>
           )}
-
           <div className="form-group">
-            <label>Email address</label>
-            <input type="email" placeholder="you@example.com" value={form.email} onChange={e => set('email', e.target.value)} required />
+            <label>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com" required />
           </div>
-
           <div className="form-group">
             <label>Password</label>
-            <input type="password" placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'} value={form.password} onChange={e => set('password', e.target.value)} required />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="Min 6 characters" required minLength={6} />
           </div>
-
-          {mode === 'register' && (
-            <div className="form-group">
-              <label>Confirm password</label>
-              <input type="password" placeholder="Re-enter your password" value={form.confirm} onChange={e => set('confirm', e.target.value)} required />
-            </div>
-          )}
-
-          {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
-          {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
-
-          <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
-            {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 
-        {mode === 'login' && (
-          <p style={{ textAlign: 'center', marginTop: 12 }}>
-            <button onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
-              Forgot your password?
-            </button>
-          </p>
-        )}
-
-        <div className="divider"><span>{mode === 'login' ? 'New to RoadSite?' : 'Already registered?'}</span></div>
-
-        <button className="btn btn-ghost btn-full" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess(''); }}>
-          {mode === 'login' ? 'Create a new account' : 'Sign in instead'}
-        </button>
-
-        {mode === 'login' && (
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--gray-400)', marginTop: 16 }}>
-            Don't have access yet? Register and await administrator approval.
-          </p>
-        )}
+        <div className="auth-toggle">
+          {isLogin ? "Don't have an account? " : 'Already registered? '}
+          <button onClick={() => { setIsLogin(!isLogin); setError(''); }}>
+            {isLogin ? 'Register' : 'Sign In'}
+          </button>
+        </div>
       </div>
     </div>
   );
