@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { signIn, signUp } from '../lib/supabase';
+import { signIn, signUp, supabase } from '../lib/supabase';
 
 export default function AuthPage({ onAuth }) {
   const [mode, setMode] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -12,6 +13,7 @@ export default function AuthPage({ onAuth }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     if (mode === 'register') {
       if (!form.fullName.trim()) return setError('Full name is required.');
       if (form.password.length < 8) return setError('Password must be at least 8 characters.');
@@ -30,6 +32,42 @@ export default function AuthPage({ onAuth }) {
       }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
+    }
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!form.email.trim()) return setError('Please enter your email address first.');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+        redirectTo: window.location.origin + '/#reset-password',
+      });
+      if (error) throw error;
+      setSuccess('Password reset link sent! Check your email inbox (and spam folder).');
+    } catch (err) {
+      setError(err.message || 'Failed to send reset email. Please try again.');
+    }
+    setLoading(false);
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    if (form.password.length < 8) return setError('Password must be at least 8 characters.');
+    if (form.password !== form.confirm) return setError('Passwords do not match.');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: form.password });
+      if (error) throw error;
+      setSuccess('Password updated successfully! Redirecting to login...');
+      setTimeout(() => { setMode('login'); setSuccess(''); }, 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to update password.');
     }
     setLoading(false);
   };
@@ -55,6 +93,64 @@ export default function AuthPage({ onAuth }) {
     );
   }
 
+  if (mode === 'reset-password') {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="logo-icon">🔑</div>
+            <h1>Set New Password</h1>
+            <p>Enter your new password below</p>
+          </div>
+          <form onSubmit={handleResetPassword}>
+            <div className="form-group">
+              <label>New password</label>
+              <input type="password" placeholder="At least 8 characters" value={form.password} onChange={e => set('password', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Confirm new password</label>
+              <input type="password" placeholder="Re-enter your password" value={form.confirm} onChange={e => set('confirm', e.target.value)} required />
+            </div>
+            {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
+            {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
+            <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
+              {loading ? 'Updating...' : 'Update Password'}
+            </button>
+          </form>
+          <div className="divider"><span>or</span></div>
+          <button className="btn btn-ghost btn-full" onClick={() => setMode('login')}>Back to sign in</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'forgot') {
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="logo-icon">📧</div>
+            <h1>Reset Password</h1>
+            <p>We'll send a reset link to your email</p>
+          </div>
+          <form onSubmit={handleForgotPassword}>
+            <div className="form-group">
+              <label>Email address</label>
+              <input type="email" placeholder="you@example.com" value={form.email} onChange={e => set('email', e.target.value)} required />
+            </div>
+            {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
+            {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
+            <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
+              {loading ? 'Sending...' : 'Send reset link'}
+            </button>
+          </form>
+          <div className="divider"><span>remembered it?</span></div>
+          <button className="btn btn-ghost btn-full" onClick={() => { setMode('login'); setError(''); setSuccess(''); }}>Back to sign in</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-shell">
       <div className="auth-card">
@@ -68,69 +164,46 @@ export default function AuthPage({ onAuth }) {
           {mode === 'register' && (
             <div className="form-group">
               <label>Full name</label>
-              <input
-                type="text"
-                placeholder="e.g. James Mwangi"
-                value={form.fullName}
-                onChange={e => set('fullName', e.target.value)}
-                required
-              />
+              <input type="text" placeholder="e.g. James Mwangi" value={form.fullName} onChange={e => set('fullName', e.target.value)} required />
             </div>
           )}
 
           <div className="form-group">
             <label>Email address</label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={e => set('email', e.target.value)}
-              required
-            />
+            <input type="email" placeholder="you@example.com" value={form.email} onChange={e => set('email', e.target.value)} required />
           </div>
 
           <div className="form-group">
             <label>Password</label>
-            <input
-              type="password"
-              placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'}
-              value={form.password}
-              onChange={e => set('password', e.target.value)}
-              required
-            />
+            <input type="password" placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'} value={form.password} onChange={e => set('password', e.target.value)} required />
           </div>
 
           {mode === 'register' && (
             <div className="form-group">
               <label>Confirm password</label>
-              <input
-                type="password"
-                placeholder="Re-enter your password"
-                value={form.confirm}
-                onChange={e => set('confirm', e.target.value)}
-                required
-              />
+              <input type="password" placeholder="Re-enter your password" value={form.confirm} onChange={e => set('confirm', e.target.value)} required />
             </div>
           )}
 
           {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
+          {success && <p style={{ color: '#166534', fontSize: 13, marginBottom: 12, background: '#DCFCE7', padding: '8px 12px', borderRadius: 6 }}>{success}</p>}
 
-          <button
-            className="btn btn-primary btn-full"
-            type="submit"
-            disabled={loading}
-            style={{ padding: '11px', fontSize: 14 }}
-          >
+          <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ padding: '11px', fontSize: 14 }}>
             {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>
 
+        {mode === 'login' && (
+          <p style={{ textAlign: 'center', marginTop: 12 }}>
+            <button onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+              Forgot your password?
+            </button>
+          </p>
+        )}
+
         <div className="divider"><span>{mode === 'login' ? 'New to RoadSite?' : 'Already registered?'}</span></div>
 
-        <button
-          className="btn btn-ghost btn-full"
-          onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
-        >
+        <button className="btn btn-ghost btn-full" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess(''); }}>
           {mode === 'login' ? 'Create a new account' : 'Sign in instead'}
         </button>
 
