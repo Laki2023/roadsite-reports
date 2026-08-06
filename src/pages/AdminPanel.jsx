@@ -2,23 +2,72 @@ import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS } from '../lib/supabase';
 
 const ROLES = ['pending', 'inspector', 're', 'engineer', 'pm', 'admin'];
+const PROJECT_ROLES = [
+  'Project Manager','Project Admin','Resident Engineer','Inspector','Surveyor',
+  'Materials Technician','Environmental Officer','Accounts Officer'
+];
 
 export default function AdminPanel({ profile, showToast }) {
   const [users, setUsers] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [tab, setTab] = useState('pending');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [approveModal, setApproveModal] = useState(null);
+  const [approveForm, setApproveForm] = useState({ role: 'inspector', designation: '', project_id: '', project_role: 'Inspector' });
 
   const isSuperAdmin = profile.is_super_admin === true;
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadAll(); }, []);
 
-  async function loadUsers() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    setUsers(data || []);
+  async function loadAll() {
+    const [usersRes, projRes] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name').order('name'),
+    ]);
+    setUsers(usersRes.data || []);
+    setProjects(projRes.data || []);
+  }
+
+  function openApproveModal(user) {
+    setApproveModal(user);
+    setApproveForm({
+      role: 'inspector',
+      designation: user.designation || 'Inspector',
+      project_id: '',
+      project_role: 'Inspector',
+    });
+  }
+
+  async function handleApprove(e) {
+    e.preventDefault();
+    const user = approveModal;
+    if (!user) return;
+
+    // Update role and designation
+    const { error } = await supabase.from('profiles').update({
+      role: approveForm.role,
+      designation: approveForm.designation,
+      approved_at: new Date().toISOString(),
+      approved_by: profile.id,
+    }).eq('id', user.id);
+    if (error) { showToast(error.message, 'error'); return; }
+
+    // Optionally assign to project
+    if (approveForm.project_id) {
+      await supabase.from('staff_assignments').upsert({
+        project_id: approveForm.project_id,
+        staff_id: user.id,
+        role_on_project: approveForm.project_role,
+        is_active: true,
+      }, { onConflict: 'project_id,staff_id' });
+    }
+
+    showToast(`${user.full_name} approved as ${ROLE_LABELS[approveForm.role]}`);
+    setApproveModal(null);
+    loadAll();
   }
 
   async function updateRole(userId, newRole) {
-    // Only super admin can promote to admin or demote from admin
     const targetUser = users.find(u => u.id === userId);
     if ((newRole === 'admin' || targetUser?.role === 'admin') && !isSuperAdmin) {
       showToast('Only the Super Admin can manage admin roles', 'error');
@@ -30,47 +79,37 @@ export default function AdminPanel({ profile, showToast }) {
       updates.approved_by = profile.id;
     }
     const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      showToast(`Role updated to ${ROLE_LABELS[newRole]}`);
-      loadUsers();
-    }
+    if (error) { showToast(error.message, 'error'); } 
+    else { showToast(`Role updated to ${ROLE_LABELS[newRole]}`); loadAll(); }
   }
 
   async function toggleSuperAdmin(userId, currentValue) {
     if (!isSuperAdmin) return;
     const { error } = await supabase.from('profiles').update({ is_super_admin: !currentValue }).eq('id', userId);
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      showToast(!currentValue ? 'Super Admin access granted' : 'Super Admin access revoked');
-      loadUsers();
-    }
+    if (error) { showToast(error.message, 'error'); }
+    else { showToast(!currentValue ? 'Super Admin access granted' : 'Super Admin access revoked'); loadAll(); }
   }
 
   async function deleteUser(userId) {
     if (!isSuperAdmin) return;
     const targetUser = users.find(u => u.id === userId);
-    if (targetUser?.is_super_admin) {
-      showToast('Cannot delete a Super Admin', 'error');
-      return;
-    }
-    // Soft delete: set role to pending and clear data
+    if (targetUser?.is_super_admin) { showToast('Cannot delete a Super Admin', 'error'); return; }
     const { error } = await supabase.from('profiles').update({
-      role: 'pending',
-      designation: null,
-      reports_to: null,
-      can_approve_reports: false,
-      is_super_admin: false,
+      role: 'pending', designation: null, reports_to: null,
+      can_approve_reports: false, is_super_admin: false,
     }).eq('id', userId);
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      showToast('User removed and reset to pending');
-      setConfirmDelete(null);
-      loadUsers();
-    }
+    if (error) { showToast(error.message, 'error'); }
+    else { showToast('User removed'); setConfirmDelete(null); loadAll(); }
+  }
+
+  async function assignProjectAdmin(userId, projectId) {
+    if (!projectId) return;
+    const { error } = await supabase.from('staff_assignments').upsert({
+      project_id: projectId, staff_id: userId,
+      role_on_project: 'Project Admin', is_active: true,
+    }, { onConflict: 'project_id,staff_id' });
+    if (error) { showToast(error.message, 'error'); }
+    else { showToast('User assigned as Project Admin'); }
   }
 
   const pending = users.filter(u => u.role === 'pending');
@@ -111,51 +150,59 @@ export default function AdminPanel({ profile, showToast }) {
             <p>No pending approvals</p>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Name</th><th>Email</th><th>Phone</th><th>Registered</th><th>Actions</th></tr>
-              </thead>
-              <tbody>
-                {pending.map(u => (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 500 }}>{u.full_name}</td>
-                    <td className="text-sm">{u.email}</td>
-                    <td className="text-sm">{u.phone || '—'}</td>
-                    <td className="text-mono text-sm">{u.created_at?.split('T')[0]}</td>
-                    <td>
-                      <div className="btn-group">
-                        <button className="btn btn-sm btn-success" onClick={() => updateRole(u.id, 'inspector')}>Inspector</button>
-                        <button className="btn btn-sm btn-primary" onClick={() => updateRole(u.id, 're')}>RE</button>
-                        <button className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'engineer')}>Engineer</button>
-                        {isSuperAdmin && (
-                          <button className="btn btn-sm" style={{ background: '#b45309', color: '#fff' }}
-                            onClick={() => updateRole(u.id, 'admin')}>Admin</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {pending.map(u => (
+              <div key={u.id} className="card" style={{ padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>{u.full_name}</h3>
+                    <div className="text-sm text-muted">{u.email}</div>
+                  </div>
+                  <span className="badge badge-warning">Pending</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 20px', fontSize: 13, marginBottom: 16 }}>
+                  <div><span className="text-muted">Phone:</span> {u.phone || '—'}</div>
+                  <div><span className="text-muted">Designation:</span> {u.designation || '—'}</div>
+                  <div><span className="text-muted">Region:</span> {u.region || '—'}</div>
+                  <div><span className="text-muted">County:</span> {u.county || '—'}</div>
+                  <div><span className="text-muted">Registered:</span> <span className="text-mono">{u.created_at?.split('T')[0]}</span></div>
+                </div>
+
+                {u.bio && (
+                  <div style={{ background: 'var(--bg-hover)', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13, marginBottom: 16, fontStyle: 'italic' }}>
+                    "{u.bio}"
+                  </div>
+                )}
+
+                <div className="btn-group">
+                  <button className="btn btn-success" onClick={() => openApproveModal(u)}>
+                    Review & Approve
+                  </button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'inspector')}>
+                    Quick Approve (Inspector)
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )
       )}
 
-      {/* ── ADMIN MANAGEMENT TAB (Super Admin only) ── */}
+      {/* ── ADMIN MANAGEMENT TAB ── */}
       {tab === 'admins' && isSuperAdmin && (
         <div>
           <div className="card" style={{ marginBottom: 16, padding: 16, background: 'var(--bg-hover)', borderLeft: '3px solid var(--accent)' }}>
             <strong>Admin Management</strong>
             <div className="text-sm text-muted" style={{ marginTop: 4 }}>
-              As Super Admin, you control who has admin access. You can promote users to admin, revoke admin rights, grant Super Admin privileges, or remove users entirely.
+              Promote users to admin, revoke access, or assign them as Project Admins on specific projects.
             </div>
           </div>
 
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Super Admin</th><th>Actions</th></tr>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Super</th><th>Make Project Admin</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {admins.map(u => (
@@ -170,22 +217,24 @@ export default function AdminPanel({ profile, showToast }) {
                       {u.is_super_admin ? (
                         <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑 Super</span>
                       ) : (
-                        <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, false)}
-                          disabled={u.id === profile.id}>
-                          Grant Super
-                        </button>
+                        <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, false)}>Grant Super</button>
                       )}
+                    </td>
+                    <td>
+                      <select onChange={e => assignProjectAdmin(u.id, e.target.value)} defaultValue=""
+                        style={{ padding: '4px 8px', fontSize: 12 }}>
+                        <option value="">Assign to project...</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
                     </td>
                     <td>
                       {u.id !== profile.id && (
                         <div className="btn-group">
                           {u.is_super_admin && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, true)}>
-                              Revoke Super
-                            </button>
+                            <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, true)}>Revoke Super</button>
                           )}
                           <button className="btn btn-sm" style={{ background: '#dc2626', color: '#fff' }}
-                            onClick={() => updateRole(u.id, 'pm')}>Demote to PM</button>
+                            onClick={() => updateRole(u.id, 'pm')}>Demote</button>
                           <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(u.id)}>Remove</button>
                         </div>
                       )}
@@ -198,14 +247,13 @@ export default function AdminPanel({ profile, showToast }) {
 
           <div className="card" style={{ marginTop: 24 }}>
             <div className="card-header"><h3>Promote User to Admin</h3></div>
-            <div className="text-sm text-muted" style={{ marginBottom: 12 }}>Select an active non-admin user to promote.</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {nonAdmins.map(u => (
                 <button key={u.id} className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'admin')}>
                   {u.full_name} ({ROLE_LABELS[u.role]})
                 </button>
               ))}
-              {nonAdmins.length === 0 && <span className="text-muted">No non-admin users to promote</span>}
+              {nonAdmins.length === 0 && <span className="text-muted text-sm">No non-admin users</span>}
             </div>
           </div>
         </div>
@@ -217,7 +265,7 @@ export default function AdminPanel({ profile, showToast }) {
           <table>
             <thead>
               <tr>
-                <th>Name</th><th>Email</th><th>Designation</th><th>Role</th>
+                <th>Name</th><th>Email</th><th>Designation</th><th>Region</th><th>Role</th>
                 {isSuperAdmin && <th>Super</th>}
                 <th>Change Role</th>
                 {isSuperAdmin && <th></th>}
@@ -232,6 +280,7 @@ export default function AdminPanel({ profile, showToast }) {
                   </td>
                   <td className="text-sm">{u.email}</td>
                   <td className="text-sm">{u.designation || '—'}</td>
+                  <td className="text-sm">{u.region ? `${u.region}${u.county ? ` / ${u.county}` : ''}` : '—'}</td>
                   <td><span className="badge badge-accent">{ROLE_LABELS[u.role]}</span></td>
                   {isSuperAdmin && (
                     <td>{u.is_super_admin && <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑</span>}</td>
@@ -241,8 +290,7 @@ export default function AdminPanel({ profile, showToast }) {
                       disabled={u.role === 'admin' && !isSuperAdmin}
                       style={{ padding: '5px 10px', fontSize: 12 }}>
                       {ROLES.filter(r => r !== 'pending').map(r => (
-                        <option key={r} value={r}
-                          disabled={r === 'admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                        <option key={r} value={r} disabled={r === 'admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
                       ))}
                     </select>
                   </td>
@@ -266,25 +314,98 @@ export default function AdminPanel({ profile, showToast }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', fontSize: 13 }}>
           <div><span className="text-muted">App Version:</span> 3.0.0</div>
           <div><span className="text-muted">Total Users:</span> {users.length}</div>
-          <div><span className="text-muted">Active Users:</span> {active.length}</div>
+          <div><span className="text-muted">Active:</span> {active.length}</div>
           <div><span className="text-muted">Admins:</span> {admins.length}</div>
           <div><span className="text-muted">Super Admins:</span> {users.filter(u => u.is_super_admin).length}</div>
           <div><span className="text-muted">Pending:</span> {pending.length}</div>
         </div>
         <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
           <strong>Role Hierarchy:</strong> Super Admin → Admin → PM → Engineer → RE → Inspector → Pending
-          <br /><span className="text-muted">Super Admin can add/remove admins and has full system control. Project Leads manage their own project teams.</span>
+          <br /><strong>Project Roles:</strong> Project Admin → Project Manager → RE → Inspector → Surveyor → Technician
+          <br /><span className="text-muted">Super Admin controls system admins. Project Admins manage their assigned projects.</span>
         </div>
       </div>
+
+      {/* ── APPROVE MODAL ── */}
+      {approveModal && (
+        <div className="modal-overlay" onClick={() => setApproveModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <h3>Approve {approveModal.full_name}<button onClick={() => setApproveModal(null)}>×</button></h3>
+
+            <div style={{ background: 'var(--bg-hover)', padding: 14, borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                <div><span className="text-muted">Email:</span> {approveModal.email}</div>
+                <div><span className="text-muted">Phone:</span> {approveModal.phone || '—'}</div>
+                <div><span className="text-muted">Designation:</span> {approveModal.designation || '—'}</div>
+                <div><span className="text-muted">Region:</span> {approveModal.region || '—'}</div>
+                <div><span className="text-muted">County:</span> {approveModal.county || '—'}</div>
+                <div><span className="text-muted">Registered:</span> {approveModal.created_at?.split('T')[0]}</div>
+              </div>
+              {approveModal.bio && (
+                <div style={{ marginTop: 8, fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  "{approveModal.bio}"
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleApprove}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group mb-16">
+                  <label>System Role *</label>
+                  <select value={approveForm.role} onChange={e => setApproveForm({ ...approveForm, role: e.target.value })} required>
+                    {ROLES.filter(r => r !== 'pending').map(r => (
+                      <option key={r} value={r} disabled={r === 'admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group mb-16">
+                  <label>Designation</label>
+                  <select value={approveForm.designation} onChange={e => setApproveForm({ ...approveForm, designation: e.target.value })}>
+                    <option value="">—</option>
+                    {['Project Manager','Engineer','Resident Engineer','Inspector','Surveyor','Materials Technician','Environmental Officer','Accounts Officer'].map(d => (
+                      <option key={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-hover)', padding: 14, borderRadius: 'var(--radius)', marginBottom: 16 }}>
+                <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>Assign to Project (optional)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="text-sm">Project</label>
+                    <select value={approveForm.project_id} onChange={e => setApproveForm({ ...approveForm, project_id: e.target.value })}>
+                      <option value="">No project assignment</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="text-sm">Role on Project</label>
+                    <select value={approveForm.project_role} onChange={e => setApproveForm({ ...approveForm, project_role: e.target.value })}
+                      disabled={!approveForm.project_id}>
+                      {PROJECT_ROLES.map(r => <option key={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="btn-group">
+                <button className="btn btn-success" type="submit">Approve User</button>
+                <button className="btn btn-secondary" type="button" onClick={() => setApproveModal(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
         <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <h3>Remove User<button onClick={() => setConfirmDelete(null)}>×</button></h3>
-            <p>Are you sure you want to remove <strong>{users.find(u => u.id === confirmDelete)?.full_name}</strong>? This will reset their role to Pending and remove all permissions.</p>
+            <p>Are you sure you want to remove <strong>{users.find(u => u.id === confirmDelete)?.full_name}</strong>?</p>
             <div className="btn-group" style={{ marginTop: 16 }}>
-              <button className="btn btn-danger" onClick={() => deleteUser(confirmDelete)}>Yes, Remove User</button>
+              <button className="btn btn-danger" onClick={() => deleteUser(confirmDelete)}>Yes, Remove</button>
               <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
             </div>
           </div>
