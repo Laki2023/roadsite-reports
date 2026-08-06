@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 
-export default function Dashboard({ profile, navigateTo }) {
+export default function Dashboard({ profile, navigateTo, activeEmergencies = [] }) {
   const [stats, setStats] = useState({
     projects: 0, activeProjects: 0, reports: 0, reportsToday: 0,
     urgentReports: 0, openIssues: 0, testsPending: 0, testsFailed: 0,
@@ -72,6 +72,34 @@ export default function Dashboard({ profile, navigateTo }) {
           <div className="subtitle">Welcome back, {profile.full_name.split(' ')[0]}</div>
         </div>
       </div>
+
+      {/* Emergency Alerts */}
+      {activeEmergencies.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+          {activeEmergencies.map(em => (
+            <div key={em.id} className="dashboard-emergency-card" onClick={() => navigateTo('emergency')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 28, animation: em.status === 'Reported' ? 'emergencyPulse 0.8s ease-in-out infinite' : 'none' }}>🚨</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{em.emergency_type}</div>
+                  <div style={{ fontSize: 13, opacity: 0.9 }}>
+                    {em.projects?.name}{em.chainage ? ` — Ch. ${em.chainage}` : ''}
+                    {em.people_involved > 0 ? ` — ${em.people_involved} people involved` : ''}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 4 }}>
+                    {em.status}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 4, opacity: 0.8 }}>
+                    {(() => { const d = Date.now() - new Date(em.reported_at).getTime(); const m = Math.floor(d/60000); return m < 60 ? `${m}m ago` : `${Math.floor(m/60)}h ago`; })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="stats-grid">

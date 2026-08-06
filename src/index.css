@@ -512,3 +512,75 @@ select option { background: var(--bg-card); }
 .text-accent { color: var(--accent); }
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
+
+/* ═══ EMERGENCY SYSTEM ═══ */
+@keyframes emergencyPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@keyframes emergencyBlink {
+  0%, 100% { background: #dc2626; }
+  50% { background: #991b1b; }
+}
+@keyframes emergencyGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.8); }
+}
+@keyframes emergencyDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* Top banner */
+.emergency-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; cursor: pointer;
+  animation: emergencyBlink 1.2s ease-in-out infinite;
+  color: #fff; font-size: 14px;
+}
+.emergency-banner-icon { font-size: 22px; animation: emergencyPulse 0.8s ease-in-out infinite; }
+.emergency-banner-text { flex: 1; }
+.emergency-banner-action {
+  background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 4px;
+  font-weight: 600; font-size: 12px; white-space: nowrap;
+}
+.emergency-banner:hover .emergency-banner-action { background: rgba(255,255,255,0.35); }
+
+/* When banner is showing, push everything down */
+.app-shell:has(.emergency-banner) .sidebar { top: 44px; height: calc(100vh - 44px); }
+.app-shell:has(.emergency-banner) .main-content { margin-top: 44px; }
+.app-shell:has(.emergency-banner) .mobile-header { top: 44px; }
+
+/* Sidebar emergency button */
+.emergency-sidebar-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 14px; border: 2px solid #dc2626; border-radius: 8px;
+  background: transparent; color: #dc2626; font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: all 0.2s;
+}
+.emergency-sidebar-btn:hover { background: #dc2626; color: #fff; }
+.emergency-sidebar-btn.has-active {
+  background: #dc2626; color: #fff;
+  animation: emergencyGlow 1.5s ease-in-out infinite;
+}
+.emergency-count-badge {
+  margin-left: auto; background: #fff; color: #dc2626;
+  font-size: 12px; font-weight: 800; min-width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 11px; animation: emergencyDot 1s ease-in-out infinite;
+}
+
+/* Emergency card blink */
+.emergency-card-blink {
+  animation: emergencyGlow 1.5s ease-in-out infinite;
+}
+
+/* Dashboard emergency cards */
+.dashboard-emergency-card {
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+  border: 2px solid #dc2626; border-radius: 12px; padding: 16px 20px;
+  color: #fff; cursor: pointer; transition: transform 0.15s;
+  animation: emergencyGlow 2s ease-in-out infinite;
+}
+.dashboard-emergency-card:hover { transform: translateY(-2px); }
