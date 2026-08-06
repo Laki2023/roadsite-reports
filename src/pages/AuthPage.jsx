@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+const TITLES = ['Mr.', 'Mrs.', 'Ms.', 'Eng.', 'Dr.', 'Prof.', 'Hon.', 'Arch.', 'QS.'];
+const PROFESSIONS = [
+  'Civil Engineer', 'Structural Engineer', 'Highway Engineer', 'Geotechnical Engineer',
+  'Environmental Engineer', 'Surveyor', 'Land Surveyor', 'Quantity Surveyor',
+  'Architect', 'Materials Engineer', 'Project Manager', 'Construction Manager',
+  'Site Inspector', 'Laboratory Technician', 'Environmental Officer',
+  'Health & Safety Officer', 'Accounts Officer', 'Other'
+];
 const KENYAN_REGIONS = [
   'Nairobi','Central','Coast','Eastern','North Eastern','Nyanza','Rift Valley','Western'
 ];
@@ -13,8 +21,10 @@ export default function AuthPage({ showToast }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [title, setTitle] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [profession, setProfession] = useState('');
   const [region, setRegion] = useState('');
   const [county, setCounty] = useState('');
   const [designation, setDesignation] = useState('');
@@ -32,17 +42,20 @@ export default function AuthPage({ showToast }) {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
       } else {
+        const displayName = title ? `${title} ${fullName}` : fullName;
         const { data, error: err } = await supabase.auth.signUp({
           email, password,
-          options: { data: { full_name: fullName } }
+          options: { data: { full_name: displayName } }
         });
         if (err) throw err;
         if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
-            full_name: fullName,
+            full_name: displayName,
             email,
             phone: phone || null,
+            title: title || null,
+            profession: profession || null,
             designation: designation || 'Inspector',
             region: region || null,
             county: county || null,
@@ -61,6 +74,7 @@ export default function AuthPage({ showToast }) {
   }
 
   if (success) {
+    const displayName = title ? `${title} ${fullName}` : fullName;
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>
@@ -70,14 +84,12 @@ export default function AuthPage({ showToast }) {
             Your account has been created and is pending approval by an administrator.
             You'll be able to sign in once your account is approved.
           </p>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            The admin will be notified of your registration. You provided:
-          </p>
           <div style={{ textAlign: 'left', background: 'var(--bg-hover)', padding: 16, borderRadius: 'var(--radius)', marginTop: 12, fontSize: 13 }}>
-            <div><strong>Name:</strong> {fullName}</div>
+            <div><strong>Name:</strong> {displayName}</div>
             <div><strong>Email:</strong> {email}</div>
+            {profession && <div><strong>Profession:</strong> {profession}</div>}
             {phone && <div><strong>Phone:</strong> {phone}</div>}
-            {designation && <div><strong>Role:</strong> {designation}</div>}
+            {designation && <div><strong>Designation:</strong> {designation}</div>}
             {region && <div><strong>Region:</strong> {region}</div>}
           </div>
           <button className="btn btn-primary" style={{ marginTop: 24 }}
@@ -105,10 +117,19 @@ export default function AuthPage({ showToast }) {
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <>
-              <div className="form-group">
-                <label>Full Name *</label>
-                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                  placeholder="e.g. Collins Amayi" required />
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12 }}>
+                <div className="form-group">
+                  <label>Title</label>
+                  <select value={title} onChange={e => setTitle(e.target.value)}>
+                    <option value="">—</option>
+                    {TITLES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                    placeholder="e.g. Collins Olaki Amayi" required />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -118,15 +139,22 @@ export default function AuthPage({ showToast }) {
                     placeholder="+254 7XX XXX XXX" />
                 </div>
                 <div className="form-group">
-                  <label>Your Role / Designation</label>
-                  <select value={designation} onChange={e => setDesignation(e.target.value)}>
-                    <option value="">Select...</option>
-                    {DESIGNATIONS_SIGNUP.map(d => <option key={d}>{d}</option>)}
+                  <label>Profession</label>
+                  <select value={profession} onChange={e => setProfession(e.target.value)}>
+                    <option value="">Select profession...</option>
+                    {PROFESSIONS.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group">
+                  <label>Your Designation</label>
+                  <select value={designation} onChange={e => setDesignation(e.target.value)}>
+                    <option value="">Select...</option>
+                    {DESIGNATIONS_SIGNUP.map(d => <option key={d}>{d}</option>)}
+                  </select>
+                </div>
                 <div className="form-group">
                   <label>Region</label>
                   <select value={region} onChange={e => setRegion(e.target.value)}>
@@ -134,22 +162,23 @@ export default function AuthPage({ showToast }) {
                     {KENYAN_REGIONS.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>County</label>
-                  <input type="text" value={county} onChange={e => setCounty(e.target.value)}
-                    placeholder="e.g. Murang'a" />
-                </div>
+              </div>
+
+              <div className="form-group">
+                <label>County</label>
+                <input type="text" value={county} onChange={e => setCounty(e.target.value)}
+                  placeholder="e.g. Murang'a" />
               </div>
 
               <div className="form-group">
                 <label>Brief Introduction</label>
                 <textarea rows={2} value={bio} onChange={e => setBio(e.target.value)}
-                  placeholder="e.g. 5 years experience in road construction supervision, currently working on..." 
+                  placeholder="e.g. 5 years experience in road construction supervision, EBK registered..."
                   style={{ fontSize: 13 }} />
               </div>
 
               <div style={{ background: 'var(--bg-hover)', padding: '8px 12px', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Fields marked with * are required. All other fields are optional but help the admin process your registration faster.
+                Only Name, Email and Password are required. All other fields are optional but help the admin process your registration faster.
               </div>
             </>
           )}
