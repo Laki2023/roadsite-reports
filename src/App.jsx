@@ -12,6 +12,8 @@ import IssuesPage from './pages/IssuesPage';
 import StaffPage from './pages/StaffPage';
 import AdminPanel from './pages/AdminPanel';
 import EmergencyPage from './pages/EmergencyPage';
+import WorksActivitiesPage from './pages/WorksActivitiesPage';
+import EquipmentPage from './pages/EquipmentPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'inspector' },
@@ -21,9 +23,11 @@ const NAV_ITEMS = [
   { key: 'submit-report', label: 'Submit Report', icon: '✎', minRole: 'inspector' },
   { key: 'reports', label: 'View Reports', icon: '☰', minRole: 'inspector' },
   { key: 'issues', label: 'Site Issues', icon: '⚠', minRole: 'inspector' },
+  { key: 'works', label: 'Works Activities', icon: '⛏', minRole: 'inspector' },
   { section: 'Road Engineering' },
   { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 're' },
   { key: 'quality', label: 'Quality Tests', icon: '⬡', minRole: 'inspector' },
+  { key: 'equipment', label: 'Equipment', icon: '⚙', minRole: 'inspector' },
   { section: 'Management' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
   { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'admin' },
@@ -141,6 +145,8 @@ export default function App() {
       case 'pavement': return <PavementPage {...ctx} />;
       case 'quality': return <QualityTestsPage {...ctx} />;
       case 'issues': return <IssuesPage {...ctx} />;
+      case 'works': return <WorksActivitiesPage {...ctx} />;
+      case 'equipment': return <EquipmentPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
