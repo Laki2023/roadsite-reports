@@ -14,6 +14,7 @@ import AdminPanel from './pages/AdminPanel';
 import EmergencyPage from './pages/EmergencyPage';
 import WorksActivitiesPage from './pages/WorksActivitiesPage';
 import EquipmentPage from './pages/EquipmentPage';
+import StructuresPage from './pages/StructuresPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'inspector' },
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 're' },
   { key: 'quality', label: 'Quality Tests', icon: '⬡', minRole: 'inspector' },
   { key: 'equipment', label: 'Equipment', icon: '⚙', minRole: 'inspector' },
+  { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
   { section: 'Management' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
   { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'admin' },
@@ -147,6 +149,7 @@ export default function App() {
       case 'issues': return <IssuesPage {...ctx} />;
       case 'works': return <WorksActivitiesPage {...ctx} />;
       case 'equipment': return <EquipmentPage {...ctx} />;
+      case 'structures': return <StructuresPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
