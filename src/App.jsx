@@ -186,7 +186,7 @@ export default function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
-          <div className="brand-sub">v3.0 — Field & Quality</div>
+          <div className="brand-sub">v7.0 — Road Project Management</div>
         </div>
 
         {/* Emergency Button - always visible */}
