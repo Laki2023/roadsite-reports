@@ -16,6 +16,7 @@ import WorksActivitiesPage from './pages/WorksActivitiesPage';
 import EquipmentPage from './pages/EquipmentPage';
 import StructuresPage from './pages/StructuresPage';
 import BoQPage from './pages/BoQPage';
+import IPCPage from './pages/IPCPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'inspector' },
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
   { section: 'Management' },
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
+  { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'engineer' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
   { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'admin' },
 ];
@@ -153,6 +155,7 @@ export default function App() {
       case 'equipment': return <EquipmentPage {...ctx} />;
       case 'structures': return <StructuresPage {...ctx} />;
       case 'boq': return <BoQPage {...ctx} />;
+      case 'ipc': return <IPCPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
