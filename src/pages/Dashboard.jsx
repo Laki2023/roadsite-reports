@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from 'recharts';
+import ProjectSummary from './ProjectSummary';
 
 const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
 const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
@@ -130,136 +131,9 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Loading dashboard...</div>;
 
-  // Project detail view
+  // Project detail view - use Executive Summary
   if (selectedProjectId && projectDetail) {
-    const { project: p, boq, works, equip, structs, issues, layers, tests, ipcs } = projectDetail;
-    const contractSum = boq.reduce((s, i) => s + (i.boq_amount || 0), 0);
-    const valueDone = boq.reduce((s, i) => s + (i.value_to_date || 0), 0);
-    const financialPct = contractSum > 0 ? (valueDone / contractSum) * 100 : 0;
-    const worksComplete = works.filter(w => w.status === 'Completed' || w.status === 'Approved').length;
-    const worksPct = works.length > 0 ? (worksComplete / works.length) * 100 : 0;
-    const eqReq = equip.reduce((s, e) => s + (e.required_quantity || 0), 0);
-    const eqOn = equip.reduce((s, e) => s + (e.actual_on_site || 0), 0);
-    const structsComplete = structs.filter(s => s.overall_status === 'Completed' || s.overall_status === 'Approved').length;
-    const testsPassed = tests.filter(t => t.result_status === 'Pass').length;
-    const openIssues = issues.filter(i => i.status === 'Open' || i.status === 'In Progress').length;
-
-    // Works chart data
-    const worksChart = works.map(w => ({
-      name: w.activity_code,
-      planned: w.planned_quantity || 0,
-      completed: w.completed_quantity || 0,
-    })).filter(w => w.planned > 0);
-
-    // IPC trend
-    const ipcTrend = ipcs.map(i => ({
-      name: `IPC ${i.ipc_no}`,
-      gross: i.gross_value || 0,
-      net: i.net_amount || 0,
-    }));
-
-    return (
-      <div>
-        <button className="btn btn-sm btn-secondary mb-16" onClick={() => { setSelectedProjectId(null); setProjectDetail(null); }}>← Back to Dashboard</button>
-        <div className="page-header">
-          <div>
-            <h2>{p.name}</h2>
-            <div className="subtitle">{p.contract_no} · {p.contractor_name} · {p.category}</div>
-          </div>
-          <span className="badge badge-accent" style={{ fontSize: 14, padding: '6px 16px' }}>{p.current_phase}</span>
-        </div>
-
-        {/* KPI Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 20 }}>
-          {[
-            { label: 'Financial', value: `${financialPct.toFixed(1)}%`, sub: fmt(valueDone), color: '#e87b35' },
-            { label: 'Works', value: `${worksPct.toFixed(0)}%`, sub: `${worksComplete}/${works.length}`, color: '#2563eb' },
-            { label: 'Equipment', value: eqReq > 0 ? `${Math.round((eqOn/eqReq)*100)}%` : '—', sub: `${eqOn}/${eqReq}`, color: '#16a34a' },
-            { label: 'Structures', value: `${structs.length > 0 ? Math.round((structsComplete/structs.length)*100) : 0}%`, sub: `${structsComplete}/${structs.length}`, color: '#7c3aed' },
-            { label: 'Tests Pass Rate', value: tests.length > 0 ? `${Math.round((testsPassed/tests.length)*100)}%` : '—', sub: `${testsPassed}/${tests.length}`, color: '#0891b2' },
-            { label: 'Open Issues', value: openIssues, sub: `of ${issues.length}`, color: openIssues > 0 ? '#dc2626' : '#16a34a' },
-          ].map((kpi, i) => (
-            <div key={i} className="stat-card" style={{ textAlign: 'center', borderTop: `3px solid ${kpi.color}` }}>
-              <div className="stat-label">{kpi.label}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: kpi.color, margin: '8px 0' }}>{kpi.value}</div>
-              <div className="text-sm text-muted">{kpi.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          {/* Works Progress Chart */}
-          {worksChart.length > 0 && (
-            <div className="card" style={{ padding: 16 }}>
-              <h3 style={{ marginBottom: 12 }}>Works Progress by Activity</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={worksChart} margin={{ left: 0, right: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="planned" fill="#4b5563" name="Planned" radius={[2,2,0,0]} />
-                  <Bar dataKey="completed" fill="#e87b35" name="Completed" radius={[2,2,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* IPC Trend */}
-          {ipcTrend.length > 0 && (
-            <div className="card" style={{ padding: 16 }}>
-              <h3 style={{ marginBottom: 12 }}>Payment Certificate Trend</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={ipcTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => (v/1000000).toFixed(0) + 'M'} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={v => fmt(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="gross" stroke="#2563eb" strokeWidth={2} name="Gross Value" dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="net" stroke="#e87b35" strokeWidth={2} name="Net Amount" dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Contract Details */}
-          <div className="card" style={{ padding: 16 }}>
-            <h3 style={{ marginBottom: 12 }}>Contract Details</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 13 }}>
-              <div><span className="text-muted">Employer:</span> {p.employer}</div>
-              <div><span className="text-muted">FIDIC:</span> {p.fidic_edition}</div>
-              <div><span className="text-muted">Contract Sum:</span> <strong>{fmt(p.contract_sum)}</strong></div>
-              <div><span className="text-muted">Road Class:</span> {p.road_class || '—'}</div>
-              <div><span className="text-muted">Chainage:</span> {p.start_chainage}–{p.end_chainage} km</div>
-              <div><span className="text-muted">Region:</span> {p.region} / {p.county}</div>
-              <div><span className="text-muted">Commenced:</span> {p.commencement_date || '—'}</div>
-              <div><span className="text-muted">Completion:</span> {p.original_completion_date || '—'}</div>
-            </div>
-          </div>
-
-          {/* Structure Summary */}
-          {structs.length > 0 && (
-            <div className="card" style={{ padding: 16 }}>
-              <h3 style={{ marginBottom: 12 }}>Structures ({structs.length})</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {structs.slice(0, 8).map(s => (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                    <span style={{ fontWeight: 600, minWidth: 60 }}>{s.structure_ref}</span>
-                    <span className="text-muted" style={{ flex: 1 }}>{s.structure_type} Ch.{s.chainage}</span>
-                    <div className="progress-bar" style={{ width: 80, height: 6 }}>
-                      <div className={`fill ${s.percent_complete >= 80 ? 'green' : s.percent_complete >= 40 ? 'orange' : 'red'}`} style={{ width: `${s.percent_complete || 0}%` }} />
-                    </div>
-                    <span style={{ minWidth: 30, textAlign: 'right' }}>{s.percent_complete || 0}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <ProjectSummary projectId={selectedProjectId} onBack={() => { setSelectedProjectId(null); setProjectDetail(null); }} profile={profile} />;
   }
 
   // Main Dashboard
