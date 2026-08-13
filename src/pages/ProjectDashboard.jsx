@@ -160,17 +160,53 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
     actual: Math.round(physPct * ((i+1)/(curMonth+1))),
   }));
 
-  // Activities by category
+  // Activities with live tracking
+  const today = new Date().toISOString().slice(0,10);
+  const weekAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10);
+  const twoWeeksAgo = new Date(Date.now() - 14*86400000).toISOString().slice(0,10);
+
+  // Categorize activities by recency
+  const liveActivities = works.filter(w => w.last_progress_date === today);
+  const activeThisWeek = works.filter(w => w.last_progress_date >= weekAgo && w.last_progress_date !== today);
+  const stalledActivities = works.filter(w => w.status === 'In Progress' && (!w.last_progress_date || w.last_progress_date < twoWeeksAgo));
+  const completedActivities = works.filter(w => w.status === 'Completed' || w.status === 'Approved');
+
+  // Activities by category for progress bars
   const actByCat = {};
   works.forEach(w => {
     const cat = w.category || w.activity_name || 'Other';
-    if (!actByCat[cat]) actByCat[cat] = { total:0, done:0 };
+    if (!actByCat[cat]) actByCat[cat] = { total:0, done:0, lastDate:null, hasLive:false };
     actByCat[cat].total += w.planned_quantity || 1;
     actByCat[cat].done += w.completed_quantity || (w.status==='Completed'||w.status==='Approved' ? (w.planned_quantity||1) : 0);
+    if (w.last_progress_date === today) actByCat[cat].hasLive = true;
+    if (!actByCat[cat].lastDate || (w.last_progress_date && w.last_progress_date > actByCat[cat].lastDate))
+      actByCat[cat].lastDate = w.last_progress_date;
   });
   const actProgress = Object.entries(actByCat)
-    .map(([name,d])=>({ name: name.length>25 ? name.slice(0,25)+'...' : name, pct: pct(d.done, d.total) }))
+    .map(([name,d])=>({ name: name.length>22 ? name.slice(0,22)+'...' : name, pct: pct(d.done, d.total), hasLive: d.hasLive, lastDate: d.lastDate }))
     .sort((a,b)=>b.pct-a.pct).slice(0,10);
+
+  // Individual activity ranking (for detailed view)
+  const topActivities = works
+    .map(w => ({
+      name: (w.activity_code ? w.activity_code + ' ' : '') + (w.activity_name || 'Unknown'),
+      pct: w.planned_quantity > 0 ? pct(w.completed_quantity || 0, w.planned_quantity) : 0,
+      status: w.status,
+      isLive: w.last_progress_date === today,
+      isActiveWeek: w.last_progress_date >= weekAgo,
+      isStalled: w.status === 'In Progress' && (!w.last_progress_date || w.last_progress_date < twoWeeksAgo),
+      isCritical: w.is_critical,
+      lastDate: w.last_progress_date,
+      category: w.category,
+    }))
+    .filter(w => w.status !== 'Not Started' || w.pct > 0)
+    .sort((a,b) => {
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+      if (a.isStalled && !b.isStalled) return -1;
+      return b.pct - a.pct;
+    })
+    .slice(0, 15);
 
   // Chainage progress (visual bar)
   const chainageStep = Math.max(1, Math.ceil(roadLen / 20));
@@ -402,15 +438,163 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             </>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
 
-          {/* Major Activities */}
-          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>Major Activities</h3>
-          <div style={{ maxHeight:200, overflowY:'auto' }}>
+          {/* Category Progress with Live Indicators */}
+          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>Major Activities by Category</h3>
+          <div style={{ maxHeight:220, overflowY:'auto' }}>
             {actProgress.length > 0 ? actProgress.map((a,i) => (
-              <ProgressBar key={i} label={a.name} value={a.pct}
-                color={a.pct>=80?'#10b981':a.pct>=40?'#e87b35':'#ef4444'} />
+              <div key={i} style={{ marginBottom:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, marginBottom:3 }}>
+                  <span style={{ fontWeight:500, display:'flex', alignItems:'center', gap:5 }}>
+                    {a.hasLive && <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block',
+                      boxShadow:'0 0 6px #10b981', animation:'pulse 1.5s infinite' }} title="Active today" />}
+                    {a.name}
+                  </span>
+                  <span style={{ fontWeight:700, color: a.pct>=80?'#10b981':a.pct>=40?'#e87b35':'#ef4444' }}>{a.pct}%</span>
+                </div>
+                <div style={{ height:8, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${a.pct}%`, borderRadius:4, transition:'width 1s ease',
+                    background: a.hasLive
+                      ? 'linear-gradient(90deg, #10b981, #34d399)'
+                      : a.pct>=80 ? '#10b981' : a.pct>=40 ? '#e87b35' : '#ef4444' }} />
+                </div>
+              </div>
             )) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>}
           </div>
         </div>
+      </div>
+
+      {/* ══════ LIVE ACTIVITY MONITOR ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>
+            <span style={{ display:'inline-block', width:10, height:10, borderRadius:'50%', background:'#10b981',
+              marginRight:8, boxShadow:'0 0 8px #10b981', animation:'pulse 1.5s infinite' }} />
+            Live Activity Monitor
+          </h3>
+          <div style={{ display:'flex', gap:12, fontSize:11 }}>
+            <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', boxShadow:'0 0 4px #10b981' }} />
+              Active Today ({liveActivities.length})
+            </span>
+            <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:'#3b82f6' }} />
+              This Week ({activeThisWeek.length})
+            </span>
+            <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:'#ef4444' }} />
+              Stalled ({stalledActivities.length})
+            </span>
+            <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:'#6b7280' }} />
+              Completed ({completedActivities.length}/{works.length})
+            </span>
+          </div>
+        </div>
+
+        {/* Activity Status Strip */}
+        <div style={{ display:'flex', gap:2, height:14, borderRadius:7, overflow:'hidden', marginBottom:16 }}>
+          {works.length > 0 && (
+            <>
+              <div style={{ width:`${pct(completedActivities.length, works.length)}%`, background:'#10b981', transition:'width 1s' }}
+                title={`Completed: ${completedActivities.length}`} />
+              <div style={{ width:`${pct(liveActivities.length + activeThisWeek.length, works.length)}%`,
+                background:'linear-gradient(90deg, #34d399, #3b82f6)', transition:'width 1s' }}
+                title={`Active: ${liveActivities.length + activeThisWeek.length}`} />
+              <div style={{ width:`${pct(stalledActivities.length, works.length)}%`, background:'#ef4444', transition:'width 1s' }}
+                title={`Stalled: ${stalledActivities.length}`} />
+              <div style={{ flex:1, background:'#374151' }} title="Not Started / Pending" />
+            </>
+          )}
+        </div>
+
+        {/* Individual Activities Table */}
+        {topActivities.length > 0 ? (
+          <div style={{ maxHeight:400, overflowY:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr style={{ borderBottom:'2px solid var(--border)' }}>
+                  <th style={{ textAlign:'left', padding:'6px 8px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Status</th>
+                  <th style={{ textAlign:'left', padding:'6px 8px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Activity</th>
+                  <th style={{ textAlign:'left', padding:'6px 8px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Category</th>
+                  <th style={{ textAlign:'center', padding:'6px 8px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Progress</th>
+                  <th style={{ textAlign:'right', padding:'6px 8px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Last Update</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topActivities.map((a,i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid var(--border)',
+                    background: a.isLive ? '#10b98108' : a.isStalled ? '#ef444408' : 'transparent' }}>
+                    <td style={{ padding:'8px', width:40 }}>
+                      {a.isLive ? (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:10, height:10, borderRadius:'50%', background:'#10b981',
+                            boxShadow:'0 0 8px #10b981', animation:'pulse 1.5s infinite' }} />
+                          <span style={{ fontSize:9, fontWeight:700, color:'#10b981' }}>LIVE</span>
+                        </span>
+                      ) : a.isStalled ? (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:10, height:10, borderRadius:'50%', background:'#ef4444' }} />
+                          <span style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>STALLED</span>
+                        </span>
+                      ) : a.status === 'Completed' || a.status === 'Approved' ? (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:12 }}>✅</span>
+                          <span style={{ fontSize:9, fontWeight:700, color:'#6b7280' }}>DONE</span>
+                        </span>
+                      ) : a.isActiveWeek ? (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:10, height:10, borderRadius:'50%', background:'#3b82f6' }} />
+                          <span style={{ fontSize:9, fontWeight:700, color:'#3b82f6' }}>ACTIVE</span>
+                        </span>
+                      ) : (
+                        <span style={{ width:10, height:10, borderRadius:'50%', background:'#374151', display:'inline-block' }} />
+                      )}
+                    </td>
+                    <td style={{ padding:'8px', fontWeight: a.isCritical ? 700 : 500 }}>
+                      {a.isCritical && <span style={{ color:'#ef4444', marginRight:4, fontSize:10 }}>★</span>}
+                      {a.name.length > 40 ? a.name.slice(0,40)+'...' : a.name}
+                    </td>
+                    <td style={{ padding:'8px' }}>
+                      <span className="badge badge-muted" style={{ fontSize:9 }}>{a.category || '—'}</span>
+                    </td>
+                    <td style={{ padding:'8px', width:140 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <div style={{ flex:1, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ height:'100%', borderRadius:3, transition:'width 0.8s ease',
+                            width:`${a.pct}%`,
+                            background: a.isLive ? 'linear-gradient(90deg, #10b981, #34d399)'
+                              : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : a.pct > 0 ? '#ef4444' : '#374151' }} />
+                        </div>
+                        <span style={{ fontSize:11, fontWeight:700, width:32, textAlign:'right',
+                          color: a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : '#ef4444' }}>{a.pct}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding:'8px', textAlign:'right', fontSize:11, color:'var(--text-muted)' }}>
+                      {a.lastDate || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:30 }}>
+            No activity progress recorded yet. Go to Works Activities to start logging progress.
+          </div>
+        )}
+
+        {/* Stalled Warning */}
+        {stalledActivities.length > 0 && (
+          <div style={{ marginTop:12, padding:'10px 14px', background:'#fef2f2', borderRadius:'var(--radius)', borderLeft:'3px solid #ef4444' }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#dc2626', marginBottom:4 }}>
+              ⚠ {stalledActivities.length} Stalled Activit{stalledActivities.length === 1 ? 'y' : 'ies'} — No progress for 14+ days
+            </div>
+            <div style={{ fontSize:11, color:'#991b1b' }}>
+              {stalledActivities.slice(0,5).map(w => w.activity_name).join(' · ')}
+              {stalledActivities.length > 5 && ` · +${stalledActivities.length - 5} more`}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ══════ FINANCIAL S-CURVE + COMBINED PROGRESS ══════ */}
