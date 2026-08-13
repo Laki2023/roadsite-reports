@@ -288,6 +288,134 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   if (delayProb > 60) warnings.push({ type:'critical', msg:`Delay probability at ${delayProb}% — recovery programme needed` });
   if (critRisks > 0) warnings.push({ type:'warning', msg:`${critRisks} critical risk${critRisks>1?'s':''} on register` });
 
+  /* ══════════════════════════════════════════════════════════════
+     PROGRESS RATE ANALYSIS ENGINE
+     Computes weekly productivity, detects trends, and triggers
+     meeting recommendations per FIDIC Cl. 8.6 (Rate of Progress)
+     ══════════════════════════════════════════════════════════════ */
+
+  // Group progress entries by week
+  const progressByWeek = {};
+  reports.forEach(r => {
+    if (!r.report_date) return;
+    const d = new Date(r.report_date);
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay());
+    const weekKey = weekStart.toISOString().slice(0,10);
+    progressByWeek[weekKey] = (progressByWeek[weekKey] || 0) + 1;
+  });
+
+  // Weekly activity progress (from works_progress via last_progress_date)
+  const activityByWeek = {};
+  works.forEach(w => {
+    if (!w.last_progress_date) return;
+    const d = new Date(w.last_progress_date);
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay());
+    const weekKey = weekStart.toISOString().slice(0,10);
+    if (!activityByWeek[weekKey]) activityByWeek[weekKey] = { count: 0, quantity: 0 };
+    activityByWeek[weekKey].count += 1;
+    activityByWeek[weekKey].quantity += w.completed_quantity || 0;
+  });
+
+  // Build weekly rate data (last 12 weeks)
+  const weeklyRates = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - (i * 7));
+    d.setDate(d.getDate() - d.getDay());
+    const weekKey = d.toISOString().slice(0,10);
+    const weekLabel = `W${12 - i}`;
+    const reportsCount = progressByWeek[weekKey] || 0;
+    const activitiesWorked = activityByWeek[weekKey]?.count || 0;
+    // Productivity index: combination of reports filed and activities worked on
+    const productivityIndex = reportsCount + (activitiesWorked * 2);
+    weeklyRates.push({ week: weekLabel, weekDate: weekKey, reports: reportsCount, activities: activitiesWorked, productivity: productivityIndex });
+  }
+
+  // Trend detection — compare last 4 weeks vs previous 4 weeks
+  const recent4 = weeklyRates.slice(-4);
+  const previous4 = weeklyRates.slice(-8, -4);
+  const recentAvg = recent4.reduce((s,w) => s + w.productivity, 0) / Math.max(recent4.length, 1);
+  const previousAvg = previous4.reduce((s,w) => s + w.productivity, 0) / Math.max(previous4.length, 1);
+  const rateChange = previousAvg > 0 ? Math.round(((recentAvg - previousAvg) / previousAvg) * 100) : 0;
+
+  const progressTrend = recentAvg === 0 && previousAvg === 0 ? 'no_data'
+    : rateChange > 15 ? 'increasing'
+    : rateChange > -5 ? 'steady'
+    : rateChange > -25 ? 'declining'
+    : 'critical_decline';
+
+  const trendConfig = {
+    no_data: { label: 'No Data', color: '#6b7280', icon: '—', desc: 'Insufficient progress data to analyse trend' },
+    increasing: { label: 'Increasing', color: '#10b981', icon: '📈', desc: 'Productivity is improving — rate of progress has increased' },
+    steady: { label: 'Steady', color: '#3b82f6', icon: '➡️', desc: 'Productivity is consistent — maintain current momentum' },
+    declining: { label: 'Declining', color: '#f59e0b', icon: '📉', desc: 'Productivity is reducing — contractor may need to increase resources' },
+    critical_decline: { label: 'Critical Decline', color: '#ef4444', icon: '🚨', desc: 'Severe productivity drop — FIDIC Cl. 8.6 intervention may be required' },
+  };
+  const trend = trendConfig[progressTrend];
+
+  // Consecutive declining weeks
+  let decliningWeeks = 0;
+  for (let i = weeklyRates.length - 1; i > 0; i--) {
+    if (weeklyRates[i].productivity < weeklyRates[i-1].productivity) decliningWeeks++;
+    else break;
+  }
+
+  // Zero progress weeks (recent)
+  const zeroWeeks = recent4.filter(w => w.productivity === 0).length;
+
+  // ── Meeting Recommendation Engine ──
+  const meetingReasons = [];
+  let meetingUrgency = 'none'; // none, recommended, required, urgent
+
+  if (progressTrend === 'critical_decline') {
+    meetingReasons.push({ reason: 'Critical decline in progress rate — FIDIC Cl. 8.6', urgency: 'urgent', fidic: 'Cl. 8.6' });
+    meetingUrgency = 'urgent';
+  }
+  if (decliningWeeks >= 3) {
+    meetingReasons.push({ reason: `Progress declining for ${decliningWeeks} consecutive weeks`, urgency: 'required' });
+    if (meetingUrgency !== 'urgent') meetingUrgency = 'required';
+  }
+  if (zeroWeeks >= 2) {
+    meetingReasons.push({ reason: `${zeroWeeks} out of last 4 weeks with zero productivity`, urgency: 'urgent' });
+    meetingUrgency = 'urgent';
+  }
+  if (variance < -15) {
+    meetingReasons.push({ reason: `Physical progress ${Math.abs(variance)}% behind schedule`, urgency: 'required', fidic: 'Cl. 8.6' });
+    if (meetingUrgency !== 'urgent') meetingUrgency = 'required';
+  }
+  if (stalledActivities.length > 3) {
+    meetingReasons.push({ reason: `${stalledActivities.length} activities stalled for 14+ days`, urgency: 'required' });
+    if (meetingUrgency !== 'urgent') meetingUrgency = 'required';
+  }
+  if (critIss >= 2) {
+    meetingReasons.push({ reason: `${critIss} critical issues unresolved`, urgency: 'required' });
+    if (meetingUrgency !== 'urgent') meetingUrgency = 'required';
+  }
+  if (eqPct < 50 && eqReq > 0) {
+    meetingReasons.push({ reason: `Equipment mobilisation critically low at ${eqPct}%`, urgency: 'required' });
+    if (meetingUrgency !== 'urgent') meetingUrgency = 'required';
+  }
+  if (finPct > physPct + 20) {
+    meetingReasons.push({ reason: 'Financial progress exceeds physical by 20%+ — overpayment risk', urgency: 'recommended', fidic: 'Cl. 14.6' });
+    if (meetingUrgency === 'none') meetingUrgency = 'recommended';
+  }
+  if (delayProb > 70) {
+    meetingReasons.push({ reason: `Delay probability at ${delayProb}% — revised programme required`, urgency: 'urgent', fidic: 'Cl. 8.3' });
+    meetingUrgency = 'urgent';
+  }
+
+  // Add rate-related warnings to early warnings
+  if (progressTrend === 'declining') warnings.push({ type:'warning', msg:`Progress rate declining by ${Math.abs(rateChange)}% — monitor closely` });
+  if (progressTrend === 'critical_decline') warnings.push({ type:'critical', msg:`Critical decline in progress rate (${Math.abs(rateChange)}%) — FIDIC Cl. 8.6 action needed` });
+  if (decliningWeeks >= 3) warnings.push({ type:'warning', msg:`${decliningWeeks} consecutive weeks of declining productivity` });
+  if (zeroWeeks >= 2) warnings.push({ type:'critical', msg:`${zeroWeeks} out of last 4 weeks with zero productivity recorded` });
+  if (meetingUrgency === 'urgent') warnings.push({ type:'critical', msg:'Project management meeting urgently recommended — see analysis below' });
+
+  const meetingColors = { none:'#6b7280', recommended:'#3b82f6', required:'#f59e0b', urgent:'#ef4444' };
+  const meetingLabels = { none:'Not Required', recommended:'Recommended', required:'Required', urgent:'Urgently Required' };
+
   const category = (p.category || 'Construction').toLowerCase();
 
   return (
@@ -595,6 +723,140 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             </div>
           </div>
         )}
+      </div>
+
+      {/* ══════ PROGRESS RATE ANALYSIS + MEETING RECOMMENDATION ══════ */}
+      <div style={{ display:'grid', gridTemplateColumns:'3fr 2fr', gap:14, marginBottom:16 }}>
+        {/* Progress Rate Chart */}
+        <div className="card" style={{ padding:16 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <h3 style={{ margin:0, fontSize:15 }}>
+              {trend.icon} Progress Rate Analysis
+            </h3>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:trend.color }}>{trend.label}</span>
+              {rateChange !== 0 && progressTrend !== 'no_data' && (
+                <span style={{ fontSize:11, fontWeight:700, color: rateChange > 0 ? '#10b981' : '#ef4444',
+                  padding:'2px 8px', borderRadius:9999, background: rateChange > 0 ? '#10b98118' : '#ef444418' }}>
+                  {rateChange > 0 ? '▲' : '▼'} {Math.abs(rateChange)}%
+                </span>
+              )}
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={weeklyRates} margin={{ left:0, right:8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+              <XAxis dataKey="week" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
+              <YAxis tick={{ fontSize:10, fill:'var(--text-muted)' }} />
+              <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }}
+                labelFormatter={l => {
+                  const w = weeklyRates.find(r => r.week === l);
+                  return w ? `Week of ${w.weekDate}` : l;
+                }} />
+              <Legend wrapperStyle={{ fontSize:10 }} />
+              <Bar dataKey="reports" fill="#3b82f6" name="Daily Reports" radius={[3,3,0,0]} />
+              <Bar dataKey="activities" fill="#e87b35" name="Activities Progressed" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+
+          <div style={{ marginTop:10, padding:'10px 14px', borderRadius:'var(--radius)',
+            background: progressTrend === 'critical_decline' ? '#fef2f2' : progressTrend === 'declining' ? '#fffbeb'
+              : progressTrend === 'increasing' ? '#f0fdf4' : 'var(--bg-hover)', fontSize:12 }}>
+            <div style={{ fontWeight:600, color:trend.color, marginBottom:2 }}>{trend.desc}</div>
+            <div style={{ fontSize:11, color:'var(--text-muted)' }}>
+              Recent 4-week avg: <strong>{recentAvg.toFixed(1)}</strong> · Previous 4-week avg: <strong>{previousAvg.toFixed(1)}</strong>
+              {decliningWeeks > 0 && <span> · <span style={{ color:'#ef4444' }}>{decliningWeeks} consecutive declining week{decliningWeeks > 1 ? 's' : ''}</span></span>}
+            </div>
+            {progressTrend === 'critical_decline' && (
+              <div style={{ marginTop:6, fontSize:11, color:'#991b1b', fontWeight:500 }}>
+                Under FIDIC Cl. 8.6, the Engineer may instruct the Contractor to submit a revised programme
+                showing modified methods to achieve completion within the Time for Completion.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Meeting Recommendation Panel */}
+        <div className="card" style={{ padding:16, borderLeft:`4px solid ${meetingColors[meetingUrgency]}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+            <h3 style={{ margin:0, fontSize:15 }}>📋 Meeting Recommendation</h3>
+          </div>
+
+          {/* Meeting Status Indicator */}
+          <div style={{ textAlign:'center', padding:'16px 0', marginBottom:14 }}>
+            <div style={{ fontSize:48, marginBottom:6 }}>
+              {meetingUrgency === 'urgent' ? '🚨' : meetingUrgency === 'required' ? '⚠️' : meetingUrgency === 'recommended' ? 'ℹ️' : '✅'}
+            </div>
+            <div style={{ fontSize:20, fontWeight:800, color:meetingColors[meetingUrgency] }}>
+              {meetingLabels[meetingUrgency]}
+            </div>
+            <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>
+              Project Management Meeting
+            </div>
+          </div>
+
+          {/* Reasons */}
+          {meetingReasons.length > 0 ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {meetingReasons.map((r, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:12,
+                  padding:'8px 10px', borderRadius:'var(--radius)',
+                  background: r.urgency === 'urgent' ? '#fef2f2' : r.urgency === 'required' ? '#fffbeb' : '#eff6ff' }}>
+                  <span style={{ flexShrink:0, marginTop:1 }}>
+                    {r.urgency === 'urgent' ? '🔴' : r.urgency === 'required' ? '🟡' : '🔵'}
+                  </span>
+                  <div>
+                    <span style={{ color: r.urgency === 'urgent' ? '#dc2626' : r.urgency === 'required' ? '#d97706' : '#2563eb' }}>
+                      {r.reason}
+                    </span>
+                    {r.fidic && (
+                      <span style={{ marginLeft:6, fontSize:9, padding:'1px 5px', borderRadius:4,
+                        background:'var(--bg-hover)', color:'var(--text-muted)', fontWeight:600 }}>
+                        FIDIC {r.fidic}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign:'center', fontSize:12, color:'var(--text-muted)', padding:'10px 0' }}>
+              No issues requiring management attention at this time. Continue monitoring.
+            </div>
+          )}
+
+          {/* Recommended Actions */}
+          {meetingUrgency !== 'none' && (
+            <div style={{ marginTop:14, padding:'10px 14px', background:'var(--bg-hover)', borderRadius:'var(--radius)', fontSize:11 }}>
+              <div style={{ fontWeight:700, marginBottom:6, color:'var(--text)' }}>Recommended Actions:</div>
+              {meetingUrgency === 'urgent' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:3, color:'var(--text-muted)' }}>
+                  <div>1. Convene emergency project management meeting within 48 hours</div>
+                  <div>2. Request Contractor's revised programme per FIDIC Cl. 8.6</div>
+                  <div>3. Issue Notice to Contractor citing specific concerns</div>
+                  <div>4. Review resource mobilisation and acceleration options</div>
+                  <div>5. Consider Engineer's Instruction for recovery measures</div>
+                </div>
+              )}
+              {meetingUrgency === 'required' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:3, color:'var(--text-muted)' }}>
+                  <div>1. Schedule project management meeting within one week</div>
+                  <div>2. Prepare progress comparison report for discussion</div>
+                  <div>3. Review contractor's current programme vs actual progress</div>
+                  <div>4. Assess need for additional resources or revised methodology</div>
+                </div>
+              )}
+              {meetingUrgency === 'recommended' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:3, color:'var(--text-muted)' }}>
+                  <div>1. Include in next scheduled project review meeting agenda</div>
+                  <div>2. Monitor identified issues over the next reporting period</div>
+                  <div>3. Request contractor's explanation if trend continues</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ══════ FINANCIAL S-CURVE + COMBINED PROGRESS ══════ */}
