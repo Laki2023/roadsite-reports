@@ -123,7 +123,7 @@ export default function AdminPanel({ profile, showToast }) {
         <div>
           <h2>Administration</h2>
           <div className="subtitle">
-            {isSuperAdmin ? '🔑 Super Admin — Full system control' : 'Manage users and roles'}
+            {profile.is_platform_admin ? '🔑 Platform Admin — Full system control' : isSuperAdmin ? '🔑 Super Admin — Agency control' : 'Manage users and roles'}
           </div>
         </div>
       </div>

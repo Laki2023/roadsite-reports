@@ -18,7 +18,9 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const isSuperAdmin = isPlatformAdmin || profile.is_super_admin === true || profile.role === 'super_admin';
-  const myRoles = assignableRoles(profile.role);
+  const myRoles = isPlatformAdmin
+    ? ALL_ROLES.filter(r => r !== 'pending')
+    : assignableRoles(profile.role);
 
   // ── Data Loading ──
   const loadAll = useCallback(async () => {
@@ -157,7 +159,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
                 <tbody>
                   {filtered.map(u => {
                     const isSelf = u.id === profile.id;
-                    const canEdit = !isSelf && ROLE_LEVELS[profile.role] > ROLE_LEVELS[u.role];
+                    const canEdit = !isSelf && (isPlatformAdmin || ROLE_LEVELS[profile.role] > ROLE_LEVELS[u.role]);
                     const rc = ROLE_COLORS[u.role] || ROLE_COLORS.viewer;
                     return (
                       <tr key={u.id}>
