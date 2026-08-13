@@ -445,14 +445,16 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
 
       {/* ══════ FOOTER ACTIONS ══════ */}
       <div className="card" style={{ padding:14, display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
-        <button className="btn btn-secondary" onClick={() => navigateTo('reports')}>📋 View Reports</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('works')}>⛏ Works Activities</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('quality')}>🧪 Quality Tests</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('equipment')}>⚙ Equipment</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('boq')}>📊 Bill of Quantities</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('ipc')}>💰 IPC Certificates</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('issues')}>⚠ Site Issues</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('approvals')}>✅ Approvals</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('reports', p)}>📋 View Reports</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('works', p)}>⛏ Works Activities</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('quality', p)}>🧪 Quality Tests</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('equipment', p)}>⚙ Equipment</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('boq', p)}>📊 Bill of Quantities</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('ipc', p)}>💰 IPC Certificates</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('issues', p)}>⚠ Site Issues</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('pavement', p)}>▤ Pavement Layers</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('structures', p)}>🌉 Structures</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('approvals', p)}>✅ Approvals</button>
       </div>
     </div>
   );

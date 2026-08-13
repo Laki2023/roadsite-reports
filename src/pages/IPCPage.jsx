@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 
-export default function IPCPage({ profile, showToast }) {
+export default function IPCPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [projectData, setProjectData] = useState(null);
   const [ipcs, setIpcs] = useState([]);
   const [boqItems, setBoqItems] = useState([]);

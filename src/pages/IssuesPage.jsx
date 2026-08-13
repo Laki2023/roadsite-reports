@@ -6,9 +6,9 @@ const EMPTY_ISSUE = {
   chainage_from: '', chainage_to: '', status: 'Open', resolution_notes: '',
 };
 
-export default function IssuesPage({ profile, showToast }) {
+export default function IssuesPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(propProject?.id || '');
   const [issues, setIssues] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_ISSUE);

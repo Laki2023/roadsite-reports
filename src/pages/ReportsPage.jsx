@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function ReportsPage({ profile, showToast }) {
+export default function ReportsPage({ profile, showToast, selectedProject: propProject }) {
   const [reports, setReports] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [filterProject, setFilterProject] = useState('all');
+  const [filterProject, setFilterProject] = useState(propProject?.id || 'all');
   const [filterDate, setFilterDate] = useState('');
   const [expanded, setExpanded] = useState(null);
 

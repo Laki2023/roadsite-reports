@@ -6,9 +6,9 @@ const CATEGORY_COLORS = {
   Surfacing: '#4b5563', 'Road Furniture': '#059669', Environmental: '#16a34a', Other: '#6b7280'
 };
 
-export default function WorksActivitiesPage({ profile, showToast }) {
+export default function WorksActivitiesPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [activities, setActivities] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tab, setTab] = useState('activities');

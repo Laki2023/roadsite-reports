@@ -10,9 +10,9 @@ const EQUIPMENT_TYPES = [
 ];
 const STATUSES = ['Operational','Idle','Breakdown','Under Repair','Demobilized','Standby'];
 
-export default function EquipmentPage({ profile, showToast }) {
+export default function EquipmentPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [equipment, setEquipment] = useState([]);
   const [dailyStatus, setDailyStatus] = useState([]);
   const [tab, setTab] = useState('register');

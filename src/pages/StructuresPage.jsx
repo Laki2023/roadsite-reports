@@ -27,9 +27,9 @@ const TYPE_ICONS = {
   'Drift/Causeway': '🌊', 'Headwall': '▐', 'Wingwall': '◣', 'Apron': '▤', 'Scour Protection': '🛡️',
 };
 
-export default function StructuresPage({ profile, showToast }) {
+export default function StructuresPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [structures, setStructures] = useState([]);
   const [progressData, setProgressData] = useState({});
   const [tab, setTab] = useState('list');

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 
-export default function BoQPage({ profile, showToast }) {
+export default function BoQPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [sections, setSections] = useState([]);
   const [items, setItems] = useState([]);
   const [activities, setActivities] = useState([]);
