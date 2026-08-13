@@ -19,6 +19,7 @@ import BoQPage from './pages/BoQPage';
 import IPCPage from './pages/IPCPage';
 import UserManagement from './pages/UserManagement';
 import ApprovalsPage from './pages/ApprovalsPage';
+import ProjectDashboard from './pages/ProjectDashboard';
 import ProjectSummary from './pages/ProjectSummary';
 import SiteInstructionsPage from './pages/SiteInstructionsPage';
 
@@ -169,6 +170,7 @@ export default function App() {
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
       case 'project-summary': return <ProjectSummary {...ctx} />;
+      case 'project-dashboard': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('dashboard')} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
     }
   };

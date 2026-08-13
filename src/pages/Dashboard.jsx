@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ROLE_LABELS } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, AreaChart, Area, RadialBarChart, RadialBar } from 'recharts';
-import ProjectSummary from './ProjectSummary';
+import ProjectDashboard from './ProjectDashboard';
 
 const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
 const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
@@ -225,7 +225,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Loading dashboard...</div>;
 
   if (selectedProjectId && projectDetail) {
-    return <ProjectSummary projectId={selectedProjectId} onBack={() => { setSelectedProjectId(null); setProjectDetail(null); }} profile={profile} />;
+    return <ProjectDashboard projectId={selectedProjectId} onBack={() => { setSelectedProjectId(null); setProjectDetail(null); }} profile={profile} navigateTo={navigateTo} />;
   }
 
   const health = getHealthGrade(stats.healthScore);
