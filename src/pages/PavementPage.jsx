@@ -229,7 +229,7 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
                       <td>{l.side}</td>
                       <td><span className={`badge badge-${statusColor(l.layer_status)}`}>{l.layer_status}</span></td>
                       <td className="text-mono text-sm">{l.date_laid || '—'}</td>
-                      <td className="text-sm">{l.approved_by_profile?.full_name || '—'}</td>
+                      <td className="text-sm">{l.approved_by_profile?.full_name || (l.approved_by ? 'System' : '—')}</td>
                       <td>
                         {hasRole(profile.role, 'resident_engineer') && (
                           <button className="btn btn-sm btn-secondary" onClick={() => openEdit(l)}>Edit</button>
