@@ -36,8 +36,8 @@ const NAV_ITEMS = [
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
   { section: 'Management' },
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
-  { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'engineer' },
-  { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
+  { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
+  { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'project_engineer' },
   { key: 'user-mgmt', label: 'User Management', icon: '🛡', minRole: 'engineer' },
   { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'super_admin' },
 ];
