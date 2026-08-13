@@ -187,12 +187,27 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   }
   const chainageColors = { completed:'#10b981', ongoing:'#f59e0b', behind:'#ef4444', notstarted:'#374151' };
 
-  // IPC chart data
-  const ipcChart = ipcs.map(i => ({
-    name: `IPC ${i.ipc_no}`,
-    certified: i.certified_amount || 0,
-    paid: i.paid_amount || 0,
-  }));
+  // IPC chart data with cumulative and unpaid
+  let cumCertified = 0, cumPaid = 0;
+  const ipcChart = ipcs.map(i => {
+    const cert = i.certified_amount || 0;
+    const pd = i.paid_amount || 0;
+    cumCertified += cert;
+    cumPaid += pd;
+    return {
+      name: `IPC ${i.ipc_no}`,
+      certified: cert,
+      paid: pd,
+      unpaid: Math.max(0, cert - pd),
+      cumCertified,
+      cumPaid,
+      cumUnpaid: cumCertified - cumPaid,
+    };
+  });
+  const totalUnpaid = certified - paid;
+  const paymentRatio = certified > 0 ? pct(paid, certified) : 0;
+  const avgIpcValue = ipcs.length > 0 ? Math.round(certified / ipcs.length) : 0;
+  const retentionEst = contractSum * 0.1; // Assume 10% retention
 
   // Early warnings
   const warnings = [];
@@ -366,31 +381,109 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       </div>
 
       {/* ══════ FINANCIAL + QUALITY + RISK ══════ */}
-      <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:14, marginBottom:16 }}>
-        {/* IPC / Financial Chart */}
-        <div className="card" style={{ padding:14 }}>
-          <h3 style={{ margin:'0 0 10px', fontSize:14 }}>Payment Certificates (IPC)</h3>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:14, marginBottom:16 }}>
+        {/* IPC / Financial Section — Full Width */}
+        <div className="card" style={{ padding:16 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+            <h3 style={{ margin:0, fontSize:15 }}>Payment Certificates (IPC) & Financial Summary</h3>
+            <span className="text-sm text-muted">{ipcs.length} IPC{ipcs.length!==1?'s':''} issued</span>
+          </div>
+
+          {/* Financial KPI strip */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:10, marginBottom:16 }}>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:'3px solid #2563eb' }}>
+              <div style={{ fontSize:18, fontWeight:800, color:'#2563eb' }}>{fmtB(certified)}</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Total Certified</div>
+            </div>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:'3px solid #10b981' }}>
+              <div style={{ fontSize:18, fontWeight:800, color:'#10b981' }}>{fmtB(paid)}</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Total Paid</div>
+            </div>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:`3px solid ${totalUnpaid>0?'#ef4444':'#10b981'}` }}>
+              <div style={{ fontSize:18, fontWeight:800, color:totalUnpaid>0?'#ef4444':'#10b981' }}>{fmtB(totalUnpaid)}</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Outstanding / Unpaid</div>
+            </div>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:'3px solid #d97706' }}>
+              <div style={{ fontSize:18, fontWeight:800, color:'#d97706' }}>{fmtB(balance)}</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Contract Balance</div>
+            </div>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:'3px solid #7c3aed' }}>
+              <div style={{ fontSize:18, fontWeight:800, color:'#7c3aed' }}>{paymentRatio}%</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Payment Ratio</div>
+            </div>
+            <div style={{ textAlign:'center', padding:'10px 8px', background:'var(--bg-hover)', borderRadius:'var(--radius)', borderTop:'3px solid #6b7280' }}>
+              <div style={{ fontSize:18, fontWeight:800 }}>{fmtB(avgIpcValue)}</div>
+              <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>Avg IPC Value</div>
+            </div>
+          </div>
+
           {ipcChart.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={ipcChart} margin={{ left:0, right:8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
-                <XAxis dataKey="name" tick={{ fontSize:9, fill:'var(--text-muted)' }} />
-                <YAxis tick={{ fontSize:9, fill:'var(--text-muted)' }} tickFormatter={v=>(v/1e6).toFixed(0)+'M'} />
-                <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>fmt(v)} />
-                <Legend wrapperStyle={{ fontSize:10 }} />
-                <Bar dataKey="certified" fill="#2563eb" name="Certified" radius={[3,3,0,0]} />
-                <Bar dataKey="paid" fill="#10b981" name="Paid" radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:50 }}>No IPC data yet</div>}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:10, fontSize:11 }}>
-            <div style={{ textAlign:'center' }}><div style={{ fontWeight:700 }}>{fmtB(certified)}</div><div className="text-muted">Certified</div></div>
-            <div style={{ textAlign:'center' }}><div style={{ fontWeight:700 }}>{fmtB(paid)}</div><div className="text-muted">Paid</div></div>
-            <div style={{ textAlign:'center' }}><div style={{ fontWeight:700 }}>{fmtB(balance)}</div><div className="text-muted">Balance</div></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              {/* Bar chart: Per-IPC Certified vs Paid vs Unpaid */}
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, marginBottom:8, color:'var(--text-muted)' }}>Per-IPC Breakdown</div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={ipcChart} margin={{ left:0, right:8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                    <XAxis dataKey="name" tick={{ fontSize:9, fill:'var(--text-muted)' }} />
+                    <YAxis tick={{ fontSize:9, fill:'var(--text-muted)' }} tickFormatter={v=>(v/1e6).toFixed(0)+'M'} />
+                    <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>fmt(v)} />
+                    <Legend wrapperStyle={{ fontSize:10 }} />
+                    <Bar dataKey="certified" fill="#2563eb" name="Certified" radius={[3,3,0,0]} />
+                    <Bar dataKey="paid" fill="#10b981" name="Paid" radius={[3,3,0,0]} />
+                    <Bar dataKey="unpaid" fill="#ef4444" name="Unpaid" radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Cumulative line chart: Running totals */}
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, marginBottom:8, color:'var(--text-muted)' }}>Cumulative Payment Curve</div>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={ipcChart} margin={{ left:0, right:8 }}>
+                    <defs>
+                      <linearGradient id="gCert" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.3}/><stop offset="100%" stopColor="#2563eb" stopOpacity={0.02}/></linearGradient>
+                      <linearGradient id="gPaid" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.02}/></linearGradient>
+                      <linearGradient id="gUnpd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ef4444" stopOpacity={0.2}/><stop offset="100%" stopColor="#ef4444" stopOpacity={0.02}/></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                    <XAxis dataKey="name" tick={{ fontSize:9, fill:'var(--text-muted)' }} />
+                    <YAxis tick={{ fontSize:9, fill:'var(--text-muted)' }} tickFormatter={v=>(v/1e6).toFixed(0)+'M'} />
+                    <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>fmt(v)} />
+                    <Legend wrapperStyle={{ fontSize:10 }} />
+                    <Area type="monotone" dataKey="cumCertified" stroke="#2563eb" strokeWidth={2.5} fill="url(#gCert)" name="Cum. Certified" dot={{ r:3 }} />
+                    <Area type="monotone" dataKey="cumPaid" stroke="#10b981" strokeWidth={2.5} fill="url(#gPaid)" name="Cum. Paid" dot={{ r:3 }} />
+                    <Area type="monotone" dataKey="cumUnpaid" stroke="#ef4444" strokeWidth={1.5} fill="url(#gUnpd)" name="Cum. Unpaid" dot={{ r:2 }} strokeDasharray="4 4" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:50 }}>No IPC data yet — generate certificates from the IPC page</div>}
+
+          {/* Contract financial progress bar */}
+          <div style={{ marginTop:14 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:4 }}>
+              <span style={{ fontWeight:600 }}>Contract Financial Progress</span>
+              <span style={{ fontWeight:700 }}>{finPct}% of contract sum</span>
+            </div>
+            <div style={{ height:16, background:'var(--border)', borderRadius:8, overflow:'hidden', position:'relative' }}>
+              <div style={{ height:'100%', width:`${pct(paid, contractSum)}%`, background:'#10b981', position:'absolute', left:0, transition:'width 1s', borderRadius:8 }} />
+              <div style={{ height:'100%', width:`${finPct}%`, background:'#2563eb40', position:'absolute', left:0, transition:'width 1s', borderRadius:8 }} />
+              <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', fontSize:9, fontWeight:700, color:'#fff', textShadow:'0 1px 3px rgba(0,0,0,0.5)' }}>
+                {fmtB(paid)} paid of {fmtB(contractSum)}
+              </div>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, marginTop:4, color:'var(--text-muted)' }}>
+              <span>🟢 Paid ({pct(paid, contractSum)}%)</span>
+              <span>🔵 Certified ({pct(certified, contractSum)}%)</span>
+              <span>⬜ Balance ({pct(balance, contractSum)}%)</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Quality Summary */}
+      {/* ══════ QUALITY + RISK ROW ══════ */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
         <div className="card" style={{ padding:14 }}>
           <h3 style={{ margin:'0 0 10px', fontSize:14 }}>Quality & Testing</h3>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
