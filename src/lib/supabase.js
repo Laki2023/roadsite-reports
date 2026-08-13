@@ -5,22 +5,48 @@ const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'sb_publishab
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-/* Role hierarchy (highest to lowest):
-   admin > pm > engineer > re > inspector > pending
+/* Role hierarchy (matches user_role enum in database):
+   super_admin > engineer > resident_engineer > inspector > viewer > pending
    Each level can do everything below it. */
-const ROLE_LEVELS = { admin: 6, pm: 5, engineer: 4, re: 3, inspector: 2, pending: 0 };
+const ROLE_LEVELS = {
+  super_admin: 5,
+  engineer: 4,
+  resident_engineer: 3,
+  inspector: 2,
+  viewer: 1,
+  pending: 0,
+};
+
+export { ROLE_LEVELS };
 
 export function hasRole(userRole, requiredRole) {
   return (ROLE_LEVELS[userRole] || 0) >= (ROLE_LEVELS[requiredRole] || 0);
 }
 
+/** Roles a given user role is allowed to assign (strictly below own level) */
+export function assignableRoles(userRole) {
+  const level = ROLE_LEVELS[userRole] || 0;
+  return ALL_ROLES.filter(r => ROLE_LEVELS[r] < level && r !== 'pending');
+}
+
+export const ALL_ROLES = ['super_admin', 'engineer', 'resident_engineer', 'inspector', 'viewer', 'pending'];
+
 export const ROLE_LABELS = {
-  admin: 'Administrator',
-  pm: 'Project Manager',
+  super_admin: 'Super Admin',
   engineer: 'Engineer',
-  re: 'Resident Engineer',
+  resident_engineer: 'Resident Engineer',
   inspector: 'Inspector',
+  viewer: 'Viewer',
   pending: 'Pending Approval',
+};
+
+export const ROLE_COLORS = {
+  super_admin: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+  engineer:    { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
+  resident_engineer: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+  inspector:   { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' },
+  viewer:      { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' },
+  pending:     { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
 };
 
 export const PROJECT_CATEGORIES = ['Construction', 'Rehabilitation', 'Maintenance'];

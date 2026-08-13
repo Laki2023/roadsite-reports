@@ -31,7 +31,7 @@ export default function ProjectSummary({ projectId, onBack, profile }) {
   const [showModal, setShowModal] = useState(null);
   const [modalForm, setModalForm] = useState({});
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => { load(); }, [projectId]);
 

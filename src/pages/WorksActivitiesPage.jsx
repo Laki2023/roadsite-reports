@@ -18,7 +18,7 @@ export default function WorksActivitiesPage({ profile, showToast }) {
     start_chainage: '', end_chainage: '', side: 'Both', quantity: '', equipment_used: '', materials_used: '', gang_size: 0, notes: ''
   });
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));

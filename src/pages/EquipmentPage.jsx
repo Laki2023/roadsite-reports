@@ -21,7 +21,7 @@ export default function EquipmentPage({ profile, showToast }) {
   const [addForm, setAddForm] = useState({ equipment_name: '', equipment_type: 'Excavator', specification: '', required_quantity: 1, actual_on_site: 0, is_key_equipment: false, notes: '' });
   const [statusForm, setStatusForm] = useState({ status_date: new Date().toISOString().split('T')[0], status: 'Operational', hours_worked: 0, location_chainage: '', operator: '', fuel_litres: '', notes: '' });
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => {
     supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || []));

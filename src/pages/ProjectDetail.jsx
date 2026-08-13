@@ -26,7 +26,7 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
   const [dutyForm, setDutyForm] = useState({ assigned_to: '', title: '', description: '', priority: 'Medium', due_date: '' });
   const [saving, setSaving] = useState(false);
 
-  const isAdmin = hasRole(profile?.role, 'admin');
+  const isAdmin = hasRole(profile?.role, 'super_admin');
   const isSuperAdmin = profile?.is_super_admin;
   const isProjectLead = project?.project_lead_id === profile?.id;
   const canManage = isAdmin || isSuperAdmin || isProjectLead;

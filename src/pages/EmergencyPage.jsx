@@ -30,7 +30,7 @@ export default function EmergencyPage({ profile, showToast }) {
   });
   const [saving, setSaving] = useState(false);
 
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => { loadAll(); }, []);
 

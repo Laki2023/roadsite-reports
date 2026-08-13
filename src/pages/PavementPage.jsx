@@ -124,7 +124,7 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
           <h2>Pavement Layers</h2>
           <div className="subtitle">Track pavement construction layer by layer, chainage by chainage</div>
         </div>
-        {projectId && hasRole(profile.role, 're') && (
+        {projectId && hasRole(profile.role, 'resident_engineer') && (
           <button className="btn btn-primary" onClick={() => { setForm(EMPTY_LAYER); setEditId(null); setShowModal(true); }}>
             + Add Layer
           </button>
@@ -185,7 +185,7 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
               ) : (
                 <div className="layer-stack">
                   {[...filtered].reverse().map(l => (
-                    <div key={l.id} className="layer-bar" onClick={() => hasRole(profile.role, 're') && openEdit(l)}
+                    <div key={l.id} className="layer-bar" onClick={() => hasRole(profile.role, 'resident_engineer') && openEdit(l)}
                       style={{
                         background: layerColors[l.layer_type] || '#555',
                         color: '#fff',
@@ -231,7 +231,7 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
                       <td className="text-mono text-sm">{l.date_laid || '—'}</td>
                       <td className="text-sm">{l.approved_by_profile?.full_name || '—'}</td>
                       <td>
-                        {hasRole(profile.role, 're') && (
+                        {hasRole(profile.role, 'resident_engineer') && (
                           <button className="btn btn-sm btn-secondary" onClick={() => openEdit(l)}>Edit</button>
                         )}
                       </td>

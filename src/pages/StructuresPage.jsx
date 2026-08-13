@@ -39,7 +39,7 @@ export default function StructuresPage({ profile, showToast }) {
   const [addForm, setAddForm] = useState({ structure_type: 'Box Culvert', structure_ref: '', chainage: '', side: 'CL', dimensions: '', span_m: '', height_m: '', width_m: '', length_m: '', no_of_cells: 1, drawing_ref: '', concrete_grade: 'C25/30', foundation_type: '', notes: '' });
   const [progressForm, setProgressForm] = useState({ stage: '', status: 'Completed', work_date: new Date().toISOString().split('T')[0], quantity: '', unit: '', concrete_volume_m3: '', rebar_kg: '', gang_size: 0, materials_used: '', equipment_used: '', notes: '' });
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);

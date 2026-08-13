@@ -16,7 +16,7 @@ export default function BoQPage({ profile, showToast }) {
   const [bulkText, setBulkText] = useState('');
   const [bulkSection, setBulkSection] = useState('');
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 're');
+  const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);

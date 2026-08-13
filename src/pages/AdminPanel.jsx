@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, ROLE_LABELS } from '../lib/supabase';
+import { supabase, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
 
-const ROLES = ['pending', 'inspector', 're', 'engineer', 'pm', 'admin'];
+const ROLES = ['pending', 'viewer', 'inspector', 'resident_engineer', 'engineer', 'super_admin'];
 const PROJECT_ROLES = [
   'Project Manager','Project Admin','Resident Engineer','Inspector','Surveyor',
   'Materials Technician','Environmental Officer','Accounts Officer'
@@ -69,8 +69,8 @@ export default function AdminPanel({ profile, showToast }) {
 
   async function updateRole(userId, newRole) {
     const targetUser = users.find(u => u.id === userId);
-    if ((newRole === 'admin' || targetUser?.role === 'admin') && !isSuperAdmin) {
-      showToast('Only the Super Admin can manage admin roles', 'error');
+    if ((newRole === 'super_admin' || targetUser?.role === 'super_admin') && !isSuperAdmin) {
+      showToast('Only a Super Admin can manage Super Admin roles', 'error');
       return;
     }
     const updates = { role: newRole };
@@ -114,8 +114,8 @@ export default function AdminPanel({ profile, showToast }) {
 
   const pending = users.filter(u => u.role === 'pending');
   const active = users.filter(u => u.role !== 'pending');
-  const admins = active.filter(u => u.role === 'admin');
-  const nonAdmins = active.filter(u => u.role !== 'admin');
+  const admins = active.filter(u => u.role === 'super_admin');
+  const nonAdmins = active.filter(u => u.role !== 'super_admin');
 
   return (
     <div>
@@ -246,14 +246,14 @@ export default function AdminPanel({ profile, showToast }) {
           </div>
 
           <div className="card" style={{ marginTop: 24 }}>
-            <div className="card-header"><h3>Promote User to Admin</h3></div>
+            <div className="card-header"><h3>Promote User to Super Admin</h3></div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {nonAdmins.map(u => (
-                <button key={u.id} className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'admin')}>
+                <button key={u.id} className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'super_admin')}>
                   {u.full_name} ({ROLE_LABELS[u.role]})
                 </button>
               ))}
-              {nonAdmins.length === 0 && <span className="text-muted text-sm">No non-admin users</span>}
+              {nonAdmins.length === 0 && <span className="text-muted text-sm">All users are Super Admins</span>}
             </div>
           </div>
         </div>
@@ -287,10 +287,10 @@ export default function AdminPanel({ profile, showToast }) {
                   )}
                   <td>
                     <select value={u.role} onChange={e => updateRole(u.id, e.target.value)}
-                      disabled={u.role === 'admin' && !isSuperAdmin}
+                      disabled={u.role === 'super_admin' && !isSuperAdmin}
                       style={{ padding: '5px 10px', fontSize: 12 }}>
                       {ROLES.filter(r => r !== 'pending').map(r => (
-                        <option key={r} value={r} disabled={r === 'admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                        <option key={r} value={r} disabled={r === 'super_admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
                       ))}
                     </select>
                   </td>
@@ -320,9 +320,9 @@ export default function AdminPanel({ profile, showToast }) {
           <div><span className="text-muted">Pending:</span> {pending.length}</div>
         </div>
         <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
-          <strong>Role Hierarchy:</strong> Super Admin → Admin → PM → Engineer → RE → Inspector → Pending
-          <br /><strong>Project Roles:</strong> Project Admin → Project Manager → RE → Inspector → Surveyor → Technician
-          <br /><span className="text-muted">Super Admin controls system admins. Project Admins manage their assigned projects.</span>
+          <strong>Role Hierarchy:</strong> Super Admin → Engineer → Resident Engineer → Inspector → Viewer → Pending
+          <br /><strong>Project Roles:</strong> Engineer → RE → Inspector → Surveyor → Technician
+          <br /><span className="text-muted">Super Admin has full system control. Engineers manage projects and users. REs supervise daily site work.</span>
         </div>
       </div>
 
@@ -354,7 +354,7 @@ export default function AdminPanel({ profile, showToast }) {
                   <label>System Role *</label>
                   <select value={approveForm.role} onChange={e => setApproveForm({ ...approveForm, role: e.target.value })} required>
                     {ROLES.filter(r => r !== 'pending').map(r => (
-                      <option key={r} value={r} disabled={r === 'admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                      <option key={r} value={r} disabled={r === 'super_admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
                     ))}
                   </select>
                 </div>

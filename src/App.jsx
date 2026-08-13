@@ -17,18 +17,20 @@ import EquipmentPage from './pages/EquipmentPage';
 import StructuresPage from './pages/StructuresPage';
 import BoQPage from './pages/BoQPage';
 import IPCPage from './pages/IPCPage';
+import UserManagement from './pages/UserManagement';
+import ProjectSummary from './pages/ProjectSummary';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'inspector' },
+  { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'viewer' },
   { section: 'Projects' },
-  { key: 'projects', label: 'Projects', icon: '◈', minRole: 'inspector' },
+  { key: 'projects', label: 'Projects', icon: '◈', minRole: 'viewer' },
   { section: 'Field Work' },
   { key: 'submit-report', label: 'Submit Report', icon: '✎', minRole: 'inspector' },
-  { key: 'reports', label: 'View Reports', icon: '☰', minRole: 'inspector' },
+  { key: 'reports', label: 'View Reports', icon: '☰', minRole: 'viewer' },
   { key: 'issues', label: 'Site Issues', icon: '⚠', minRole: 'inspector' },
   { key: 'works', label: 'Works Activities', icon: '⛏', minRole: 'inspector' },
   { section: 'Road Engineering' },
-  { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 're' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 'resident_engineer' },
   { key: 'quality', label: 'Quality Tests', icon: '⬡', minRole: 'inspector' },
   { key: 'equipment', label: 'Equipment', icon: '⚙', minRole: 'inspector' },
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
@@ -36,7 +38,8 @@ const NAV_ITEMS = [
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'engineer' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'engineer' },
-  { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'admin' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡', minRole: 'engineer' },
+  { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'super_admin' },
 ];
 
 export default function App() {
@@ -157,8 +160,10 @@ export default function App() {
       case 'boq': return <BoQPage {...ctx} />;
       case 'ipc': return <IPCPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
+      case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
+      case 'project-summary': return <ProjectSummary {...ctx} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
     }
   };
