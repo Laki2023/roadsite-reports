@@ -52,6 +52,151 @@ export const ROLE_COLORS = {
   pending:     { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
 };
 
+/* ══════════════════════════════════════════════════════════════
+   APPROVAL AUTHORITY & ESCALATION SYSTEM
+   Based on FIDIC chain of command for Kenyan road projects.
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * What each role can approve / action without escalation.
+ * Anything above their authority must be escalated up.
+ */
+export const APPROVAL_AUTHORITY = {
+  inspector: {
+    label: 'Inspector of Works',
+    canApprove: [],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency'],
+    canIssue: [],
+    escalateTo: 'resident_engineer',
+  },
+  resident_engineer: {
+    label: 'Resident Engineer',
+    canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer', 'minor_works_change'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction'],
+    canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice'],
+    escalateTo: 'project_engineer',
+  },
+  project_engineer: {
+    label: "Engineer's Representative",
+    canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer', 'minor_works_change',
+                 'site_instruction', 'interim_payment', 'programme_update', 'design_change_minor'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction', 'ipc'],
+    canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice', 'variation_order_minor', 'engineer_instruction'],
+    escalateTo: 'engineer',
+  },
+  engineer: {
+    label: 'The Engineer',
+    canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer', 'minor_works_change',
+                 'site_instruction', 'interim_payment', 'programme_update', 'design_change_minor',
+                 'variation_order', 'eot_claim', 'cost_claim', 'design_change_major', 'taking_over'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction', 'ipc', 'eot_determination', 'final_payment'],
+    canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice', 'variation_order_minor',
+               'engineer_instruction', 'variation_order', 'taking_over_certificate', 'payment_certificate'],
+    escalateTo: 'super_admin',
+  },
+  super_admin: {
+    label: 'Employer (DG)',
+    canApprove: ['*'], // everything
+    canSubmit: ['*'],
+    canIssue: ['*'],
+    escalateTo: null, // top of chain
+  },
+};
+
+/**
+ * Check if a user role can approve a specific item type.
+ * @param {string} userRole - current user's role
+ * @param {string} itemType - type of item to approve (e.g. 'site_instruction', 'variation_order')
+ * @param {boolean} isPlatformAdmin - platform admin override
+ * @returns {{ allowed: boolean, escalateTo: string|null }}
+ */
+export function canApproveItem(userRole, itemType, isPlatformAdmin = false) {
+  // Platform admin can approve everything
+  if (isPlatformAdmin) return { allowed: true, escalateTo: null };
+
+  const authority = APPROVAL_AUTHORITY[userRole];
+  if (!authority) return { allowed: false, escalateTo: 'resident_engineer' };
+
+  // Wildcard = can approve everything
+  if (authority.canApprove.includes('*') || authority.canApprove.includes(itemType)) {
+    return { allowed: true, escalateTo: null };
+  }
+
+  // Not allowed — must escalate
+  return { allowed: false, escalateTo: authority.escalateTo };
+}
+
+/**
+ * Check if a user role can issue a specific instruction/notice type.
+ */
+export function canIssueItem(userRole, itemType, isPlatformAdmin = false) {
+  if (isPlatformAdmin) return { allowed: true, escalateTo: null };
+
+  const authority = APPROVAL_AUTHORITY[userRole];
+  if (!authority) return { allowed: false, escalateTo: 'resident_engineer' };
+
+  if (authority.canIssue.includes('*') || authority.canIssue.includes(itemType)) {
+    return { allowed: true, escalateTo: null };
+  }
+
+  return { allowed: false, escalateTo: authority.escalateTo };
+}
+
+/**
+ * Get the full escalation chain from a given role up to super_admin.
+ * e.g. getEscalationChain('inspector') → ['resident_engineer', 'project_engineer', 'engineer', 'super_admin']
+ */
+export function getEscalationChain(fromRole) {
+  const chain = [];
+  let current = APPROVAL_AUTHORITY[fromRole]?.escalateTo;
+  while (current) {
+    chain.push(current);
+    current = APPROVAL_AUTHORITY[current]?.escalateTo;
+  }
+  return chain;
+}
+
+/**
+ * Get the next role up for escalation.
+ */
+export function getEscalationTarget(fromRole) {
+  return APPROVAL_AUTHORITY[fromRole]?.escalateTo || null;
+}
+
+/**
+ * Instruction types that can be issued in the system.
+ */
+export const INSTRUCTION_TYPES = [
+  { key: 'site_instruction', label: 'Site Instruction', minRole: 'resident_engineer', fidic: 'Cl. 3.3' },
+  { key: 'engineer_instruction', label: "Engineer's Instruction", minRole: 'project_engineer', fidic: 'Cl. 3.3' },
+  { key: 'variation_order_minor', label: 'Variation Order (Minor)', minRole: 'project_engineer', fidic: 'Cl. 13.1' },
+  { key: 'variation_order', label: 'Variation Order', minRole: 'engineer', fidic: 'Cl. 13.1' },
+  { key: 'noncompliance_notice', label: 'Non-Compliance Notice', minRole: 'resident_engineer', fidic: 'Cl. 7.5' },
+  { key: 'defect_notice', label: 'Defect Notice', minRole: 'resident_engineer', fidic: 'Cl. 11.1' },
+  { key: 'taking_over_certificate', label: 'Taking-Over Certificate', minRole: 'engineer', fidic: 'Cl. 10.1' },
+  { key: 'payment_certificate', label: 'Payment Certificate', minRole: 'engineer', fidic: 'Cl. 14.6' },
+];
+
+/**
+ * Approval item types with descriptions.
+ */
+export const APPROVAL_TYPES = [
+  { key: 'daily_report', label: 'Daily Site Report', minRole: 'resident_engineer' },
+  { key: 'quality_test', label: 'Quality Test Result', minRole: 'resident_engineer' },
+  { key: 'material_approval', label: 'Material Approval', minRole: 'resident_engineer' },
+  { key: 'pavement_layer', label: 'Pavement Layer Approval', minRole: 'resident_engineer' },
+  { key: 'minor_works_change', label: 'Minor Works Change', minRole: 'resident_engineer' },
+  { key: 'site_instruction', label: 'Site Instruction', minRole: 'project_engineer' },
+  { key: 'interim_payment', label: 'Interim Payment Certificate', minRole: 'project_engineer' },
+  { key: 'programme_update', label: 'Programme Update', minRole: 'project_engineer' },
+  { key: 'design_change_minor', label: 'Design Change (Minor)', minRole: 'project_engineer' },
+  { key: 'variation_order', label: 'Variation Order', minRole: 'engineer' },
+  { key: 'eot_claim', label: 'Extension of Time Claim', minRole: 'engineer' },
+  { key: 'cost_claim', label: 'Cost Claim', minRole: 'engineer' },
+  { key: 'design_change_major', label: 'Design Change (Major)', minRole: 'engineer' },
+  { key: 'taking_over', label: 'Taking Over', minRole: 'engineer' },
+];
+
 export const PROJECT_CATEGORIES = ['Construction', 'Rehabilitation', 'Maintenance'];
 
 export const FIDIC_EDITIONS = [
