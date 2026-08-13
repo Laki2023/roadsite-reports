@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
 
-const ROLES = ['pending', 'viewer', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin'];
+const ROLES = ['pending', 'viewer', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
 const PROJECT_ROLES = [
   'Project Manager','Project Admin','Resident Engineer','Inspector','Surveyor',
   'Materials Technician','Environmental Officer','Accounts Officer'
@@ -320,9 +320,9 @@ export default function AdminPanel({ profile, showToast }) {
           <div><span className="text-muted">Pending:</span> {pending.length}</div>
         </div>
         <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
-          <strong>Role Hierarchy:</strong> Super Admin → Engineer → Project Engineer → Resident Engineer → Inspector → Viewer → Pending
-          <br /><strong>FIDIC Roles:</strong> Employer (DG) → The Engineer → Engineer's Rep → RE → Inspector of Works
-          <br /><span className="text-muted">Super Admin has agency-level control. Engineers manage contracts. Project Engineers handle day-to-day administration.</span>
+          <strong>Role Hierarchy:</strong> Director General → Super Admin → Engineer → Project Engineer → Resident Engineer → Inspector → Viewer → Pending
+          <br /><strong>FIDIC Roles:</strong> Employer (DG) → Director → The Engineer → Engineer's Rep → RE → Inspector of Works
+          <br /><span className="text-muted">DG has organisation-wide oversight. Super Admins manage project portfolios. Engineers manage contracts.</span>
         </div>
       </div>
 

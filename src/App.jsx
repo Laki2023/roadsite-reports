@@ -20,6 +20,7 @@ import IPCPage from './pages/IPCPage';
 import UserManagement from './pages/UserManagement';
 import ApprovalsPage from './pages/ApprovalsPage';
 import ProjectDashboard from './pages/ProjectDashboard';
+import OrgManagement from './pages/OrgManagement';
 import ProjectSummary from './pages/ProjectSummary';
 import SiteInstructionsPage from './pages/SiteInstructionsPage';
 
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'project_engineer' },
   { key: 'user-mgmt', label: 'User Management', icon: '🛡', minRole: 'engineer' },
+  { key: 'org-mgmt', label: 'Organisations', icon: '🏛', minRole: 'director_general' },
   { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'super_admin' },
 ];
 
@@ -167,6 +169,7 @@ export default function App() {
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;
+      case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
       case 'project-summary': return <ProjectSummary {...ctx} />;

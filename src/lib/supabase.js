@@ -6,9 +6,10 @@ const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'sb_publishab
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /* Role hierarchy (matches user_role enum in database):
-   super_admin > engineer > project_engineer > resident_engineer > inspector > viewer > pending
+   director_general > super_admin > engineer > project_engineer > resident_engineer > inspector > viewer > pending
    Each level can do everything below it. */
 const ROLE_LEVELS = {
+  director_general: 7,
   super_admin: 6,
   engineer: 5,
   project_engineer: 4,
@@ -30,9 +31,10 @@ export function assignableRoles(userRole) {
   return ALL_ROLES.filter(r => ROLE_LEVELS[r] < level && r !== 'pending');
 }
 
-export const ALL_ROLES = ['super_admin', 'engineer', 'project_engineer', 'resident_engineer', 'inspector', 'viewer', 'pending'];
+export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'resident_engineer', 'inspector', 'viewer', 'pending'];
 
 export const ROLE_LABELS = {
+  director_general: 'Director General',
   super_admin: 'Super Admin',
   engineer: 'Engineer',
   project_engineer: 'Project Engineer',
@@ -43,6 +45,7 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_COLORS = {
+  director_general: { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
   super_admin: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
   engineer:    { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
   project_engineer: { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
