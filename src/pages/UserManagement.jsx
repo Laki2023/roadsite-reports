@@ -16,7 +16,8 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
   const [editModal, setEditModal] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
 
-  const isSuperAdmin = profile.is_super_admin === true || profile.role === 'super_admin';
+  const isPlatformAdmin = profile.is_platform_admin === true;
+  const isSuperAdmin = isPlatformAdmin || profile.is_super_admin === true || profile.role === 'super_admin';
   const myRoles = assignableRoles(profile.role);
 
   // ── Data Loading ──

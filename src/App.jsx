@@ -214,7 +214,7 @@ export default function App() {
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item, i) => {
             if (item.section) return <div key={i} className="nav-section">{item.section}</div>;
-            if (!hasRole(profile.role, item.minRole)) return null;
+            if (!profile.is_platform_admin && !hasRole(profile.role, item.minRole)) return null;
             return (
               <button key={item.key}
                 className={page === item.key ? 'active' : ''}
@@ -227,7 +227,7 @@ export default function App() {
         </nav>
         <div className="sidebar-user">
           <div className="user-name">{profile.full_name}</div>
-          <div className="user-role">{ROLE_LABELS[profile.role] || profile.role}</div>
+          <div className="user-role">{profile.is_platform_admin ? 'Platform Admin' : (ROLE_LABELS[profile.role] || profile.role)}</div>
           <button className="btn btn-secondary btn-sm mt-16" style={{ width: '100%', justifyContent: 'center' }}
             onClick={() => supabase.auth.signOut()}>
             Sign Out

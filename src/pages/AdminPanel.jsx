@@ -15,7 +15,7 @@ export default function AdminPanel({ profile, showToast }) {
   const [approveModal, setApproveModal] = useState(null);
   const [approveForm, setApproveForm] = useState({ role: 'inspector', designation: '', project_id: '', project_role: 'Inspector' });
 
-  const isSuperAdmin = profile.is_super_admin === true;
+  const isSuperAdmin = profile.is_platform_admin === true || profile.is_super_admin === true;
 
   useEffect(() => { loadAll(); }, []);
 
