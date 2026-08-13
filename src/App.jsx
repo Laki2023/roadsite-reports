@@ -19,6 +19,7 @@ import BoQPage from './pages/BoQPage';
 import IPCPage from './pages/IPCPage';
 import UserManagement from './pages/UserManagement';
 import ProjectSummary from './pages/ProjectSummary';
+import SiteInstructionsPage from './pages/SiteInstructionsPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'viewer' },
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
   { section: 'Management' },
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
+  { key: 'site-instructions', label: 'Site Instructions', icon: '📝', minRole: 'resident_engineer' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'project_engineer' },
   { key: 'user-mgmt', label: 'User Management', icon: '🛡', minRole: 'engineer' },
@@ -158,6 +160,7 @@ export default function App() {
       case 'equipment': return <EquipmentPage {...ctx} />;
       case 'structures': return <StructuresPage {...ctx} />;
       case 'boq': return <BoQPage {...ctx} />;
+      case 'site-instructions': return <SiteInstructionsPage {...ctx} />;
       case 'ipc': return <IPCPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
