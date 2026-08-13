@@ -207,7 +207,40 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   const totalUnpaid = certified - paid;
   const paymentRatio = certified > 0 ? pct(paid, certified) : 0;
   const avgIpcValue = ipcs.length > 0 ? Math.round(certified / ipcs.length) : 0;
-  const retentionEst = contractSum * 0.1; // Assume 10% retention
+  const retentionEst = contractSum * 0.1;
+
+  // Financial S-Curve — monthly planned vs actual expenditure
+  const finSCurve = months.slice(0, curMonth + 1).map((m, i) => {
+    const monthFraction = (i + 1) / 12;
+    // Planned: S-curve distribution (front-loaded typical for road construction)
+    const sCurveFactor = monthFraction < 0.3 ? monthFraction * 0.6
+      : monthFraction < 0.7 ? 0.18 + (monthFraction - 0.3) * 1.55
+      : 0.8 + (monthFraction - 0.7) * 0.67;
+    const planned = Math.round(contractSum * Math.min(sCurveFactor, 1));
+    // Actual: from cumulative IPC certified up to this month index
+    const monthDate = new Date(new Date().getFullYear(), i, 28);
+    const ipcsToDate = ipcs.filter(ipc => {
+      const ipcDate = ipc.created_at || ipc.ipc_date;
+      return ipcDate && new Date(ipcDate) <= monthDate;
+    });
+    const actualCert = ipcsToDate.reduce((s, ipc) => s + (ipc.certified_amount || 0), 0);
+    const actualPaid = ipcsToDate.reduce((s, ipc) => s + (ipc.paid_amount || 0), 0);
+    return {
+      month: m,
+      planned,
+      certified: actualCert || Math.round(certified * ((i + 1) / (curMonth + 1))),
+      paid: actualPaid || Math.round(paid * ((i + 1) / (curMonth + 1))),
+    };
+  });
+
+  // Combined progress comparison (physical vs financial)
+  const combinedProgress = months.slice(0, curMonth + 1).map((m, i) => ({
+    month: m,
+    physPlanned: sCurve[i]?.planned || 0,
+    physActual: sCurve[i]?.actual || 0,
+    finPlanned: contractSum > 0 ? pct(finSCurve[i]?.planned || 0, contractSum) : 0,
+    finActual: contractSum > 0 ? pct(finSCurve[i]?.certified || 0, contractSum) : 0,
+  })); // Assume 10% retention
 
   // Early warnings
   const warnings = [];
@@ -377,6 +410,79 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 color={a.pct>=80?'#10b981':a.pct>=40?'#e87b35':'#ef4444'} />
             )) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>}
           </div>
+        </div>
+      </div>
+
+      {/* ══════ FINANCIAL S-CURVE + COMBINED PROGRESS ══════ */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
+        {/* Financial S-Curve */}
+        <div className="card" style={{ padding:14 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <h3 style={{ margin:0, fontSize:14 }}>Financial Progress Curve</h3>
+            <span className="badge badge-muted" style={{ fontSize:9 }}>KES</span>
+          </div>
+          <ResponsiveContainer width="100%" height={230}>
+            <AreaChart data={finSCurve} margin={{ left:0, right:8, top:5 }}>
+              <defs>
+                <linearGradient id="gFP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6b7280" stopOpacity={0.15}/><stop offset="100%" stopColor="#6b7280" stopOpacity={0.02}/></linearGradient>
+                <linearGradient id="gFC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.25}/><stop offset="100%" stopColor="#2563eb" stopOpacity={0.02}/></linearGradient>
+                <linearGradient id="gFPd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.02}/></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+              <XAxis dataKey="month" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
+              <YAxis tick={{ fontSize:9, fill:'var(--text-muted)' }} tickFormatter={v=>(v/1e6).toFixed(0)+'M'} />
+              <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>fmt(v)} />
+              <Legend wrapperStyle={{ fontSize:10 }} />
+              <Area type="monotone" dataKey="planned" stroke="#6b7280" strokeWidth={2} fill="url(#gFP)" name="Planned Expenditure" dot={false} strokeDasharray="6 3" />
+              <Area type="monotone" dataKey="certified" stroke="#2563eb" strokeWidth={2.5} fill="url(#gFC)" name="Actual Certified" dot={{ r:3 }} />
+              <Area type="monotone" dataKey="paid" stroke="#10b981" strokeWidth={2} fill="url(#gFPd)" name="Actual Paid" dot={{ r:2 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginTop:6, padding:'0 8px' }}>
+            <span>Planned: <strong>{fmtB(finSCurve[finSCurve.length-1]?.planned || 0)}</strong></span>
+            <span style={{ color:'#2563eb' }}>Certified: <strong>{fmtB(certified)}</strong></span>
+            <span style={{ color:'#10b981' }}>Paid: <strong>{fmtB(paid)}</strong></span>
+          </div>
+        </div>
+
+        {/* Combined Physical vs Financial */}
+        <div className="card" style={{ padding:14 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <h3 style={{ margin:0, fontSize:14 }}>Physical vs Financial Progress</h3>
+            <StatusBadge status={Math.abs(physPct - finPct) <= 10 ? 'On Track' : finPct > physPct ? 'Overpaid' : 'Underpaid'} />
+          </div>
+          <ResponsiveContainer width="100%" height={230}>
+            <AreaChart data={combinedProgress} margin={{ left:0, right:8, top:5 }}>
+              <defs>
+                <linearGradient id="gPhy" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e87b35" stopOpacity={0.2}/><stop offset="100%" stopColor="#e87b35" stopOpacity={0.02}/></linearGradient>
+                <linearGradient id="gFin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.2}/><stop offset="100%" stopColor="#2563eb" stopOpacity={0.02}/></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+              <XAxis dataKey="month" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
+              <YAxis tick={{ fontSize:10, fill:'var(--text-muted)' }} domain={[0,100]} tickFormatter={v=>v+'%'} />
+              <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>v+'%'} />
+              <Legend wrapperStyle={{ fontSize:10 }} />
+              <Area type="monotone" dataKey="physPlanned" stroke="#6b7280" strokeWidth={1.5} fill="none" name="Physical Planned" dot={false} strokeDasharray="4 3" />
+              <Area type="monotone" dataKey="physActual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gPhy)" name="Physical Actual" dot={{ r:3 }} />
+              <Area type="monotone" dataKey="finActual" stroke="#2563eb" strokeWidth={2.5} fill="url(#gFin)" name="Financial Actual" dot={{ r:3 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginTop:6, padding:'0 8px' }}>
+            <span style={{ color:'#e87b35' }}>Physical: <strong>{physPct}%</strong></span>
+            <span style={{ color:'#2563eb' }}>Financial: <strong>{finPct}%</strong></span>
+            <span style={{ color: Math.abs(physPct-finPct)<=10?'#10b981':'#ef4444', fontWeight:700 }}>
+              Gap: {physPct > finPct ? '+' : ''}{physPct - finPct}%
+            </span>
+          </div>
+          {Math.abs(physPct - finPct) > 15 && (
+            <div style={{ marginTop:8, padding:'6px 10px', borderRadius:'var(--radius)', fontSize:11,
+              background: finPct > physPct ? '#fef2f2' : '#eff6ff',
+              color: finPct > physPct ? '#dc2626' : '#2563eb' }}>
+              {finPct > physPct
+                ? '⚠ Financial progress exceeds physical — review for potential overpayment'
+                : 'ℹ Physical progress exceeds financial — contractor may be underpaid'}
+            </div>
+          )}
         </div>
       </div>
 
