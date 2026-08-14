@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { autoGenerateProgramme, syncProgressFromReports, parseContractorProgramme } from '../lib/programmeEngine';
 
 const CATEGORY_COLORS = {
   preliminary: '#6366f1', mobilisation: '#8b5cf6', earthworks: '#b45309',
@@ -39,7 +40,12 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [viewMode, setViewMode] = useState('months'); // weeks | months | quarters
+  const [sourceView, setSourceView] = useState('engineer'); // engineer | contractor | compare
+  const [syncing, setSyncing] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const ganttRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { loadProjects(); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
@@ -62,21 +68,30 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
     setLoading(false);
   }
 
+  // ── Filter items by source view ──
+  const filteredItems = useMemo(() => {
+    if (sourceView === 'compare') return items;
+    return items.filter(i => !i.source_type || i.source_type === sourceView);
+  }, [items, sourceView]);
+
+  const engineerItems = items.filter(i => !i.source_type || i.source_type === 'engineer');
+  const contractorItems = items.filter(i => i.source_type === 'contractor');
+
   // ── Timeline calculations ──
   const timeline = useMemo(() => {
-    if (items.length === 0) {
+    if (filteredItems.length === 0) {
       const proj = projects.find(p => p.id === selectedProject);
       const start = proj?.start_date || new Date().toISOString().split('T')[0];
       const end = proj?.end_date || addDays(start, 365);
       return { start, end, totalDays: daysBetween(start, end) || 365 };
     }
-    const allDates = items.flatMap(i => [i.baseline_start, i.baseline_end, i.planned_start, i.planned_end, i.actual_start, i.actual_end].filter(Boolean));
+    const allDates = filteredItems.flatMap(i => [i.baseline_start, i.baseline_end, i.planned_start, i.planned_end, i.actual_start, i.actual_end].filter(Boolean));
     const start = allDates.sort()[0];
     const end = allDates.sort().reverse()[0];
     const padStart = addDays(start, -14);
     const padEnd = addDays(end, 30);
     return { start: padStart, end: padEnd, totalDays: daysBetween(padStart, padEnd) };
-  }, [items, selectedProject, projects]);
+  }, [filteredItems, selectedProject, projects]);
 
   // ── Generate time columns ──
   const timeColumns = useMemo(() => {
@@ -145,7 +160,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
 
   // ── Summary stats ──
   const stats = useMemo(() => {
-    const nonSummary = items.filter(i => !i.is_summary);
+    const nonSummary = filteredItems.filter(i => !i.is_summary);
     const totalWeight = nonSummary.reduce((s, i) => s + (i.weight || 1), 0);
     const weightedProgress = totalWeight > 0
       ? nonSummary.reduce((s, i) => s + (i.progress_pct || 0) * (i.weight || 1), 0) / totalWeight : 0;
@@ -154,7 +169,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
     const late = nonSummary.filter(i => getSlippage(i).status === 'late').length;
     const notStarted = nonSummary.filter(i => i.status === 'not_started').length;
     return { weightedProgress: weightedProgress.toFixed(1), completed, inProgress, late, notStarted, total: nonSummary.length };
-  }, [items]);
+  }, [filteredItems]);
 
   // ── Add / Edit item ──
   const emptyItem = {
@@ -216,6 +231,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
       planned_end: addDays(baseStart, 90),
       progress_pct: a.planned_quantity > 0 ? Math.min(100, ((a.completed_quantity || 0) / a.planned_quantity) * 100) : 0,
       weight: 1,
+      source_type: sourceView === 'contractor' ? 'contractor' : 'engineer',
       created_by: profile?.id,
     }));
 
@@ -223,6 +239,72 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
     if (error) { showToast?.('Error: ' + error.message); return; }
     showToast?.(`✅ Added ${inserts.length} activities to programme`);
     loadData();
+  }
+
+  // ── Auto-generate Engineer's Programme ──
+  async function handleAutoGenerate(source = 'engineer') {
+    const existing = items.filter(i => i.source_type === source);
+    if (existing.length > 0) {
+      if (!window.confirm(`This will delete the existing ${source === 'engineer' ? "Engineer's" : "Contractor's"} programme (${existing.length} items) and regenerate. Continue?`)) return;
+      await supabase.from('programme_items').delete().eq('project_id', selectedProject).eq('source_type', source);
+    }
+
+    setGenerating(true);
+    try {
+      const proj = projects.find(p => p.id === selectedProject);
+      const count = await autoGenerateProgramme(selectedProject, proj, activities, profile?.id, source);
+      showToast?.(`✅ Auto-generated ${count} programme items (${source === 'engineer' ? "Engineer's" : "Contractor's"} estimate)`);
+      loadData();
+    } catch (err) {
+      showToast?.('Error: ' + err.message);
+    }
+    setGenerating(false);
+  }
+
+  // ── Sync progress from daily reports ──
+  async function handleSyncProgress() {
+    setSyncing(true);
+    try {
+      const count = await syncProgressFromReports(selectedProject);
+      showToast?.(`✅ Synced progress — ${count} items updated from daily reports`);
+      loadData();
+    } catch (err) {
+      showToast?.('Error: ' + err.message);
+    }
+    setSyncing(false);
+  }
+
+  // ── Upload Contractor's Programme (CSV/Excel) ──
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    try {
+      const text = await file.text();
+      const rows = text.split('\n').map(line => line.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+
+      if (rows.length < 2) { showToast?.('File must have a header row and at least one data row'); return; }
+
+      // Delete existing contractor items
+      const existing = items.filter(i => i.source_type === 'contractor');
+      if (existing.length > 0) {
+        if (!window.confirm(`This will replace ${existing.length} existing contractor programme items. Continue?`)) return;
+        await supabase.from('programme_items').delete().eq('project_id', selectedProject).eq('source_type', 'contractor');
+      }
+
+      const parsed = parseContractorProgramme(rows, selectedProject, profile?.id);
+      if (parsed.length === 0) { showToast?.('No valid items found in file. Need columns: Activity Name, Start Date, End Date'); return; }
+
+      const { error } = await supabase.from('programme_items').insert(parsed);
+      if (error) { showToast?.('Error: ' + error.message); return; }
+
+      showToast?.(`✅ Imported ${parsed.length} items from Contractor's programme`);
+      setSourceView('contractor');
+      loadData();
+    } catch (err) {
+      showToast?.('Error reading file: ' + err.message);
+    }
   }
 
   // ── Today line position ──
@@ -236,15 +318,22 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📅 Programme of Works</h1>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Baseline vs Actual Gantt chart · FIDIC Cl. 8.3</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {selectedProject && (
             <>
-              <button className="btn btn-secondary" onClick={seedFromActivities} style={{ fontSize: 11 }}>
-                ⚡ Import Activities ({activities.filter(a => !items.find(i => i.activity_id === a.id)).length})
+              <button className="btn btn-secondary" onClick={handleSyncProgress} disabled={syncing} style={{ fontSize: 11 }}>
+                {syncing ? '⏳ Syncing...' : '🔄 Sync from Reports'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => handleAutoGenerate('engineer')} disabled={generating} style={{ fontSize: 11 }}>
+                {generating ? '⏳...' : '🤖 Auto-Generate'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} style={{ fontSize: 11 }}>
+                📤 Upload Contractor PoW
               </button>
               <button className="btn btn-primary" onClick={() => { setEditItem(null); setShowEditor(true); }} style={{ fontSize: 11 }}>
                 + Add Item
               </button>
+              <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileUpload} style={{ display: 'none' }} />
             </>
           )}
         </div>
@@ -266,6 +355,21 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
               background: viewMode === m ? 'var(--accent)' : 'var(--bg-card)',
               color: viewMode === m ? '#fff' : 'var(--text-muted)',
             }}>{m}</button>
+          ))}
+        </div>
+        <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { key: 'engineer', label: '🏗️ Engineer', count: engineerItems.length },
+            { key: 'contractor', label: '📋 Contractor', count: contractorItems.length },
+            { key: 'compare', label: '⚖️ Compare', count: null },
+          ].map(v => (
+            <button key={v.key} onClick={() => setSourceView(v.key)} style={{
+              padding: '5px 10px', fontSize: 10, fontWeight: 700, border: '1px solid var(--border)',
+              borderRadius: 4, cursor: 'pointer',
+              background: sourceView === v.key ? (v.key === 'engineer' ? '#059669' : v.key === 'contractor' ? '#e87b35' : '#6366f1') : 'var(--bg-card)',
+              color: sourceView === v.key ? '#fff' : 'var(--text-muted)',
+            }}>{v.label}{v.count !== null ? ` (${v.count})` : ''}</button>
           ))}
         </div>
       </div>
@@ -294,11 +398,15 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
 
           {/* Gantt Chart */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-            {items.length === 0 ? (
+            {filteredItems.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>No programme items yet</div>
-                <div style={{ fontSize: 11, margin: '8px 0 16px' }}>Click "Import Activities" to seed from your works activities, or "Add Item" to create manually.</div>
+                <div style={{ fontSize: 11, margin: '8px 0 16px' }}>
+                  {sourceView === 'engineer' && 'Click "🤖 Auto-Generate" to create an Engineer\'s programme from production rates, or "Add Item" to build manually.'}
+                  {sourceView === 'contractor' && 'Click "📤 Upload Contractor PoW" to import the Contractor\'s programme from CSV.'}
+                  {sourceView === 'compare' && 'Generate both programmes first, then switch to Compare view.'}
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', overflow: 'hidden' }}>
@@ -310,7 +418,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
                   </div>
                   {/* Rows */}
                   <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-                    {items.map((item, idx) => {
+                    {filteredItems.map((item, idx) => {
                       const slip = getSlippage(item);
                       return (
                         <div key={item.id} style={{
@@ -320,7 +428,8 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
                           alignItems: 'center',
                         }}>
                           <div style={{ paddingLeft: (item.indent_level || 0) * 12 }}>
-                            <div style={{ fontWeight: item.is_summary ? 800 : 500, fontSize: item.is_summary ? 11 : 10 }}>
+                            <div style={{ fontWeight: item.is_summary ? 800 : 500, fontSize: item.is_summary ? 11 : 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {sourceView === 'compare' && <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: item.source_type === 'contractor' ? '#e87b35' : '#059669' }} />}
                               {item.is_milestone ? '◆ ' : ''}{item.item_name}
                             </div>
                             {item.item_code && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{item.item_code}</div>}
@@ -387,7 +496,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
                       return acc;
                     }, { offset: 0, lines: [] }).lines}
 
-                    {items.map((item, idx) => {
+                    {filteredItems.map((item, idx) => {
                       const baselineBar = getBarPosition(item.baseline_start, item.baseline_end);
                       const plannedBar = getBarPosition(item.planned_start, item.planned_end);
                       const actualBar = item.actual_start ? getBarPosition(item.actual_start, item.actual_end || new Date().toISOString().split('T')[0]) : null;
@@ -457,11 +566,15 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
           {/* Legend */}
           <div style={{ display: 'flex', gap: 16, padding: '10px 14px', fontSize: 9, color: 'var(--text-muted)', flexWrap: 'wrap', marginTop: 8 }}>
             <span>■ <span style={{ color: '#475569' }}>Baseline</span></span>
-            <span>■ <span style={{ color: 'var(--accent)' }}>Planned (Approved)</span></span>
+            <span>■ <span style={{ color: 'var(--accent)' }}>Planned</span></span>
             <span>■ <span style={{ color: '#059669' }}>Actual Progress</span></span>
             <span>■ <span style={{ color: '#dc2626' }}>Behind Schedule</span></span>
             <span style={{ color: '#dc2626' }}>│ Today</span>
             <span>◆ Milestone</span>
+            {sourceView === 'compare' && <>
+              <span>● <span style={{ color: '#059669' }}>Engineer</span></span>
+              <span>● <span style={{ color: '#e87b35' }}>Contractor</span></span>
+            </>}
           </div>
         </>
       )}
