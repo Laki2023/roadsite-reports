@@ -22,6 +22,7 @@ import ApprovalsPage from './pages/ApprovalsPage';
 import ProjectDashboard from './pages/ProjectDashboard';
 import OrgManagement from './pages/OrgManagement';
 import ProjectSummary from './pages/ProjectSummary';
+import MonthlyReportPage from './pages/MonthlyReportPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
+  { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
   { section: 'Administration' },
   { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
   { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'engineer' },
@@ -182,6 +184,7 @@ export default function App() {
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;
+      case 'monthly-report': return <MonthlyReportPage {...ctx} />;
       case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
@@ -220,7 +223,7 @@ export default function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
-          <div className="brand-sub">v14.3 — Road Project Management</div>
+          <div className="brand-sub">v14.4 — Road Project Management</div>
         </div>
 
         {/* Project Context Banner */}
