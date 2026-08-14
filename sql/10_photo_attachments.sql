@@ -75,7 +75,7 @@ CREATE POLICY "org_users_view_photos" ON report_photos
 CREATE POLICY "project_users_view_photos" ON report_photos
   FOR SELECT USING (
     project_id IN (
-      SELECT project_id FROM project_assignments WHERE user_id = auth.uid()
+      SELECT project_id FROM project_role_assignments WHERE user_id = auth.uid()
     )
   );
 
@@ -86,7 +86,7 @@ CREATE POLICY "field_staff_upload_photos" ON report_photos
     AND (
       EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin = true)
       OR project_id IN (
-        SELECT project_id FROM project_assignments WHERE user_id = auth.uid()
+        SELECT project_id FROM project_role_assignments WHERE user_id = auth.uid()
       )
     )
   );
