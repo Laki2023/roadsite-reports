@@ -1101,6 +1101,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         <button className="btn btn-secondary" onClick={() => navigateTo('structures', p)}>🌉 Structures</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('approvals', p)}>✅ Approvals</button>
         <button className="btn btn-primary" onClick={() => navigateTo('monthly-report', p)}>📋 Monthly Report</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('programme', p)}>📅 Programme</button>
       </div>
     </div>
   );
