@@ -133,7 +133,7 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
             <tbody>
               {filtered.map(p => (
                 <tr key={p.id} style={{ cursor: 'pointer' }}
-                  onClick={() => navigateTo('project-detail', p)}>
+                  onClick={() => navigateTo('project-dashboard', p)}>
                   <td style={{ fontWeight: 600 }}>{p.name}</td>
                   <td className="text-mono text-sm">{p.contract_no || '—'}</td>
                   <td><span className={`badge badge-${catColors[p.category] || 'muted'}`}>{p.category}</span></td>

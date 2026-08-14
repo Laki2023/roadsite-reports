@@ -22,30 +22,31 @@ import ApprovalsPage from './pages/ApprovalsPage';
 import ProjectDashboard from './pages/ProjectDashboard';
 import OrgManagement from './pages/OrgManagement';
 import ProjectSummary from './pages/ProjectSummary';
-import SiteInstructionsPage from './pages/SiteInstructionsPage';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '◫', minRole: 'viewer' },
+  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
   { section: 'Projects' },
-  { key: 'projects', label: 'Projects', icon: '◈', minRole: 'viewer' },
-  { section: 'Field Work' },
-  { key: 'submit-report', label: 'Submit Report', icon: '✎', minRole: 'inspector' },
-  { key: 'reports', label: 'View Reports', icon: '☰', minRole: 'viewer' },
-  { key: 'issues', label: 'Site Issues', icon: '⚠', minRole: 'inspector' },
-  { key: 'works', label: 'Works Activities', icon: '⛏', minRole: 'inspector' },
-  { section: 'Road Engineering' },
-  { key: 'pavement', label: 'Pavement Layers', icon: '▤', minRole: 'resident_engineer' },
-  { key: 'quality', label: 'Quality Tests', icon: '⬡', minRole: 'inspector' },
-  { key: 'equipment', label: 'Equipment', icon: '⚙', minRole: 'inspector' },
+  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'viewer' },
+  { section: 'Field Operations' },
+  { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'inspector' },
+  { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'viewer' },
+  { key: 'works', label: 'Works Activities', icon: '⛏️', minRole: 'inspector' },
+  { key: 'issues', label: 'Site Issues', icon: '⚠️', minRole: 'inspector' },
+  { key: 'emergency', label: 'Emergency', icon: '🚨', minRole: 'inspector' },
+  { section: 'Engineering' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '🛣️', minRole: 'resident_engineer' },
+  { key: 'quality', label: 'Quality Tests', icon: '🧪', minRole: 'inspector' },
+  { key: 'equipment', label: 'Equipment', icon: '🚜', minRole: 'inspector' },
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
-  { section: 'Management' },
+  { section: 'Contract Admin' },
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
-  { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
-  { key: 'staff', label: 'Staff & Teams', icon: '◉', minRole: 'project_engineer' },
-  { key: 'user-mgmt', label: 'User Management', icon: '🛡', minRole: 'engineer' },
-  { key: 'org-mgmt', label: 'Organisations', icon: '🏛', minRole: 'director_general' },
-  { key: 'admin', label: 'Administration', icon: '⚙', minRole: 'super_admin' },
+  { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
+  { section: 'Administration' },
+  { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'engineer' },
+  { key: 'org-mgmt', label: 'Organisations', icon: '🏛️', minRole: 'director_general' },
+  { key: 'admin', label: 'System Settings', icon: '⚙️', minRole: 'super_admin' },
 ];
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeEmergencies, setActiveEmergencies] = useState([]);
+  const [pendingCounts, setPendingCounts] = useState({ issues: 0, approvals: 0 });
 
   const showToast = useCallback((msg, type = 'success') => {
     setToast({ msg, type });
@@ -86,11 +88,23 @@ export default function App() {
   }, [session]);
 
   async function loadEmergencies() {
-    const { data } = await supabase.from('site_emergencies')
-      .select('*, projects(name), reporter:reported_by(full_name)')
-      .neq('status', 'Resolved')
-      .order('reported_at', { ascending: false });
-    setActiveEmergencies(data || []);
+    const [emRes, issRes, aqRes] = await Promise.all([
+      supabase.from('site_emergencies')
+        .select('*, projects(name), reporter:reported_by(full_name)')
+        .neq('status', 'Resolved')
+        .order('reported_at', { ascending: false }),
+      supabase.from('site_issues')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['Open', 'In Progress']),
+      supabase.from('approval_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending'),
+    ]);
+    setActiveEmergencies(emRes.data || []);
+    setPendingCounts({
+      issues: issRes.count || 0,
+      approvals: aqRes.count || 0,
+    });
   }
 
   async function fetchProfile(uid) {
@@ -164,7 +178,6 @@ export default function App() {
       case 'equipment': return <EquipmentPage {...ctx} />;
       case 'structures': return <StructuresPage {...ctx} />;
       case 'boq': return <BoQPage {...ctx} />;
-      case 'site-instructions': return <SiteInstructionsPage {...ctx} />;
       case 'ipc': return <IPCPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
@@ -172,8 +185,9 @@ export default function App() {
       case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
-      case 'project-summary': return <ProjectSummary {...ctx} />;
+      case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'project-dashboard': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('dashboard')} />;
+      case 'project-summary': return <ProjectSummary {...ctx} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
     }
   };
@@ -207,37 +221,59 @@ export default function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
-          <div className="brand-sub">v7.0 — Road Project Management</div>
+          <div className="brand-sub">v14.0 — Road Project Management</div>
         </div>
 
-        {/* Emergency Button - always visible */}
-        <div style={{ padding: '0 12px', marginBottom: 8 }}>
-          <button className={`emergency-sidebar-btn ${activeEmergencies.length > 0 ? 'has-active' : ''}`}
-            onClick={() => navigateTo('emergency')}>
-            <span>🚨</span> Emergency
-            {activeEmergencies.length > 0 && (
-              <span className="emergency-count-badge">{activeEmergencies.length}</span>
-            )}
-          </button>
-        </div>
+        {/* Project Context Banner */}
+        {selectedProject && page !== 'dashboard' && page !== 'projects' && (
+          <div style={{ padding: '8px 12px', margin: '0 12px 8px', background: 'rgba(232,123,53,0.15)',
+            borderRadius: 'var(--radius)', borderLeft: '3px solid #e87b35', cursor: 'pointer' }}
+            onClick={() => navigateTo('project-dashboard', selectedProject)}>
+            <div style={{ fontSize: 10, color: '#e87b35', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Project</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedProject.name || 'Selected Project'}
+            </div>
+          </div>
+        )}
 
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item, i) => {
             if (item.section) return <div key={i} className="nav-section">{item.section}</div>;
             if (!profile.is_platform_admin && !hasRole(profile.role, item.minRole)) return null;
+            const isActive = page === item.key;
+            const badge = item.key === 'emergency' && activeEmergencies.length > 0 ? activeEmergencies.length
+              : item.key === 'issues' && pendingCounts.issues > 0 ? pendingCounts.issues
+              : item.key === 'approvals' && pendingCounts.approvals > 0 ? pendingCounts.approvals
+              : null;
             return (
               <button key={item.key}
-                className={page === item.key ? 'active' : ''}
-                onClick={() => navigateTo(item.key)}>
-                <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{item.icon}</span>
-                {item.label}
+                className={isActive ? 'active' : ''}
+                onClick={() => navigateTo(item.key)}
+                style={{ position: 'relative' }}>
+                <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {badge && (
+                  <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    background: item.key === 'emergency' ? '#ef4444' : '#e87b35', color: '#fff',
+                    fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 9999, minWidth: 16, textAlign: 'center' }}>
+                    {badge}
+                  </span>
+                )}
               </button>
             );
           })}
         </nav>
         <div className="sidebar-user">
-          <div className="user-name">{profile.full_name}</div>
-          <div className="user-role">{profile.is_platform_admin ? 'Platform Admin' : (ROLE_LABELS[profile.role] || profile.role)}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e87b35', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+              {profile.full_name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
+            </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div className="user-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</div>
+              <div className="user-role">{profile.is_platform_admin ? '🔒 Platform Admin' : (ROLE_LABELS[profile.role] || profile.role)}</div>
+            </div>
+          </div>
           <button className="btn btn-secondary btn-sm mt-16" style={{ width: '100%', justifyContent: 'center' }}
             onClick={() => supabase.auth.signOut()}>
             Sign Out
