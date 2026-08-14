@@ -4,7 +4,7 @@ import { fetchMonthlyReportData } from '../lib/monthlyReportData';
 import { generateMonthlyPDF } from '../lib/generatePDF';
 import { generateMonthlyDocx } from '../lib/generateDocx';
 
-export default function MonthlyReportPage({ profile, showToast }) {
+export default function MonthlyReportPage({ profile, showToast, selectedProject: contextProject }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -19,6 +19,26 @@ export default function MonthlyReportPage({ profile, showToast }) {
   const [narratives, setNarratives] = useState({});
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [autoLoaded, setAutoLoaded] = useState(false);
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  // Auto-select project when navigating from Project Dashboard
+  useEffect(() => {
+    if (contextProject?.id && !autoLoaded) {
+      setSelectedProject(contextProject.id);
+      setAutoLoaded(true);
+    }
+  }, [contextProject, autoLoaded]);
+
+  // Auto-load report when project is set from context
+  useEffect(() => {
+    if (selectedProject && autoLoaded && !reportData && !loading) {
+      loadReport();
+    }
+  }, [selectedProject, autoLoaded]);
 
   useEffect(() => {
     loadProjects();
