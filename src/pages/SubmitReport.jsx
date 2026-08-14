@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ROLE_LABELS, INSTRUCTION_TYPES } from '../lib/supabase';
+import PhotoUploader, { uploadReportPhotos } from '../components/PhotoUploader';
 
 const WEATHER = [
   { key: 'Sunny', icon: '☀️', color: '#f59e0b' },
@@ -102,6 +103,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [instructionEntries, setInstructionEntries] = useState([]);
   const [materialEntries, setMaterialEntries] = useState([]);
 
+  // ── Photo State ──
+  const [worksPhotos, setWorksPhotos] = useState([]);
+  const [equipPhotos, setEquipPhotos] = useState([]);
+  const [qualityPhotos, setQualityPhotos] = useState([]);
+  const [structPhotos, setStructPhotos] = useState([]);
+  const [issuePhotos, setIssuePhotos] = useState([]);
+  const [generalPhotos, setGeneralPhotos] = useState([]);
+
   // ── Data Loading ──
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
@@ -146,6 +155,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     true, // Step 8
   ];
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
+  const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
 
   // ── Submit ──
   async function handleSubmit() {
@@ -251,8 +261,18 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         });
       }
 
+      // 9. Upload Photos to Supabase Storage
+      const allPhotos = [
+        ...worksPhotos, ...equipPhotos, ...qualityPhotos,
+        ...structPhotos, ...issuePhotos, ...generalPhotos,
+      ];
+      let photoCount = 0;
+      if (allPhotos.length > 0) {
+        photoCount = await uploadReportPhotos(allPhotos, selectedProject, report.id, profile, form.report_date);
+      }
+
       setSubmitted(true);
-      showToast('✅ Report submitted — all data auto-synced!');
+      showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -275,9 +295,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           {issueEntries.length > 0 && <span className="badge badge-accent">⚠️ {issueEntries.length} issues raised</span>}
           {instructionEntries.length > 0 && <span className="badge badge-accent">📋 {instructionEntries.length} instructions issued</span>}
           {materialEntries.length > 0 && <span className="badge badge-accent">📦 {materialEntries.length} materials received</span>}
+          {totalPhotos > 0 && <span className="badge badge-accent">📷 {totalPhotos} photos uploaded</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]); }}>
+          <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]); setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]); }}>
             📝 Submit Another Report
           </button>
           <button className="btn btn-secondary" onClick={() => navigateTo('dashboard')}>📊 Go to Dashboard</button>
@@ -453,6 +474,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             );
           })}
           <AddButton label="Add Activity Progress" onClick={addWork} />
+          <PhotoUploader
+            projectId={selectedProject}
+            category="works_progress"
+            photos={worksPhotos}
+            setPhotos={setWorksPhotos}
+            maxPhotos={10}
+            label="Works Photos"
+          />
         </SectionCard>
       )}
 
@@ -474,6 +503,15 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             </EntryRow>
           ))}
           <AddButton label="Add Equipment Entry" onClick={addEquip} />
+          <PhotoUploader
+            projectId={selectedProject}
+            category="equipment"
+            photos={equipPhotos}
+            setPhotos={setEquipPhotos}
+            maxPhotos={5}
+            label="Equipment Photos"
+            compact
+          />
         </SectionCard>
       )}
 
@@ -501,6 +539,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               </EntryRow>
             ))}
             <AddButton label="Add Quality Test" onClick={addTest} />
+            <PhotoUploader
+              projectId={selectedProject}
+              category="quality_test"
+              photos={qualityPhotos}
+              setPhotos={setQualityPhotos}
+              maxPhotos={10}
+              label="Test / Material Photos"
+            />
           </SectionCard>
 
           <SectionCard title="Materials Received" icon="📦" count={materialEntries.length}>
@@ -544,6 +590,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             </EntryRow>
           ))}
           <AddButton label="Add Structure Progress" onClick={addStruct} />
+          <PhotoUploader
+            projectId={selectedProject}
+            category="structure"
+            photos={structPhotos}
+            setPhotos={setStructPhotos}
+            maxPhotos={10}
+            label="Structure Photos"
+          />
         </SectionCard>
       )}
 
@@ -567,6 +621,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               </EntryRow>
             ))}
             <AddButton label="Report Issue" onClick={addIssue} />
+            <PhotoUploader
+              projectId={selectedProject}
+              category="issue"
+              photos={issuePhotos}
+              setPhotos={setIssuePhotos}
+              maxPhotos={10}
+              label="Issue Evidence Photos"
+            />
           </SectionCard>
 
           {isRE && (
@@ -625,6 +687,31 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             </div>
           </SectionCard>
 
+          {/* General Site Photos */}
+          <SectionCard title="Site Photos" icon="📸" count={totalPhotos} color="#8b5cf6">
+            <PhotoUploader
+              projectId={selectedProject}
+              category="general"
+              photos={generalPhotos}
+              setPhotos={setGeneralPhotos}
+              maxPhotos={10}
+              label="General Site Photos"
+            />
+            {totalPhotos > 0 && (
+              <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>📷 Photos attached to this report:</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', color: 'var(--text-muted)' }}>
+                  {worksPhotos.length > 0 && <span>⛏️ Works: {worksPhotos.length}</span>}
+                  {equipPhotos.length > 0 && <span>🚜 Equipment: {equipPhotos.length}</span>}
+                  {qualityPhotos.length > 0 && <span>🧪 Quality: {qualityPhotos.length}</span>}
+                  {structPhotos.length > 0 && <span>🌉 Structures: {structPhotos.length}</span>}
+                  {issuePhotos.length > 0 && <span>⚠️ Issues: {issuePhotos.length}</span>}
+                  {generalPhotos.length > 0 && <span>📸 General: {generalPhotos.length}</span>}
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
           {/* Summary */}
           <SectionCard title="Report Summary" icon="✅">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
@@ -638,6 +725,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 { icon: '📦', label: 'Materials', value: materialEntries.length },
                 { icon: '⚠️', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
                 { icon: '📋', label: 'Instructions', value: instructionEntries.length },
+                { icon: '📷', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
                   <div style={{ fontSize: 20 }}>{s.icon}</div>

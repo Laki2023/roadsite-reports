@@ -168,7 +168,7 @@ export default function App() {
     switch (page) {
       case 'dashboard': return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
       case 'projects': return <ProjectsPage {...ctx} />;
-      case 'project-detail': return <ProjectDetail {...ctx} />;
+      case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'submit-report': return <SubmitReport {...ctx} />;
       case 'reports': return <ReportsPage {...ctx} />;
       case 'pavement': return <PavementPage {...ctx} />;
@@ -185,7 +185,6 @@ export default function App() {
       case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
-      case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'project-dashboard': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('dashboard')} />;
       case 'project-summary': return <ProjectSummary {...ctx} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
@@ -221,7 +220,7 @@ export default function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
-          <div className="brand-sub">v14.0 — Road Project Management</div>
+          <div className="brand-sub">v14.3 — Road Project Management</div>
         </div>
 
         {/* Project Context Banner */}
