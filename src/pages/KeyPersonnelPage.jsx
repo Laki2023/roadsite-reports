@@ -7,6 +7,7 @@ const PARTIES = {
   project_manager: '👔 Project Manager',
   engineer_rep: '👷 Engineer Representative',
   contractor: '🏗️ Contractor',
+  subcontractor: '🔧 Subcontractor',
 };
 const PARTY_COLORS = {
   client: '#2563eb',
@@ -14,6 +15,7 @@ const PARTY_COLORS = {
   project_manager: '#0891b2',
   engineer_rep: '#059669',
   contractor: '#e87b35',
+  subcontractor: '#8b5cf6',
 };
 const STATUS_COLORS = { active: '#059669', replaced: '#6366f1', demobilised: '#64748b', absent: '#dc2626' };
 const CONSENT_COLORS = { 'n/a': '#64748b', pending: '#f59e0b', consented: '#059669', rejected: '#dc2626' };
@@ -50,6 +52,11 @@ const COMMON_POSITIONS = {
     'Environmental Officer','Camp Manager / Admin',
     'Quantity Surveyor','Accountant / Finance Officer',
     'Laboratory Technician','Store Keeper','Section Engineer',
+  ],
+  subcontractor: [
+    'Sub Site Agent','Sub Foreman','Sub Surveyor',
+    'Sub Materials Engineer','Sub Safety Officer',
+    'Sub Plant Operator','Sub Section Engineer',
   ],
 };
 
@@ -212,6 +219,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
             <KPI icon="👔" label="Project Mgr" value={stats.byParty.project_manager || 0} color={PARTY_COLORS.project_manager} />
             <KPI icon="👷" label="Eng. Rep" value={stats.byParty.engineer_rep || 0} color={PARTY_COLORS.engineer_rep} />
             <KPI icon="🏗️" label="Contractor" value={stats.byParty.contractor || 0} color={PARTY_COLORS.contractor} />
+            <KPI icon="🔧" label="Subcontractor" value={stats.byParty.subcontractor || 0} color={PARTY_COLORS.subcontractor} />
             <KPI icon="✅" label="On Site" value={stats.onSite} color="#059669" />
             <KPI icon="⏳" label="Pending" value={stats.pendingConsent} color={stats.pendingConsent > 0 ? '#f59e0b' : '#059669'} />
           </div>
