@@ -19,7 +19,7 @@ const MATERIAL_TYPES = ['Cement', 'Bitumen', 'Aggregate', 'Sand', 'Steel', 'Fuel
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
   { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
-  { num: 3, label: 'Supervision Workforce', icon: '👷', short: 'Supervision' },
+  { num: 3, label: "Engineer's Team", icon: '👷', short: 'Engineer' },
   { num: 4, label: 'Works Progress', icon: '⛏️', short: 'Works' },
   { num: 5, label: 'Equipment', icon: '🚜', short: 'Equipment' },
   { num: 6, label: 'Quality & Materials', icon: '🧪', short: 'Quality' },
@@ -178,7 +178,7 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
                   color: '#fff', fontSize: 12, fontWeight: 800,
                 }}>{presence[t.id] ? '✓' : ''}</div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>{t.title_prefix ? `${t.title_prefix} ` : ''}{t.name}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title}</div>
                 </div>
               </div>
@@ -374,8 +374,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       supabase.from('equipment_register').select('id, equipment_name, equipment_type').eq('project_id', selectedProject).order('equipment_type'),
       supabase.from('structures').select('id, structure_ref, structure_type, chainage').eq('project_id', selectedProject).order('chainage'),
       supabase.from('pavement_layers').select('id, layer_type, start_chainage, end_chainage, layer_status').eq('project_id', selectedProject),
-      supabase.from('key_personnel').select('id, name, position_title, party').eq('project_id', selectedProject).eq('status', 'active').in('party', ['contractor', 'subcontractor']).order('position_title'),
-      supabase.from('key_personnel').select('id, name, position_title, party').eq('project_id', selectedProject).eq('status', 'active').in('party', ['engineer', 'employer']).order('position_title'),
+      supabase.from('key_personnel').select('id, name, position_title, party, title_prefix').eq('project_id', selectedProject).eq('status', 'active').in('party', ['contractor', 'subcontractor']).order('position_title'),
+      supabase.from('key_personnel').select('id, name, position_title, party, title_prefix').eq('project_id', selectedProject).eq('status', 'active').in('party', ['client', 'engineer', 'project_manager', 'engineer_rep']).order('position_title'),
     ]).then(([actRes, eqRes, strRes, layRes, contKpRes, supKpRes]) => {
       setActivities(actRes.data || []);
       setEquipment(eqRes.data || []);
@@ -762,10 +762,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         />
       )}
 
-      {/* ══════ STEP 3: SUPERVISION WORKFORCE ══════ */}
+      {/* ══════ STEP 3: ENGINEER'S TEAM ══════ */}
       {step === 3 && (
         <WorkforceStep
-          party="supervision" partyLabel="Supervision"
+          party="supervision" partyLabel="Engineer's Team"
           roles={labourRoles} personnel={supervisionPersonnel}
           presence={supervisionPresence} setPresence={setSupervisionPresence}
           labourEntries={supervisionLabour} setLabourEntries={setSupervisionLabour}
@@ -1043,7 +1043,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               {[
                 { icon: '🌤️', label: 'Weather', value: form.weather_conditions },
                 { icon: '🏗️', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
-                { icon: '👷', label: 'Supervision', value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
+                { icon: '👷', label: "Engineer's Team", value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
                 { icon: '⛏️', label: 'Activities', value: worksEntries.length },
                 { icon: '🚜', label: 'Equipment', value: equipEntries.length },
                 { icon: '🧪', label: 'Tests', value: testEntries.length },
