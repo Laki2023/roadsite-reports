@@ -4,8 +4,96 @@ import * as XLSX from 'xlsx';
 
 const BOQ_CATEGORIES = ['Preliminary', 'Earthworks', 'Pavement', 'Drainage', 'Structures', 'Surfacing', 'Road Furniture', 'Dayworks', 'Other'];
 const EQUIP_TYPES = ['Grader', 'Excavator', 'Roller', 'Loader', 'Dozer', 'Tipper', 'Bowser', 'Paver', 'Crusher', 'Compressor', 'Generator', 'Concrete Mixer', 'Bitumen Distributor', 'Water Tanker', 'Other'];
-const PARTIES = ['contractor', 'engineer', 'employer', 'subcontractor'];
+const PARTIES = [
+  { value: 'employer', label: 'Employer / Client', desc: 'KeNHA, KURA, KeRRA, County Govt' },
+  { value: 'engineer', label: 'Engineer / Consultant', desc: 'Supervision consultant (RE office)' },
+  { value: 'contractor', label: 'Contractor', desc: 'Main contractor' },
+  { value: 'subcontractor', label: 'Subcontractor', desc: 'Nominated or domestic sub' },
+];
+const PARTY_VALUES = PARTIES.map(p => p.value);
 const FIDIC_EDITIONS = ['Red Book 1999', 'Red Book 2017', 'Yellow Book 1999', 'Pink Book MDB', 'FIDIC 1987 4th Ed'];
+
+// ── Pre-populated FIDIC Key Personnel by party ──
+const STANDARD_PERSONNEL = [
+  // Employer / Client
+  { position_title: 'Project Director', party: 'employer' },
+  { position_title: 'Project Manager', party: 'employer' },
+  { position_title: 'Project Engineer', party: 'employer' },
+  { position_title: 'Project Accountant', party: 'employer' },
+  { position_title: 'Procurement Officer', party: 'employer' },
+  // Engineer / Consultant (Supervision)
+  { position_title: 'Team Leader / Principal Engineer', party: 'engineer' },
+  { position_title: 'Resident Engineer (RE)', party: 'engineer' },
+  { position_title: 'Assistant Resident Engineer', party: 'engineer' },
+  { position_title: 'Inspector of Works (Roads)', party: 'engineer' },
+  { position_title: 'Inspector of Works (Structures)', party: 'engineer' },
+  { position_title: 'Materials / Geotechnical Engineer', party: 'engineer' },
+  { position_title: 'Highway / Pavement Engineer', party: 'engineer' },
+  { position_title: 'Surveyor', party: 'engineer' },
+  { position_title: 'Quantity Surveyor', party: 'engineer' },
+  { position_title: 'Environmental Specialist', party: 'engineer' },
+  { position_title: 'Social / RAP Specialist', party: 'engineer' },
+  { position_title: 'Road Safety Specialist', party: 'engineer' },
+  { position_title: 'Claims / Contract Specialist', party: 'engineer' },
+  { position_title: 'Laboratory Technician', party: 'engineer' },
+  { position_title: 'Survey Assistant / Chainman', party: 'engineer' },
+  { position_title: 'Office Administrator', party: 'engineer' },
+  // Contractor
+  { position_title: 'Project Manager', party: 'contractor' },
+  { position_title: 'Site Agent / Construction Manager', party: 'contractor' },
+  { position_title: 'Deputy Site Agent', party: 'contractor' },
+  { position_title: 'General Foreman', party: 'contractor' },
+  { position_title: 'Materials Engineer', party: 'contractor' },
+  { position_title: 'Chief Surveyor', party: 'contractor' },
+  { position_title: 'Plant Manager', party: 'contractor' },
+  { position_title: 'Quality Assurance / QC Manager', party: 'contractor' },
+  { position_title: 'Safety / OHS Officer', party: 'contractor' },
+  { position_title: 'Environmental Officer', party: 'contractor' },
+  { position_title: 'Camp Manager / Admin', party: 'contractor' },
+  { position_title: 'Quantity Surveyor', party: 'contractor' },
+  { position_title: 'Accountant / Finance Officer', party: 'contractor' },
+  { position_title: 'Laboratory Technician', party: 'contractor' },
+  { position_title: 'Store Keeper', party: 'contractor' },
+  // Subcontractor
+  { position_title: 'Sub Site Agent', party: 'subcontractor' },
+  { position_title: 'Sub Foreman', party: 'subcontractor' },
+];
+
+// ── Pre-populated Road Construction Equipment ──
+const STANDARD_EQUIPMENT = [
+  { equipment_name: 'Motor Grader', equipment_type: 'Grader' },
+  { equipment_name: 'Hydraulic Excavator (20-30T)', equipment_type: 'Excavator' },
+  { equipment_name: 'Hydraulic Excavator (7-15T)', equipment_type: 'Excavator' },
+  { equipment_name: 'Backhoe Loader', equipment_type: 'Excavator' },
+  { equipment_name: 'Bulldozer (D6/D7)', equipment_type: 'Dozer' },
+  { equipment_name: 'Wheel Loader', equipment_type: 'Loader' },
+  { equipment_name: 'Vibratory Roller (10-14T)', equipment_type: 'Roller' },
+  { equipment_name: 'Pneumatic Tyre Roller', equipment_type: 'Roller' },
+  { equipment_name: 'Tandem Steel Roller', equipment_type: 'Roller' },
+  { equipment_name: 'Pedestrian / Walk-behind Roller', equipment_type: 'Roller' },
+  { equipment_name: 'Tipper Truck (10-15m³)', equipment_type: 'Tipper' },
+  { equipment_name: 'Tipper Truck (20-25m³)', equipment_type: 'Tipper' },
+  { equipment_name: 'Water Bowser (10,000L)', equipment_type: 'Bowser' },
+  { equipment_name: 'Bitumen Distributor', equipment_type: 'Bitumen Distributor' },
+  { equipment_name: 'Asphalt Paver (Tracked)', equipment_type: 'Paver' },
+  { equipment_name: 'Chip Spreader', equipment_type: 'Paver' },
+  { equipment_name: 'Stone Crusher & Screen', equipment_type: 'Crusher' },
+  { equipment_name: 'Concrete Batching Plant', equipment_type: 'Concrete Mixer' },
+  { equipment_name: 'Concrete Mixer (0.5m³)', equipment_type: 'Concrete Mixer' },
+  { equipment_name: 'Concrete Vibrator (Poker)', equipment_type: 'Other' },
+  { equipment_name: 'Mobile Crane (20-50T)', equipment_type: 'Other' },
+  { equipment_name: 'Compressor + Pneumatic Tools', equipment_type: 'Compressor' },
+  { equipment_name: 'Generator Set', equipment_type: 'Generator' },
+  { equipment_name: 'Low-bed Trailer', equipment_type: 'Other' },
+  { equipment_name: 'Flat-bed Truck', equipment_type: 'Other' },
+  { equipment_name: 'Fuel Bowser', equipment_type: 'Other' },
+  { equipment_name: 'Survey Equipment (Total Station)', equipment_type: 'Other' },
+  { equipment_name: 'DCP Test Set', equipment_type: 'Other' },
+  { equipment_name: 'Nuclear Density Gauge', equipment_type: 'Other' },
+  { equipment_name: 'Asphalt Cutter / Saw', equipment_type: 'Other' },
+  { equipment_name: 'Pile Driver / Hammer', equipment_type: 'Other' },
+  { equipment_name: 'Road Marking Machine', equipment_type: 'Other' },
+];
 
 const WIZARD_STEPS = [
   { num: 1, label: 'Upload Documents', icon: '📄' },
@@ -108,6 +196,21 @@ function DropZone({ onFiles, files, accept, label }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Save Indicator Component ──
+function SaveIndicator({ storageKey }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    setShow(true);
+    const t = setTimeout(() => setShow(false), 2000);
+    return () => clearTimeout(t);
+  }, [storageKey]);
+  return (
+    <div style={{ fontSize: 11, color: '#10b981', opacity: show ? 1 : 0.4, transition: 'opacity 0.5s', display: 'flex', alignItems: 'center', gap: 4 }}>
+      💾 Auto-saved
     </div>
   );
 }
@@ -701,42 +804,134 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
       {/* ══════ STEP 4: EQUIPMENT ══════ */}
       {step === 4 && (
         <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ marginBottom: 4 }}>Equipment Register</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <h3>Equipment Register</h3>
+            <SaveIndicator storageKey={storageKey} />
+          </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-            {equipmentList.length} items extracted. These will be available for daily report equipment tracking.
+            Tick the equipment on your project. You can edit quantities and add custom items below.
           </p>
 
-          <EditableTable
-            columns={[
-              { key: 'equipment_name', label: 'Equipment Name', minWidth: 200, placeholder: 'e.g. CAT 140H Motor Grader' },
-              { key: 'equipment_type', label: 'Type', width: 120, type: 'select', options: EQUIP_TYPES },
-              { key: 'quantity', label: 'Qty', width: 60, type: 'number' },
-              { key: 'ownership', label: 'Ownership', width: 100, type: 'select', options: ['Owned', 'Leased', 'Hired'] },
-            ]}
-            data={equipmentList} setData={setEquipmentList}
-            emptyRow={{ equipment_name: '', equipment_type: 'Other', quantity: 1, ownership: 'Owned' }}
-          />
+          {/* Quick-add checklist from standard equipment */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--accent)' }}>🚜 Standard Road Construction Plant</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 6 }}>
+              {STANDARD_EQUIPMENT.map(eq => {
+                const isAdded = equipmentList.some(e => e.equipment_name === eq.equipment_name);
+                return (
+                  <div key={eq.equipment_name} onClick={() => {
+                    if (isAdded) {
+                      setEquipmentList(prev => prev.filter(e => e.equipment_name !== eq.equipment_name));
+                    } else {
+                      setEquipmentList(prev => [...prev, { ...eq, quantity: 1, ownership: 'Owned' }]);
+                    }
+                  }} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer',
+                    background: isAdded ? 'rgba(16,185,129,0.08)' : 'var(--bg-hover)',
+                    border: `1px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius)', transition: 'all 0.15s', fontSize: 12,
+                  }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: isAdded ? '#10b981' : 'var(--bg-card)', border: `2px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                      color: '#fff', fontSize: 11, fontWeight: 800 }}>{isAdded ? '✓' : ''}</div>
+                    <span style={{ fontWeight: isAdded ? 600 : 400 }}>{eq.equipment_name}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>{eq.equipment_type}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Editable table for selected + custom equipment */}
+          {equipmentList.length > 0 && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>📋 Selected Equipment ({equipmentList.length})</div>
+              <EditableTable
+                columns={[
+                  { key: 'equipment_name', label: 'Equipment Name', minWidth: 200, placeholder: 'e.g. CAT 140H Motor Grader' },
+                  { key: 'equipment_type', label: 'Type', width: 120, type: 'select', options: EQUIP_TYPES },
+                  { key: 'quantity', label: 'Qty', width: 60, type: 'number' },
+                  { key: 'ownership', label: 'Ownership', width: 100, type: 'select', options: ['Owned', 'Leased', 'Hired'] },
+                ]}
+                data={equipmentList} setData={setEquipmentList}
+                emptyRow={{ equipment_name: '', equipment_type: 'Other', quantity: 1, ownership: 'Owned' }}
+              />
+            </>
+          )}
         </div>
       )}
 
       {/* ══════ STEP 5: KEY PERSONNEL ══════ */}
       {step === 5 && (
         <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ marginBottom: 4 }}>Key Personnel</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <h3>Key Personnel</h3>
+            <SaveIndicator storageKey={storageKey} />
+          </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-            {personnelList.length} personnel extracted. These will appear in daily report attendance tracking.
+            Tick the positions on your project per FIDIC party. Add names later or now.
           </p>
 
-          <EditableTable
-            columns={[
-              { key: 'name', label: 'Name', minWidth: 150, placeholder: 'Full name (or TBD)' },
-              { key: 'position_title', label: 'Position', minWidth: 180, placeholder: 'e.g. Resident Engineer' },
-              { key: 'party', label: 'Party', width: 120, type: 'select', options: PARTIES },
-              { key: 'qualifications', label: 'Qualifications', minWidth: 140, placeholder: 'BSc Civil Eng' },
-            ]}
-            data={personnelList} setData={setPersonnelList}
-            emptyRow={{ name: '', position_title: '', party: 'contractor', qualifications: '' }}
-          />
+          {/* Quick-add checklist grouped by party */}
+          {PARTIES.map(p => {
+            const partyRoles = STANDARD_PERSONNEL.filter(sp => sp.party === p.value);
+            return (
+              <div key={p.value} style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8,
+                  color: p.value === 'employer' ? '#6366f1' : p.value === 'engineer' ? '#059669' : p.value === 'contractor' ? '#e87b35' : '#8b5cf6' }}>
+                  {p.value === 'employer' ? '🏛️' : p.value === 'engineer' ? '👷' : p.value === 'contractor' ? '🏗️' : '🔧'} {p.label}
+                  <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>— {p.desc}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 6 }}>
+                  {partyRoles.map(role => {
+                    const isAdded = personnelList.some(pl => pl.position_title === role.position_title && pl.party === role.party);
+                    const existing = personnelList.find(pl => pl.position_title === role.position_title && pl.party === role.party);
+                    return (
+                      <div key={`${role.party}-${role.position_title}`} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer',
+                        background: isAdded ? 'rgba(16,185,129,0.08)' : 'var(--bg-hover)',
+                        border: `1px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius)', transition: 'all 0.15s',
+                      }} onClick={() => {
+                        if (isAdded) {
+                          setPersonnelList(prev => prev.filter(pl => !(pl.position_title === role.position_title && pl.party === role.party)));
+                        } else {
+                          setPersonnelList(prev => [...prev, { name: '', position_title: role.position_title, party: role.party, qualifications: '' }]);
+                        }
+                      }}>
+                        <div style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: isAdded ? '#10b981' : 'var(--bg-card)', border: `2px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                          color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{isAdded ? '✓' : ''}</div>
+                        <span style={{ fontSize: 12, fontWeight: isAdded ? 600 : 400 }}>{role.position_title}</span>
+                        {isAdded && existing?.name && (
+                          <span style={{ fontSize: 10, color: '#059669', marginLeft: 'auto' }}>{existing.name}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Editable table for names and custom additions */}
+          {personnelList.length > 0 && (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 8 }}>
+                📋 Selected Personnel ({personnelList.length}) — add names and qualifications below
+              </div>
+              <EditableTable
+                columns={[
+                  { key: 'name', label: 'Name', minWidth: 150, placeholder: 'Full name (or TBD)' },
+                  { key: 'position_title', label: 'Position', minWidth: 180, placeholder: 'e.g. Resident Engineer' },
+                  { key: 'party', label: 'Party', width: 130, type: 'select', options: PARTY_VALUES },
+                  { key: 'qualifications', label: 'Qualifications', minWidth: 140, placeholder: 'BSc Civil Eng' },
+                ]}
+                data={personnelList} setData={setPersonnelList}
+                emptyRow={{ name: '', position_title: '', party: 'contractor', qualifications: '' }}
+              />
+            </>
+          )}
         </div>
       )}
 
