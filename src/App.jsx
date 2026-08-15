@@ -3,7 +3,6 @@ import { supabase, hasRole, ROLE_LABELS } from './lib/supabase';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
-import ContractSetupWizard from './pages/ContractSetupWizard';
 import ProjectDetail from './pages/ProjectDetail';
 import SubmitReport from './pages/SubmitReport';
 import ReportsPage from './pages/ReportsPage';
@@ -179,7 +178,6 @@ export default function App() {
     switch (page) {
       case 'dashboard': return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
       case 'projects': return <ProjectsPage {...ctx} />;
-      case 'contract-setup': return <ContractSetupWizard {...ctx} selectedProject={selectedProject} />;
       case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'submit-report': return <SubmitReport {...ctx} />;
       case 'reports': return <ReportsPage {...ctx} />;
