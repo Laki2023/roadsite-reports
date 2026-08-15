@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
 
-const ROLES = ['pending', 'viewer', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
+const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
 const PROJECT_ROLES = [
   'Project Manager','Project Admin','Resident Engineer','Inspector','Surveyor',
   'Materials Technician','Environmental Officer','Accounts Officer'
