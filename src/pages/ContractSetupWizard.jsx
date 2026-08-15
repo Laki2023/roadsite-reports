@@ -151,17 +151,87 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
 
     for (const sheetName of wb.SheetNames) {
       const ws = wb.Sheets[sheetName];
+
+      // ── Kenya Standard BoQ Format Detection ──
+      // Sheets named "Bill X - ..." or "Summary" with headers in row 3
+      const isBillSheet = /^bill\s*\d|^summary/i.test(sheetName);
+
+      if (isBillSheet) {
+        // Read raw rows (array of arrays) to handle header on row 3
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rawRows.length < 4) continue;
+
+        // Find the header row (contains ITEM + DESCRIPTION or similar)
+        let headerRowIdx = -1;
+        for (let r = 0; r < Math.min(5, rawRows.length); r++) {
+          const rowStr = rawRows[r].map(c => String(c).toUpperCase()).join('|');
+          if (rowStr.includes('ITEM') && (rowStr.includes('DESCRIPTION') || rowStr.includes('PARTICULARS'))) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+        if (headerRowIdx < 0) continue;
+
+        // Map column indices by header keywords
+        const hdrs = rawRows[headerRowIdx].map(h => String(h).toUpperCase().trim());
+        const colItem = hdrs.findIndex(h => h === 'ITEM' || h === 'ITEM NO' || h === 'ITEM NO.' || h === 'REF');
+        const colDesc = hdrs.findIndex(h => h.includes('DESCRIPTION') || h.includes('PARTICULARS'));
+        const colUnit = hdrs.findIndex(h => h === 'UNIT' || h === 'UNITS');
+        const colQty = hdrs.findIndex(h => h === 'QTY' || h.includes('QUANTITY'));
+        const colRate = hdrs.findIndex(h => h.includes('RATE'));
+        const colAmt = hdrs.findIndex(h => h.includes('AMOUNT') || h.includes('TOTAL'));
+
+        if (colDesc < 0) continue; // Must have description column
+
+        // Determine bill category from sheet name
+        const billCategory = guessCategoryFromBill(sheetName);
+
+        // Skip summary sheet for line items (it only has bill totals)
+        if (/^summary$/i.test(sheetName)) continue;
+
+        // Parse data rows
+        for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
+          const row = rawRows[r];
+          if (!row || row.length === 0) continue;
+
+          const itemNo = colItem >= 0 ? String(row[colItem] || '').trim() : '';
+          const desc = colDesc >= 0 ? String(row[colDesc] || '').trim() : '';
+          const unit = colUnit >= 0 ? String(row[colUnit] || '').trim() : '';
+          const qty = colQty >= 0 ? parseNum(row[colQty]) : 0;
+          const rate = colRate >= 0 ? parseNum(row[colRate]) : 0;
+          const amount = colAmt >= 0 ? parseNum(row[colAmt]) : 0;
+
+          // Skip empty rows, note rows, total/summary rows, sub-headers
+          if (!desc) continue;
+          if (/^bill\s*no\.?\s*\d.*total|carried.*forward|grand.*summary|^note:|^n\.b/i.test(desc)) continue;
+          if (!itemNo && !qty && !amount && !unit) continue; // Sub-header or note row
+
+          // Accept rows that have: an item number, OR a unit+quantity, OR an amount
+          if (itemNo || (unit && qty) || amount > 0) {
+            results.boq.push({
+              item_no: itemNo,
+              description: desc.length > 200 ? desc.substring(0, 200) + '...' : desc,
+              unit: unit || 'LS',
+              quantity: qty,
+              rate: rate,
+              amount: amount || (qty * rate) || 0,
+              category: billCategory,
+            });
+          }
+        }
+        continue; // Don't run generic parser on bill sheets
+      }
+
+      // ── Generic format (non-bill sheets, equipment, personnel) ──
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
       if (rows.length === 0) continue;
-
       const headers = Object.keys(rows[0]).map(h => h.toLowerCase().trim());
 
-      // Detect BoQ sheet
+      // Generic BoQ detection (for non-Kenya-standard formats)
       if (headers.some(h => h.includes('item') || h.includes('bill')) &&
           headers.some(h => h.includes('description') || h.includes('desc')) &&
           headers.some(h => h.includes('qty') || h.includes('quantity') || h.includes('amount'))) {
         for (const row of rows) {
-          const vals = Object.values(row);
           const itemNo = findCol(row, headers, ['item', 'no', 'ref', 'bill']);
           const desc = findCol(row, headers, ['description', 'desc', 'particulars', 'item description']);
           const unit = findCol(row, headers, ['unit', 'units']);
@@ -739,6 +809,28 @@ function parseNum(val) {
   if (val === '' || val === null || val === undefined) return 0;
   if (typeof val === 'number') return val;
   return parseFloat(String(val).replace(/[,\s]/g, '')) || 0;
+}
+
+function guessCategoryFromBill(sheetName) {
+  const s = sheetName.toLowerCase();
+  if (/prelim|general/i.test(s)) return 'Preliminary';
+  if (/site\s*clear|topsoil/i.test(s)) return 'Earthworks';
+  if (/earth/i.test(s)) return 'Earthworks';
+  if (/excav.*fill|filling.*struct/i.test(s)) return 'Structures';
+  if (/culvert|drain/i.test(s)) return 'Drainage';
+  if (/passage|traffic/i.test(s)) return 'Preliminary';
+  if (/natural\s*material|subbase|sub.*base/i.test(s)) return 'Pavement';
+  if (/crush.*stone|base/i.test(s)) return 'Pavement';
+  if (/lime|cement.*improv/i.test(s)) return 'Pavement';
+  if (/lean\s*concrete|concrete\s*pave/i.test(s)) return 'Pavement';
+  if (/bitum.*surface|surface\s*dress|seal/i.test(s)) return 'Surfacing';
+  if (/bitum.*mix|asphalt/i.test(s)) return 'Surfacing';
+  if (/concrete\s*work/i.test(s)) return 'Structures';
+  if (/road\s*furniture|sign|guard|marker/i.test(s)) return 'Road Furniture';
+  if (/bridge|misc.*bridge/i.test(s)) return 'Structures';
+  if (/daywork/i.test(s)) return 'Dayworks';
+  if (/hiv|aids|safety|environ/i.test(s)) return 'Preliminary';
+  return 'Other';
 }
 
 function guessBoqCategory(desc) {
