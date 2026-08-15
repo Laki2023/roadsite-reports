@@ -23,8 +23,13 @@ const CONSENT_COLORS = { 'n/a': '#64748b', pending: '#f59e0b', consented: '#0596
 const COMMON_POSITIONS = {
   client: [
     'Director General','Deputy Director General','Director of Roads',
-    'Regional Manager','Project Coordinator','Procurement Officer',
+    'Director of Maintenance','Director of Planning',
+    'Regional Manager','Deputy Regional Manager',
+    'Project Coordinator','Procurement Officer',
     'Project Accountant','Environmental Officer (Client)',
+    'Director','Deputy Director','Owner','Representative',
+    'Board Member','Secretary','Finance Officer',
+    'Land / Wayleave Officer','Communications Officer',
   ],
   engineer: [
     'Engineer',
@@ -423,11 +428,16 @@ function PersonnelForm({ initial, personnel, onSave, onCancel, onDelete }) {
       <div style={row}>
         <div>
           <label style={ls}>Position / Title</label>
-          <select value={form.position_title || ''} onChange={e => set('position_title', e.target.value)} style={fs}>
-            <option value="">Select or type below...</option>
-            {(COMMON_POSITIONS[form.party] || []).map(p => <option key={p}>{p}</option>)}
+          <select value={(COMMON_POSITIONS[form.party] || []).includes(form.position_title) ? form.position_title : '__custom__'}
+            onChange={e => { if (e.target.value !== '__custom__') set('position_title', e.target.value); else set('position_title', ''); }} style={fs}>
+            <option value="">— Select —</option>
+            {(COMMON_POSITIONS[form.party] || []).map(p => <option key={p} value={p}>{p}</option>)}
+            <option value="__custom__">＋ Other (type below)</option>
           </select>
-          <input value={form.position_title || ''} onChange={e => set('position_title', e.target.value)} style={{ ...fs, marginTop: 4 }} placeholder="Or type custom position" />
+          {(!(COMMON_POSITIONS[form.party] || []).includes(form.position_title)) && (
+            <input value={form.position_title || ''} onChange={e => set('position_title', e.target.value)}
+              style={{ ...fs, marginTop: 4, border: '2px solid var(--accent)' }} placeholder="Type custom position..." autoFocus />
+          )}
         </div>
         <div><label style={ls}>Nationality</label><input value={form.nationality || ''} onChange={e => set('nationality', e.target.value)} style={fs} /></div>
       </div>
