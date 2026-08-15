@@ -1,5 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import * as XLSX from 'xlsx';
+
+// Bill category mapping for Kenya Standard BoQ
+function guessCategoryFromBill(sheetName) {
+  const s = sheetName.toLowerCase();
+  if (/prelim|general/i.test(s)) return 'Preliminary';
+  if (/site\s*clear|topsoil/i.test(s)) return 'Site Clearance';
+  if (/earth/i.test(s)) return 'Earthworks';
+  if (/excav.*fill|filling.*struct/i.test(s)) return 'Structures';
+  if (/culvert|drain/i.test(s)) return 'Drainage';
+  if (/passage|traffic/i.test(s)) return 'Passage of Traffic';
+  if (/natural\s*material|subbase/i.test(s)) return 'Pavement';
+  if (/crush.*stone|base/i.test(s)) return 'Pavement';
+  if (/lime|cement.*improv/i.test(s)) return 'Pavement';
+  if (/lean\s*concrete|concrete\s*pave/i.test(s)) return 'Pavement';
+  if (/bitum.*surface|surface\s*dress|seal/i.test(s)) return 'Surfacing';
+  if (/bitum.*mix|asphalt/i.test(s)) return 'Surfacing';
+  if (/concrete\s*work/i.test(s)) return 'Structures';
+  if (/road\s*furniture|sign|guard|marker/i.test(s)) return 'Road Furniture';
+  if (/bridge|misc.*bridge/i.test(s)) return 'Structures';
+  if (/daywork/i.test(s)) return 'Dayworks';
+  if (/hiv|aids|safety|environ/i.test(s)) return 'Preliminary';
+  return 'Other';
+}
 
 export default function BoQPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
@@ -16,6 +40,8 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [bulkText, setBulkText] = useState('');
   const [bulkSection, setBulkSection] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState(null); // { sections: [], items: [] }
   const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
@@ -111,6 +137,156 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
     showToast('Item removed'); loadData();
   }
 
+  // ── Excel Upload Parser ──
+  async function handleExcelUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const parsedSections = [];
+      const parsedItems = [];
+      let sortOrder = 0;
+
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rawRows.length < 3) continue;
+
+        // Skip pure summary sheets
+        if (/^summary$/i.test(sheetName) && rawRows.length < 25) continue;
+
+        // Find header row
+        let headerRowIdx = -1;
+        for (let r = 0; r < Math.min(6, rawRows.length); r++) {
+          const rowStr = rawRows[r].map(c => String(c).toUpperCase()).join('|');
+          if ((rowStr.includes('ITEM') || rowStr.includes('REF')) &&
+              (rowStr.includes('DESCRIPTION') || rowStr.includes('PARTICULARS'))) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+        if (headerRowIdx < 0) continue;
+
+        // Map columns
+        const hdrs = rawRows[headerRowIdx].map(h => String(h).toUpperCase().trim());
+        const colItem = hdrs.findIndex(h => h === 'ITEM' || h === 'ITEM NO' || h === 'ITEM NO.' || h === 'REF' || h === 'NO.');
+        const colDesc = hdrs.findIndex(h => h.includes('DESCRIPTION') || h.includes('PARTICULARS'));
+        const colUnit = hdrs.findIndex(h => h === 'UNIT' || h === 'UNITS');
+        const colQty = hdrs.findIndex(h => h === 'QTY' || h.includes('QUANTITY'));
+        const colRate = hdrs.findIndex(h => h.includes('RATE'));
+        const colAmt = hdrs.findIndex(h => h.includes('AMOUNT') || (h.includes('TOTAL') && !h.includes('ITEM')));
+        if (colDesc < 0) continue;
+
+        // Extract bill number from sheet name
+        const billMatch = sheetName.match(/bill\s*(\d+[a-zA-Z]?)/i);
+        const billNo = billMatch ? billMatch[1] : sheetName.replace(/^bill\s*/i, '').split(' ')[0];
+        const category = guessCategoryFromBill(sheetName);
+
+        // Create section
+        const sectionId = `temp_${parsedSections.length}`;
+        parsedSections.push({
+          _tempId: sectionId,
+          section_no: `Bill ${billNo}`,
+          section_title: sheetName.replace(/^bill\s*\d+[a-zA-Z]?\s*[-–—]\s*/i, '').trim() || sheetName,
+          sort_order: parsedSections.length + 1,
+          category,
+        });
+
+        // Parse data rows
+        for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
+          const row = rawRows[r];
+          if (!row || row.length === 0) continue;
+
+          const itemNo = colItem >= 0 ? String(row[colItem] || '').trim() : '';
+          const desc = colDesc >= 0 ? String(row[colDesc] || '').trim() : '';
+          const unit = colUnit >= 0 ? String(row[colUnit] || '').trim() : '';
+          const qty = colQty >= 0 ? parseFloat(String(row[colQty] || '').replace(/[,\s]/g, '')) || 0 : 0;
+          const rate = colRate >= 0 ? parseFloat(String(row[colRate] || '').replace(/[,\s]/g, '')) || 0 : 0;
+          const amount = colAmt >= 0 ? parseFloat(String(row[colAmt] || '').replace(/[,\s]/g, '')) || 0 : 0;
+
+          if (!desc) continue;
+          if (/bill\s*no\.?\s*\d.*total|carried.*forward|grand.*summary|^note:|^n\.b|^sub.*total$/i.test(desc)) continue;
+          if (!itemNo && !qty && !amount && !unit) continue;
+
+          if (itemNo || (unit && qty) || amount > 0) {
+            sortOrder++;
+            parsedItems.push({
+              _sectionId: sectionId,
+              item_no: itemNo,
+              description: desc,
+              unit: unit || 'LS',
+              boq_quantity: qty,
+              rate: rate,
+              boq_amount: amount || (qty * rate) || 0,
+              sort_order: sortOrder,
+              category,
+              _selected: true,
+            });
+          }
+        }
+      }
+
+      if (parsedItems.length > 0) {
+        setUploadPreview({ sections: parsedSections, items: parsedItems });
+        showToast(`Parsed ${parsedItems.length} items across ${parsedSections.length} bills from ${file.name}`);
+      } else {
+        showToast('No BoQ items found in this file', 'error');
+      }
+    } catch (err) {
+      showToast('Error reading file: ' + err.message, 'error');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function confirmExcelImport() {
+    if (!uploadPreview) return;
+    setSaving(true);
+    try {
+      const sectionIdMap = {};
+
+      // Create sections
+      for (const sec of uploadPreview.sections) {
+        const { data, error } = await supabase.from('boq_sections').insert({
+          project_id: selectedProject,
+          section_no: sec.section_no,
+          section_title: sec.section_title,
+          sort_order: sec.sort_order,
+        }).select().single();
+        if (error) throw error;
+        sectionIdMap[sec._tempId] = data.id;
+      }
+
+      // Create items
+      const selectedItems = uploadPreview.items.filter(i => i._selected);
+      for (const item of selectedItems) {
+        const { error } = await supabase.from('boq_items').insert({
+          project_id: selectedProject,
+          section_id: sectionIdMap[item._sectionId] || null,
+          item_no: item.item_no,
+          description: item.description,
+          unit: item.unit,
+          boq_quantity: item.boq_quantity,
+          rate: item.rate,
+          boq_amount: item.boq_amount,
+          payment_type: 'Re-measurement',
+          sort_order: item.sort_order,
+        });
+        if (error) throw error;
+      }
+
+      showToast(`✅ Imported ${uploadPreview.sections.length} bills, ${selectedItems.length} items`);
+      setUploadPreview(null);
+      loadData();
+    } catch (err) {
+      showToast('Import error: ' + err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Financial summaries
   const contractSum = items.reduce((s, i) => s + (i.boq_amount || 0), 0);
   const valueToDate = items.reduce((s, i) => s + (i.value_to_date || 0), 0);
@@ -143,8 +319,12 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
         <div><h2>📋 Bill of Quantities</h2><div className="subtitle">Contract items, valuation & financial progress</div></div>
         {selectedProject && canManage && (
           <div className="btn-group">
-            <button className="btn btn-primary" onClick={() => setShowAddItem(true)}>+ Add Item</button>
-            <button className="btn btn-secondary" onClick={() => setShowBulkImport(true)}>📥 Bulk Import</button>
+            <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📊 Upload BoQ Excel
+              <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleExcelUpload} disabled={uploading} />
+            </label>
+            <button className="btn btn-secondary" onClick={() => setShowAddItem(true)}>+ Add Item</button>
+            <button className="btn btn-secondary" onClick={() => setShowBulkImport(true)}>📥 Paste Import</button>
           </div>
         )}
       </div>
@@ -155,6 +335,80 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
+
+      {/* Excel Upload Preview */}
+      {uploadPreview && (
+        <div style={{ marginBottom: 16, padding: 20, background: 'var(--bg-accent)', border: '1px solid var(--border-accent)', borderRadius: 'var(--radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>📊 BoQ Excel — {uploadPreview.items.length} items across {uploadPreview.sections.length} bills</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Total: KES {uploadPreview.items.filter(i => i._selected).reduce((s, i) => s + (i.boq_amount || 0), 0).toLocaleString()}
+              </div>
+            </div>
+            <button onClick={() => setUploadPreview(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-secondary)' }}>×</button>
+          </div>
+
+          {/* Bills summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, marginBottom: 12 }}>
+            {uploadPreview.sections.map(sec => {
+              const secItems = uploadPreview.items.filter(i => i._sectionId === sec._tempId);
+              const secTotal = secItems.reduce((s, i) => s + (i.boq_amount || 0), 0);
+              return (
+                <div key={sec._tempId} style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '0.5px solid var(--border)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{sec.section_no}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{sec.section_title}</div>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>{secItems.length} items · KES {secTotal.toLocaleString()}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Items preview table */}
+          <div style={{ maxHeight: 350, overflowY: 'auto', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--surface-2)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-1)', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Bill</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Item</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Description</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Unit</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Qty</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Rate</th>
+                  <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, fontSize: 11, color: 'var(--text-secondary)' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {uploadPreview.items.map((item, i) => {
+                  const sec = uploadPreview.sections.find(s => s._tempId === item._sectionId);
+                  return (
+                    <tr key={i} style={{ borderBottom: '0.5px solid var(--border)', opacity: item._selected ? 1 : 0.4 }}>
+                      <td style={{ padding: '4px 8px', color: 'var(--text-accent)', fontWeight: 500 }}>{sec?.section_no?.replace('Bill ', '')}</td>
+                      <td style={{ padding: '4px 8px' }}>{item.item_no}</td>
+                      <td style={{ padding: '4px 8px', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.description}>{item.description}</td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.unit}</td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.boq_quantity?.toLocaleString()}</td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.rate?.toLocaleString()}</td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.boq_amount?.toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+            <button className="btn btn-primary" onClick={confirmExcelImport} disabled={saving} style={{ fontSize: 14 }}>
+              {saving ? '⏳ Importing...' : `✅ Import ${uploadPreview.items.filter(i => i._selected).length} items`}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setUploadPreview(null)}>Cancel</button>
+          </div>
+
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-secondary)' }}>
+            🔒 File processed in your browser only — never uploaded or stored on the server.
+          </div>
+        </div>
+      )}
 
       {selectedProject && items.length > 0 && (
         <>
