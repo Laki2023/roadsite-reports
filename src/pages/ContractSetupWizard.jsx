@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 
@@ -115,24 +115,38 @@ function DropZone({ onFiles, files, accept, label }) {
 // ── Main Wizard ──
 export default function ContractSetupWizard({ profile, showToast, navigateTo, selectedProject: existingProject }) {
   const isImportMode = !!existingProject?.id;
-  const [step, setStep] = useState(1);
+  const storageKey = `wizard_${existingProject?.id || 'new'}`;
+
+  // Restore state from sessionStorage if available
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(storageKey)) || {}; } catch { return {}; } })();
+
+  const [step, setStep] = useState(saved.step || 1);
   const [files, setFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [processStatus, setProcessStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Extracted data
-  const [contractDetails, setContractDetails] = useState({
+  // Extracted data — restore from session if available
+  const [contractDetails, setContractDetails] = useState(saved.contractDetails || {
     name: '', contract_no: '', employer: 'KeNHA', contractor_name: '', consultant: '',
     fidic_edition: 'Red Book 1999', contract_sum: '', commencement_date: '',
     original_completion_date: '', original_contract_period: '', defects_liability_period: 365,
     start_chainage: '', end_chainage: '', road_class: '', county: '', region: '',
     funding_source: 'GoK', category: 'Construction', current_phase: 'Mobilization', status: 'active',
   });
-  const [boqItems, setBoqItems] = useState([]);
-  const [equipmentList, setEquipmentList] = useState([]);
-  const [personnelList, setPersonnelList] = useState([]);
-  const [extractionSource, setExtractionSource] = useState(''); // 'ai' or 'excel' or 'manual'
+  const [boqItems, setBoqItems] = useState(saved.boqItems || []);
+  const [equipmentList, setEquipmentList] = useState(saved.equipmentList || []);
+  const [personnelList, setPersonnelList] = useState(saved.personnelList || []);
+  const [extractionSource, setExtractionSource] = useState(saved.extractionSource || '');
+
+  // Auto-save wizard state to sessionStorage on every change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify({
+        step, contractDetails, boqItems, equipmentList, personnelList, extractionSource,
+      }));
+    } catch (e) { /* storage full or unavailable */ }
+  }, [step, contractDetails, boqItems, equipmentList, personnelList, extractionSource, storageKey]); // 'ai' or 'excel' or 'manual'
 
   // ── File Handling ──
   function handleFiles(newFiles) {
@@ -477,6 +491,7 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
         ? `✅ Imported ${boqItems.length} BoQ items, ${equipmentList.length} equipment, ${personnelList.length} personnel into ${existingProject.name}`
         : `🎉 Project created with ${boqItems.length} BoQ items, ${equipmentList.length} equipment, ${personnelList.length} personnel!`;
       showToast(msg);
+      try { sessionStorage.removeItem(storageKey); } catch (e) {}
       navigateTo('project-dashboard', project);
     } catch (err) {
       showToast(`Error: ${err.message}`, 'error');
