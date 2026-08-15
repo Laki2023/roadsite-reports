@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 import * as XLSX from 'xlsx';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Bill category mapping for Kenya Standard BoQ
 function guessCategoryFromBill(sheetName) {
@@ -43,6 +44,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [uploading, setUploading] = useState(false);
   const [uploadPreview, setUploadPreview] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
   const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
@@ -440,85 +442,163 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
         </div>
       )}
 
-      {selectedProject && items.length > 0 && (
+      {selectedProject && items.length > 0 && (() => {
+        const BILL_COLORS = ['#3b82f6', '#059669', '#e87b35', '#8b5cf6', '#ec4899', '#0891b2', '#f59e0b', '#6366f1', '#ef4444', '#14b8a6',
+          '#a855f7', '#f97316', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed', '#10b981', '#f43f5e', '#0ea5e9', '#d946ef'];
+        
+        // Chart data
+        const billChartData = Object.entries(grouped).map(([secId, { section, items: secItems }], i) => ({
+          name: section.section_no?.replace('Bill ', 'B') || `S${i}`,
+          fullName: `${section.section_no}: ${section.section_title}`,
+          value: secItems.reduce((s, it) => s + (it.boq_amount || 0), 0),
+          items: secItems.length,
+          color: BILL_COLORS[i % BILL_COLORS.length],
+        })).filter(d => d.value > 0);
+
+        const top5 = [...billChartData].sort((a, b) => b.value - a.value).slice(0, 5);
+        
+        // Filter items by search
+        const filteredGrouped = {};
+        Object.entries(grouped).forEach(([secId, { section, items: secItems }]) => {
+          if (searchQuery) {
+            const filtered = secItems.filter(i => 
+              (i.item_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (i.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            if (filtered.length > 0) filteredGrouped[secId] = { section, items: filtered };
+          } else {
+            filteredGrouped[secId] = { section, items: secItems };
+          }
+        });
+
+        return (
         <>
-          {/* Financial Summary */}
-          <div style={{ marginBottom: 16, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>💰 Contract Financial Summary</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 24px', fontSize: 13 }}>
-              <div>(A) Sub-total (Works)</div>
-              <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(contractSum)}</div>
-              
-              <div style={{ color: 'var(--text-muted)' }}>(B) Add {vopPct}% Variation of Price</div>
-              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vopAmount)}</div>
-              
-              <div style={{ color: 'var(--text-muted)' }}>(C) Add {contingenciesPct}% Contingencies</div>
-              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(contingenciesAmount)}</div>
-              
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 4, fontWeight: 500 }}>(D) Sub-total (A+B+C)</div>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 4, textAlign: 'right', fontFamily: 'monospace', fontWeight: 500 }}>{fmt(subTotal2)}</div>
-              
-              <div style={{ color: 'var(--text-muted)' }}>(E) Add {vatPct}% VAT</div>
-              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vatAmount)}</div>
-              
-              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, fontWeight: 600, fontSize: 14 }}>Total Contract Sum</div>
-              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, fontSize: 14, color: '#059669' }}>{fmt(grandTotal)}</div>
+          {/* ══════ DASHBOARD ROW 1: KPI Cards ══════ */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>BoQ Items</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{items.length}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sections.length} bills</div>
             </div>
-            
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Sub-total (Works)</div>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{(contractSum / 1e6).toFixed(1)}M</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>KES {contractSum.toLocaleString()}</div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>+ VoP + Cont</div>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{(subTotal2 / 1e6).toFixed(1)}M</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>+{vopPct}% +{contingenciesPct}%</div>
+            </div>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total + VAT</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{(grandTotal / 1e6).toFixed(1)}M</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>+{vatPct}% VAT</div>
+            </div>
             {valueToDate > 0 && (
-              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span>Value certified to date: <strong style={{ color: '#059669' }}>{fmt(valueToDate)}</strong></span>
-                <span>Remaining: <strong>{fmt(remaining)}</strong></span>
-                <span>Progress: <strong>{contractSum > 0 ? Math.round((valueToDate / contractSum) * 100) : 0}%</strong></span>
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Certified</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{(valueToDate / 1e6).toFixed(1)}M</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{contractSum > 0 ? Math.round((valueToDate / contractSum) * 100) : 0}% progress</div>
               </div>
             )}
           </div>
 
-          <div className="tabs">
-            <button className={tab === 'items' ? 'active' : ''} onClick={() => setTab('items')}>BoQ Items ({items.length})</button>
-            <button className={tab === 'sections' ? 'active' : ''} onClick={() => setTab('sections')}>Sections ({sections.length})</button>
-            <button className={tab === 'variations' ? 'active' : ''} onClick={() => setTab('variations')}>Variations ({variationItems.length})</button>
-            <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Summary</button>
+          {/* ══════ DASHBOARD ROW 2: Charts ══════ */}
+          <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 12, marginBottom: 16 }}>
+            {/* Pie Chart — Bill Distribution */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Bill distribution</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={billChartData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                    {billChartData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => 'KES ' + Number(v).toLocaleString()} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>{billChartData.length} bills with amounts</div>
+            </div>
+
+            {/* Bar Chart — Top 5 Bills */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Top 5 bills by value</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={top5} layout="vertical" margin={{ left: 10, right: 10 }}>
+                  <XAxis type="number" tickFormatter={v => (v / 1e6).toFixed(0) + 'M'} style={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={35} style={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v) => 'KES ' + Number(v).toLocaleString()} labelFormatter={(l) => top5.find(d => d.name === l)?.fullName || l} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {top5.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
+          {/* ══════ DASHBOARD ROW 3: Contract Breakdown ══════ */}
+          <div style={{ marginBottom: 16, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>💰 Contract financial breakdown</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 24px', fontSize: 13 }}>
+              <div>(A) Sub-total (Works)</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 500 }}>{fmt(contractSum)}</div>
+              <div style={{ color: 'var(--text-muted)', paddingLeft: 16 }}>(B) Add {vopPct}% Variation of Price</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vopAmount)}</div>
+              <div style={{ color: 'var(--text-muted)', paddingLeft: 16 }}>(C) Add {contingenciesPct}% Contingencies</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(contingenciesAmount)}</div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 500 }}>(D) Sub-total (A+B+C)</div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 500 }}>{fmt(subTotal2)}</div>
+              <div style={{ color: 'var(--text-muted)', paddingLeft: 16 }}>(E) Add {vatPct}% VAT</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vatAmount)}</div>
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>Total contract sum</div>
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#059669' }}>{fmt(grandTotal)}</div>
+            </div>
+          </div>
+
+          {/* ══════ SEARCH + TABS ══════ */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+            <div className="tabs" style={{ margin: 0 }}>
+              <button className={tab === 'items' ? 'active' : ''} onClick={() => setTab('items')}>Bills ({sections.length})</button>
+              <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>Summary</button>
+              <button className={tab === 'variations' ? 'active' : ''} onClick={() => setTab('variations')}>Variations ({variationItems.length})</button>
+            </div>
+            {tab === 'items' && (
+              <input type="text" placeholder="🔍 Search items..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                style={{ padding: '6px 12px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-card)', width: 220 }} />
+            )}
+          </div>
+
+          {/* ══════ BILLS ACCORDION ══════ */}
           {tab === 'items' && (
             <div>
-              {canManage && items.some(i => i.linked_activity_id) && (
-                <div style={{ marginBottom: 12 }}>
-                  <button className="btn btn-sm btn-secondary" onClick={syncFromActivities}>🔄 Sync Quantities from Works Activities</button>
-                </div>
-              )}
-              {Object.entries(grouped).map(([secId, { section, items: secItems }]) => {
+              {Object.entries(filteredGrouped).map(([secId, { section, items: secItems }]) => {
                 const secTotal = secItems.reduce((s, i) => s + (i.boq_amount || 0), 0);
                 const secValueToDate = secItems.reduce((s, i) => s + (i.value_to_date || 0), 0);
                 const isExpanded = expandedSections[secId];
                 const progress = secTotal > 0 ? Math.round((secValueToDate / secTotal) * 100) : 0;
+                const chartItem = billChartData.find(d => d.fullName?.includes(section.section_title));
                 return (
                   <div key={secId} style={{ marginBottom: 8 }}>
-                    {/* Bill header — click to expand */}
                     <div onClick={() => setExpandedSections(prev => ({ ...prev, [secId]: !prev[secId] }))}
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
-                        background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: isExpanded ? '8px 8px 0 0' : '8px',
-                        transition: 'all 0.2s' }}>
+                        background: 'var(--bg-card)', border: `1px solid ${isExpanded ? (chartItem?.color || 'var(--accent)') : 'var(--border)'}`,
+                        borderRadius: isExpanded ? '8px 8px 0 0' : '8px', transition: 'all 0.2s' }}>
+                      <div style={{ width: 4, height: 36, borderRadius: 2, background: chartItem?.color || '#64748b' }} />
                       <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>{isExpanded ? '▾' : '▸'}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{section.section_no}: {section.section_title}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {secItems.length} items · {progress}% certified
+                          {secItems.length} items{searchQuery ? ' (filtered)' : ''} · {progress}% certified
                         </div>
                       </div>
-                      {/* Mini progress bar */}
                       <div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--bg-hover)', overflow: 'hidden' }}>
                         <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: progress > 100 ? '#ef4444' : '#059669', borderRadius: 3 }} />
                       </div>
-                      <div style={{ textAlign: 'right', minWidth: 120 }}>
+                      <div style={{ textAlign: 'right', minWidth: 130 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{fmt(secTotal)}</div>
-                        {secValueToDate > 0 && (
-                          <div style={{ fontSize: 10, color: '#059669' }}>{fmt(secValueToDate)} certified</div>
-                        )}
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{contractSum > 0 ? ((secTotal / contractSum) * 100).toFixed(1) : 0}% of total</div>
                       </div>
                     </div>
-                    {/* Expanded items table */}
                     {isExpanded && (
                       <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
                         {renderItemsTable(secItems)}
@@ -527,10 +607,9 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
                   </div>
                 );
               })}
-              {unsectioned.length > 0 && (
-                <div className="card">
-                  <div className="card-header"><h3>Unsectioned Items</h3></div>
-                  {renderItemsTable(unsectioned)}
+              {searchQuery && Object.keys(filteredGrouped).length === 0 && (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  No items matching "{searchQuery}"
                 </div>
               )}
             </div>
@@ -621,7 +700,8 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
             </div>
           )}
         </>
-      )}
+        );
+      })()}
 
       {selectedProject && items.length === 0 && (
         <div className="card empty-state">
