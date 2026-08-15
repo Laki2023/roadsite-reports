@@ -27,6 +27,7 @@ const COMMON_POSITIONS = {
     'Project Accountant','Environmental Officer (Client)',
   ],
   engineer: [
+    'Engineer',
     'Team Leader / Principal Engineer','Deputy Team Leader',
     'Project Engineer','Deputy Project Engineer',
     'Project Implementation Team (PIT) Member',
