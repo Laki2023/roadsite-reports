@@ -224,6 +224,48 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Loading dashboard...</div>;
 
+  // Contractor's QS gets a limited view — just their assigned projects + link to Taking Off Sheet
+  if (profile?.role === 'contractor_qs') {
+    return (
+      <div className="fade-in">
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🏗️</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Contractor Portal</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Submit your measurements for assigned projects</p>
+        </div>
+
+        {projects.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>No projects assigned yet. Contact your Resident Engineer for project access.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {projects.map(p => (
+              <div key={p.id} onClick={() => navigateTo('taking-off')}
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, cursor: 'pointer',
+                  transition: 'all 0.3s', position: 'relative', overflow: 'hidden' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px #e87b3520'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #e87b35, #f59e0b)' }} />
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                  {p.road_name || ''} {p.county ? `· ${p.county}` : ''} {p.contract_no ? `· ${p.contract_no}` : ''}
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                  <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e87b3520', color: '#e87b35' }}>📐 Open Taking Off Sheet →</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ textAlign: 'center', marginTop: 24, padding: 14, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+          🔒 Your access is limited to measurement submissions only. Rates, payment certificates, and other contract data are restricted.
+        </div>
+      </div>
+    );
+  }
+
   if (selectedProjectId && projectDetail) {
     return <ProjectDashboard projectId={selectedProjectId} onBack={() => { setSelectedProjectId(null); setProjectDetail(null); }} profile={profile} navigateTo={navigateTo} />;
   }
