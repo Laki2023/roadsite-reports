@@ -2,6 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
 
 const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
+
+const PAGE_MODULES = [
+  { key: 'submit-report', label: 'Submit Report', icon: '📝' },
+  { key: 'reports', label: 'Daily Reports', icon: '📄' },
+  { key: 'works', label: 'Works Activities', icon: '⛏️' },
+  { key: 'issues', label: 'Site Issues', icon: '⚠️' },
+  { key: 'emergency', label: 'Emergency', icon: '🚨' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '🛣️' },
+  { key: 'quality', label: 'Quality Tests', icon: '🧪' },
+  { key: 'equipment', label: 'Equipment', icon: '🚜' },
+  { key: 'structures', label: 'Structures', icon: '🌉' },
+  { key: 'programme', label: 'Programme', icon: '📅' },
+  { key: 'boq', label: 'Bill of Quantities', icon: '📋' },
+  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐' },
+  { key: 'ipc', label: 'Payment Certificates', icon: '💰' },
+  { key: 'approvals', label: 'Approvals', icon: '✅' },
+  { key: 'monthly-report', label: 'Monthly Report', icon: '📋' },
+  { key: 'claims', label: 'Claims Management', icon: '⚖️' },
+  { key: 'key-personnel', label: 'Key Personnel', icon: '👥' },
+  { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐' },
+  { key: 'staff', label: 'Staff & Teams', icon: '👥' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡️' },
+];
 const PROJECT_ROLES = [
   'Project Manager','Project Admin','Resident Engineer','Inspector','Surveyor',
   'Materials Technician','Environmental Officer','Accounts Officer'
@@ -30,11 +53,22 @@ export default function AdminPanel({ profile, showToast }) {
 
   function openApproveModal(user) {
     setApproveModal(user);
-    // Auto-suggest role based on user's party
+    // Auto-suggest role and pages based on user's party
     const autoRole = user.party === 'contractor' || user.party === 'subcontractor' ? 'contractor_qs' :
                      user.party === 'engineer_rep' ? 'inspector' :
                      user.party === 'engineer' ? 'project_engineer' :
                      user.party === 'client' || user.party === 'project_manager' ? 'engineer' : 'inspector';
+    
+    // Default pages by party
+    const contractorPages = ['taking-off'];
+    const inspectorPages = ['submit-report', 'reports', 'works', 'issues', 'quality', 'equipment', 'key-personnel', 'taking-off'];
+    const rePages = [...inspectorPages, 'emergency', 'pavement', 'structures', 'programme', 'boq', 'approvals', 'monthly-report', 'claims', 'approvals-matrix'];
+    const engineerPages = [...rePages, 'ipc', 'staff', 'user-mgmt'];
+    
+    const autoPages = (user.party === 'contractor' || user.party === 'subcontractor') ? contractorPages :
+                      user.party === 'engineer_rep' ? inspectorPages :
+                      (user.party === 'engineer' || user.party === 'project_manager') ? engineerPages : rePages;
+
     setApproveForm({
       role: autoRole,
       party: user.party || '',
@@ -42,6 +76,7 @@ export default function AdminPanel({ profile, showToast }) {
       full_name: user.full_name || '',
       project_id: '',
       project_role: 'Inspector',
+      allowed_pages: user.allowed_pages || autoPages,
     });
   }
 
@@ -56,6 +91,7 @@ export default function AdminPanel({ profile, showToast }) {
       designation: approveForm.designation,
       approved_at: new Date().toISOString(),
       approved_by: profile.id,
+      allowed_pages: approveForm.allowed_pages || [],
     };
     if (approveForm.party) updates.party = approveForm.party;
     if (approveForm.full_name && approveForm.full_name !== user.full_name) updates.full_name = approveForm.full_name;
@@ -445,6 +481,39 @@ export default function AdminPanel({ profile, showToast }) {
                       {PROJECT_ROLES.map(r => <option key={r}>{r}</option>)}
                     </select>
                   </div>
+                </div>
+              </div>
+
+              {/* Module Access Control */}
+              <div style={{ background: 'var(--bg-hover)', padding: 14, borderRadius: 'var(--radius)', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>🔐 Module access</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button type="button" onClick={() => setApproveForm({ ...approveForm, allowed_pages: PAGE_MODULES.map(m => m.key) })}
+                      style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'var(--bg-card)' }}>Select all</button>
+                    <button type="button" onClick={() => setApproveForm({ ...approveForm, allowed_pages: [] })}
+                      style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'var(--bg-card)' }}>Clear all</button>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {PAGE_MODULES.map(m => {
+                    const checked = (approveForm.allowed_pages || []).includes(m.key);
+                    return (
+                      <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+                        background: checked ? '#05966910' : 'transparent', transition: 'all 0.15s' }}>
+                        <input type="checkbox" checked={checked} onChange={() => {
+                          const pages = [...(approveForm.allowed_pages || [])];
+                          if (checked) { pages.splice(pages.indexOf(m.key), 1); }
+                          else { pages.push(m.key); }
+                          setApproveForm({ ...approveForm, allowed_pages: pages });
+                        }} style={{ accentColor: '#059669' }} />
+                        <span>{m.icon} {m.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>
+                  Only ticked modules will appear in the user's sidebar. Dashboard and Projects are always visible.
                 </div>
               </div>
 

@@ -258,7 +258,16 @@ export default function App() {
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item, i) => {
             if (item.section) return <div key={i} className="nav-section">{item.section}</div>;
-            if (!profile.is_platform_admin && !hasRole(profile.role, item.minRole)) return null;
+            // Access control: platform admin sees all, otherwise check allowed_pages then fall back to role
+            if (!profile.is_platform_admin) {
+              if (profile.allowed_pages && profile.allowed_pages.length > 0) {
+                // User has specific page assignments — use those
+                if (!profile.allowed_pages.includes(item.key) && item.key !== 'dashboard' && item.key !== 'projects') return null;
+              } else {
+                // Fall back to role-based access
+                if (!hasRole(profile.role, item.minRole)) return null;
+              }
+            }
             const isActive = page === item.key;
             const badge = item.key === 'emergency' && activeEmergencies.length > 0 ? activeEmergencies.length
               : item.key === 'issues' && pendingCounts.issues > 0 ? pendingCounts.issues
