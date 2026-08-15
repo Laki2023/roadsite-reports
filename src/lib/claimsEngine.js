@@ -56,10 +56,10 @@ const DETECTION_RULES = [
     priority: 'critical',
     description: 'IPC payment delayed beyond 56 days',
     async detect(projectId) {
-      const { data } = await supabase.from('interim_payment_certificates')
+      const { data } = await supabase.from('ipc_certificates')
         .select('*')
         .eq('project_id', projectId)
-        .order('ipc_number');
+        .order('ipc_no');
 
       if (!data) return null;
 
@@ -82,7 +82,7 @@ const DETECTION_RULES = [
           events: overdue.map(ipc => ({
             event_type: 'late_payment',
             event_date: ipc.certified_date,
-            description: `IPC ${ipc.ipc_number}: Certified KES ${(ipc.certified_amount || 0).toLocaleString()}, Paid KES ${(ipc.paid_amount || 0).toLocaleString()}`,
+            description: `IPC ${ipc.ipc_no}: Certified KES ${(ipc.certified_amount || 0).toLocaleString()}, Paid KES ${(ipc.paid_amount || 0).toLocaleString()}`,
             ipc_id: ipc.id,
             cost_impact: (ipc.certified_amount || 0) - (ipc.paid_amount || 0),
           })),

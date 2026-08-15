@@ -118,10 +118,10 @@ export async function fetchMonthlyReportData(projectId, month) {
       .lte('created_at', `${endDate}T23:59:59`),
     
     // IPCs
-    supabase.from('interim_payment_certificates')
+    supabase.from('ipc_certificates')
       .select('*')
       .eq('project_id', projectId)
-      .order('ipc_number'),
+      .order('ipc_no'),
     
     // Photos for the month
     supabase.from('report_photos')
