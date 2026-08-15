@@ -95,6 +95,9 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     ['replacement_for','date_mobilised','date_demobilised','replacement_consent_date'].forEach(k => {
       if (!payload[k]) payload[k] = null;
     });
+    // Convert empty strings to null for numeric fields
+    if (payload.years_experience === '' || payload.years_experience === undefined) payload.years_experience = null;
+    else payload.years_experience = parseInt(payload.years_experience) || null;
 
     let error;
     if (editItem?.id) {
