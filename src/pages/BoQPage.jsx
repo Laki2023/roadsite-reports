@@ -41,8 +41,9 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [bulkSection, setBulkSection] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadPreview, setUploadPreview] = useState(null); // { sections: [], items: [] }
-  const canManage = hasRole(profile?.role, 'resident_engineer');
+  const [uploadPreview, setUploadPreview] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({});
+  const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
@@ -449,15 +450,45 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
                   <button className="btn btn-sm btn-secondary" onClick={syncFromActivities}>🔄 Sync Quantities from Works Activities</button>
                 </div>
               )}
-              {Object.entries(grouped).map(([secId, { section, items: secItems }]) => (
-                <div key={secId} className="card" style={{ marginBottom: 16 }}>
-                  <div className="card-header">
-                    <h3>{section.section_no}: {section.section_title}</h3>
-                    <span className="text-mono text-sm">{fmt(secItems.reduce((s, i) => s + (i.boq_amount || 0), 0))}</span>
+              {Object.entries(grouped).map(([secId, { section, items: secItems }]) => {
+                const secTotal = secItems.reduce((s, i) => s + (i.boq_amount || 0), 0);
+                const secValueToDate = secItems.reduce((s, i) => s + (i.value_to_date || 0), 0);
+                const isExpanded = expandedSections[secId];
+                const progress = secTotal > 0 ? Math.round((secValueToDate / secTotal) * 100) : 0;
+                return (
+                  <div key={secId} style={{ marginBottom: 8 }}>
+                    {/* Bill header — click to expand */}
+                    <div onClick={() => setExpandedSections(prev => ({ ...prev, [secId]: !prev[secId] }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer',
+                        background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: isExpanded ? '8px 8px 0 0' : '8px',
+                        transition: 'all 0.2s' }}>
+                      <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>{isExpanded ? '▾' : '▸'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{section.section_no}: {section.section_title}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {secItems.length} items · {progress}% certified
+                        </div>
+                      </div>
+                      {/* Mini progress bar */}
+                      <div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(progress, 100)}%`, height: '100%', background: progress > 100 ? '#ef4444' : '#059669', borderRadius: 3 }} />
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: 120 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{fmt(secTotal)}</div>
+                        {secValueToDate > 0 && (
+                          <div style={{ fontSize: 10, color: '#059669' }}>{fmt(secValueToDate)} certified</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Expanded items table */}
+                    {isExpanded && (
+                      <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+                        {renderItemsTable(secItems)}
+                      </div>
+                    )}
                   </div>
-                  {renderItemsTable(secItems)}
-                </div>
-              ))}
+                );
+              })}
               {unsectioned.length > 0 && (
                 <div className="card">
                   <div className="card-header"><h3>Unsectioned Items</h3></div>
