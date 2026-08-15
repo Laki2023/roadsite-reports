@@ -246,6 +246,10 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
     if (!uploadPreview) return;
     setSaving(true);
     try {
+      // First clear any existing data from a failed previous import
+      await supabase.from('boq_items').delete().eq('project_id', selectedProject);
+      await supabase.from('boq_sections').delete().eq('project_id', selectedProject);
+
       const sectionIdMap = {};
 
       // Create sections
@@ -256,33 +260,42 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
           section_title: sec.section_title,
           sort_order: sec.sort_order,
         }).select().single();
-        if (error) throw error;
+        if (error) throw new Error(`Section "${sec.section_no}": ${error.message}`);
         sectionIdMap[sec._tempId] = data.id;
       }
 
-      // Create items
+      // Batch insert items per section
       const selectedItems = uploadPreview.items.filter(i => i._selected);
-      for (const item of selectedItems) {
-        const { error } = await supabase.from('boq_items').insert({
+      let imported = 0;
+
+      for (const sec of uploadPreview.sections) {
+        const secItems = selectedItems.filter(i => i._sectionId === sec._tempId);
+        if (secItems.length === 0) continue;
+
+        const payload = secItems.map(item => ({
           project_id: selectedProject,
           section_id: sectionIdMap[item._sectionId] || null,
-          item_no: item.item_no,
-          description: item.description,
-          unit: item.unit,
-          boq_quantity: item.boq_quantity,
-          rate: item.rate,
-          boq_amount: item.boq_amount,
+          item_no: item.item_no || '',
+          description: item.description || '',
+          unit: item.unit || 'LS',
+          boq_quantity: item.boq_quantity || 0,
+          rate: item.rate || 0,
+          boq_amount: item.boq_amount || 0,
           payment_type: 'Re-measurement',
-          sort_order: item.sort_order,
-        });
-        if (error) throw error;
+          sort_order: item.sort_order || 0,
+        }));
+
+        const { error } = await supabase.from('boq_items').insert(payload);
+        if (error) throw new Error(`${sec.section_no} items: ${error.message}`);
+        imported += secItems.length;
       }
 
-      showToast(`✅ Imported ${uploadPreview.sections.length} bills, ${selectedItems.length} items`);
+      showToast(`✅ Imported ${uploadPreview.sections.length} bills, ${imported} items`);
       setUploadPreview(null);
       loadData();
     } catch (err) {
       showToast('Import error: ' + err.message, 'error');
+      loadData(); // Reload to show whatever was saved
     } finally {
       setSaving(false);
     }
