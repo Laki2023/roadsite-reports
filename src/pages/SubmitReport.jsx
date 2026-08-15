@@ -78,6 +78,14 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
     const catEntries = labourEntries.filter(e => e.category === category);
     const catTotal = catEntries.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
     const [collapsed, setCollapsed] = useState(false);
+
+    function clearCategory() {
+      setLabourEntries(prev => prev.map(e => e.category === category ? { ...e, male_count: 0, female_count: 0 } : e));
+    }
+    function removeRole(roleTitle) {
+      setLabourEntries(prev => prev.filter(e => !(e.role_title === roleTitle && e.category === category)));
+    }
+
     return (
       <div style={{ marginTop: 16 }}>
         <div onClick={() => setCollapsed(!collapsed)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
@@ -86,21 +94,28 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
           <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 10 }}>
             {catTotal} on site
           </span>
+          {catTotal > 0 && (
+            <span onClick={e => { e.stopPropagation(); clearCategory(); }}
+              title="Clear all counts" style={{ fontSize: 10, color: '#ef4444', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.08)' }}>
+              ✕ Clear
+            </span>
+          )}
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{collapsed ? '▸' : '▾'}</span>
         </div>
         {!collapsed && (
           <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 60px', gap: 0, padding: '6px 10px',
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 50px 30px', gap: 0, padding: '6px 10px',
               background: 'var(--bg-hover)', borderBottom: '1px solid var(--border)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>
-              <div>Role</div><div style={{ textAlign: 'center' }}>♂ Male</div><div style={{ textAlign: 'center' }}>♀ Female</div><div style={{ textAlign: 'center' }}>Total</div>
+              <div>Role</div><div style={{ textAlign: 'center' }}>♂ M</div><div style={{ textAlign: 'center' }}>♀ F</div><div style={{ textAlign: 'center' }}>Tot</div><div></div>
             </div>
             {/* Rows */}
             {catEntries.map((entry, i) => {
               const total = (entry.male_count || 0) + (entry.female_count || 0);
               const isActive = total > 0;
+              const isCustom = !entry.ref_id;
               return (
-                <div key={entry.role_title} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 60px', gap: 0,
+                <div key={entry.role_title} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 50px 30px', gap: 0,
                   padding: '5px 10px', borderBottom: i < catEntries.length - 1 ? '1px solid var(--border)' : 'none',
                   background: isActive ? 'rgba(16,185,129,0.04)' : 'transparent', alignItems: 'center' }}>
                   <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -111,13 +126,19 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
                   </div>
                   <input type="number" min="0" value={entry.male_count || ''} placeholder="0"
                     onChange={e => updateLabour(entry.role_title, 'male_count', e.target.value)}
-                    style={{ width: 50, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
+                    style={{ width: 46, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
                       border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
                   <input type="number" min="0" value={entry.female_count || ''} placeholder="0"
                     onChange={e => updateLabour(entry.role_title, 'female_count', e.target.value)}
-                    style={{ width: 50, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
+                    style={{ width: 46, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
                       border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
                   <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: isActive ? '#059669' : 'var(--text-muted)' }}>{total}</div>
+                  <div style={{ textAlign: 'center' }}>
+                    {isCustom && (
+                      <span onClick={() => removeRole(entry.role_title)} title="Remove custom role"
+                        style={{ cursor: 'pointer', fontSize: 12, color: '#ef4444' }}>✕</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -409,16 +430,24 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     setSaving(true);
 
     try {
-      // 1. Daily Report
+      // 1. Daily Report — explicitly map fields to avoid sending non-existent columns
       const reportData = {
-        project_id: selectedProject, user_id: profile.id, ...form,
-        working_hours: parseFloat(form.working_hours) || 0,
+        project_id: selectedProject,
+        user_id: profile.id,
+        report_date: form.report_date,
+        weather_conditions: form.weather_conditions,
         max_temp_c: form.max_temp_c ? parseFloat(form.max_temp_c) : null,
         min_temp_c: form.min_temp_c ? parseFloat(form.min_temp_c) : null,
         rainfall_mm: form.rainfall_mm ? parseFloat(form.rainfall_mm) : null,
+        working_hours: parseFloat(form.working_hours) || 0,
         contractor_labour_skilled: parseInt(form.contractor_labour_skilled) || 0,
         contractor_labour_unskilled: parseInt(form.contractor_labour_unskilled) || 0,
         subcontractor_labour: parseInt(form.subcontractor_labour) || 0,
+        work_description: form.work_description || null,
+        quality_observations: form.quality_observations || null,
+        challenges: form.challenges || null,
+        visitors: form.visitors || null,
+        safety_incidents: form.safety_incidents || null,
         progress_percentage: 0,
       };
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
