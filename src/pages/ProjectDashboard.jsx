@@ -1133,7 +1133,6 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
 
       {/* ══════ FOOTER ACTIONS ══════ */}
       <div className="card" style={{ padding:14, display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
-        <button className="btn btn-primary" style={{ background: '#6366f1' }} onClick={() => navigateTo('contract-setup', p)}>📄 Import Contract Data</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('reports', p)}>📋 View Reports</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('works', p)}>⛏ Works Activities</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('quality', p)}>🧪 Quality Tests</button>
