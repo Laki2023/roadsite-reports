@@ -254,14 +254,20 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
                               ) : '—'}
                             </td>
                             <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
-                              <button onClick={() => { setEditItem(p); setShowEditor(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                              {p.party === 'contractor' && p.replacement_consent_status === 'pending' && hasRole(profile?.role, 'resident_engineer') && (
-                                <>
-                                  <button onClick={() => updateConsent(p.id, 'consented')} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12 }} title="Consent">✅</button>
-                                  <button onClick={() => updateConsent(p.id, 'rejected')} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12 }} title="Reject">❌</button>
-                                </>
-                              )}
-                              <button onClick={() => deletePersonnel(p.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <button onClick={() => { setEditItem(p); setShowEditor(true); }}
+                                  style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--accent)' }}
+                                  title="Edit">✏️ Edit</button>
+                                {p.party === 'contractor' && p.replacement_consent_status === 'pending' && hasRole(profile?.role, 'resident_engineer') && (
+                                  <>
+                                    <button onClick={() => updateConsent(p.id, 'consented')} style={{ padding: '3px 6px', fontSize: 10, border: '1px solid #059669', borderRadius: 4, background: 'rgba(5,150,105,0.1)', cursor: 'pointer', color: '#059669' }} title="Consent">✅</button>
+                                    <button onClick={() => updateConsent(p.id, 'rejected')} style={{ padding: '3px 6px', fontSize: 10, border: '1px solid #dc2626', borderRadius: 4, background: 'rgba(220,38,38,0.1)', cursor: 'pointer', color: '#dc2626' }} title="Reject">❌</button>
+                                  </>
+                                )}
+                                <button onClick={() => deletePersonnel(p.id)}
+                                  style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: '1px solid #ef4444', borderRadius: 4, background: 'rgba(239,68,68,0.08)', cursor: 'pointer', color: '#ef4444' }}
+                                  title="Delete">🗑️ Delete</button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -286,7 +292,8 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 24, width: '100%', maxWidth: 550, maxHeight: '85vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16 }}>{editItem?.id ? '✏️ Edit' : '+ Add'} Personnel</h3>
-            <PersonnelForm initial={editItem || emptyItem} personnel={personnel} onSave={savePersonnel} onCancel={() => { setShowEditor(false); setEditItem(null); }} />
+            <PersonnelForm initial={editItem || emptyItem} personnel={personnel} onSave={savePersonnel} onCancel={() => { setShowEditor(false); setEditItem(null); }}
+              onDelete={editItem?.id ? () => { deletePersonnel(editItem.id); setShowEditor(false); setEditItem(null); } : null} />
           </div>
         </div>
       )}
@@ -294,7 +301,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
   );
 }
 
-function PersonnelForm({ initial, personnel, onSave, onCancel }) {
+function PersonnelForm({ initial, personnel, onSave, onCancel, onDelete }) {
   const [form, setForm] = useState({ ...initial });
   const set = (k, v) => setForm({ ...form, [k]: v });
   const fs = { width: '100%', padding: '7px 10px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' };
@@ -363,9 +370,18 @@ function PersonnelForm({ initial, personnel, onSave, onCancel }) {
         </div>
       )}
       <div style={{ marginBottom: 14 }}><label style={ls}>Notes</label><textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} style={{ ...fs, height: 50, resize: 'vertical' }} /></div>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => { if (form.name) onSave(form); }}>💾 {initial?.id ? 'Update' : 'Add'}</button>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
+        {onDelete ? (
+          <button onClick={onDelete}
+            style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, border: '1px solid #ef4444', borderRadius: 'var(--radius)',
+              background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>
+            🗑️ Delete Personnel
+          </button>
+        ) : <div />}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => { if (form.name) onSave(form); }}>💾 {initial?.id ? 'Update' : 'Add'}</button>
+        </div>
       </div>
     </div>
   );
