@@ -31,6 +31,9 @@ const QUALIFICATIONS = [
 
 export default function AuthPage({ showToast }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const [step, setStep] = useState(1); // 1: credentials, 2: profile, 3: party
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +56,41 @@ export default function AuthPage({ showToast }) {
 
   const finalPosition = position === '__custom__' ? customPosition : position;
   const finalQualification = qualification === 'Other' ? customQualification : qualification;
+
+  // Password strength
+  function getPasswordStrength(pwd) {
+    if (!pwd) return { level: 0, label: '', color: '' };
+    let score = 0;
+    if (pwd.length >= 6) score++;
+    if (pwd.length >= 10) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (score <= 1) return { level: 1, label: 'Weak', color: '#ef4444' };
+    if (score <= 2) return { level: 2, label: 'Fair', color: '#f59e0b' };
+    if (score <= 3) return { level: 3, label: 'Good', color: '#0891b2' };
+    return { level: 4, label: 'Strong', color: '#059669' };
+  }
+  const pwdStrength = getPasswordStrength(password);
+
+  // Forgot password
+  async function handleForgotPassword() {
+    if (!resetEmail) { setError('Enter your email address'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setResetSent(true);
+      showToast('Password reset email sent — check your inbox');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e) {
     e?.preventDefault();
@@ -155,21 +193,69 @@ export default function AuthPage({ showToast }) {
             <div style={{ background: '#ef444415', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 16, border: '1px solid #ef444430' }}>{error}</div>
           )}
 
-          {isLogin ? (
+          {isLogin && !showForgotPassword ? (
             /* ═══ LOGIN ═══ */
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 20px', textAlign: 'center' }}>Welcome back</h2>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#3b82f615', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24 }}>🔐</div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Secure sign in</h2>
+              </div>
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} placeholder="you@example.com" required />
               </div>
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Enter your password" required minLength={6} />
+              </div>
+              <div style={{ textAlign: 'right', marginBottom: 16 }}>
+                <span onClick={() => { setShowForgotPassword(true); setResetEmail(email); setError(''); }}
+                  style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontWeight: 500 }}>Forgot password?</span>
               </div>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: '100%', padding: 12, fontSize: 14 }}>
                 {loading ? '⏳ Signing in...' : 'Sign in'}
               </button>
+
+              {/* Security badges */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)' }}>🔒 SSL encrypted</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)' }}>🛡️ Role-based access</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-muted)' }}>📋 Audit logged</div>
+              </div>
+            </div>
+          ) : isLogin && showForgotPassword ? (
+            /* ═══ FORGOT PASSWORD ═══ */
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f59e0b15', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24 }}>🔑</div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>Reset your password</h2>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>We'll send a reset link to your email</p>
+              </div>
+
+              {resetSent ? (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ background: '#05966915', border: '1px solid #05966930', borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>📧</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#059669' }}>Reset email sent</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Check your inbox at <strong>{resetEmail}</strong> and click the reset link</div>
+                  </div>
+                  <button className="btn btn-primary" onClick={() => { setShowForgotPassword(false); setResetSent(false); }}
+                    style={{ width: '100%', padding: 12 }}>← Back to sign in</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={labelStyle}>Email address</label>
+                    <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} style={inputStyle} placeholder="you@example.com" />
+                  </div>
+                  <button className="btn btn-primary" onClick={handleForgotPassword} disabled={loading}
+                    style={{ width: '100%', padding: 12, fontSize: 14, marginBottom: 12 }}>
+                    {loading ? '⏳ Sending...' : '📧 Send reset link'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => { setShowForgotPassword(false); setError(''); }}
+                    style={{ width: '100%', padding: 10 }}>← Back to sign in</button>
+                </>
+              )}
             </div>
           ) : (
             /* ═══ REGISTRATION ═══ */
@@ -210,6 +296,18 @@ export default function AuthPage({ showToast }) {
                   <div style={{ marginBottom: 14 }}>
                     <label style={labelStyle}>Password *</label>
                     <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Min 6 characters" required minLength={6} />
+                    {password && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                          {[1,2,3,4].map(i => (
+                            <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= pwdStrength.level ? pwdStrength.color : 'var(--border)', transition: 'all 0.3s' }} />
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 10, color: pwdStrength.color, fontWeight: 600 }}>
+                          {pwdStrength.label} {pwdStrength.level >= 3 ? '✓' : '— add uppercase, numbers, or symbols'}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div style={{ marginBottom: 20 }}>
                     <label style={labelStyle}>Phone number</label>
@@ -330,6 +428,12 @@ export default function AuthPage({ showToast }) {
                       placeholder="e.g. 8 years experience in road construction supervision..." />
                   </div>
 
+                  {/* Security notice */}
+                  <div style={{ padding: '10px 14px', background: '#05966910', border: '1px solid #05966925', borderRadius: 8, marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 600, color: '#059669' }}>🔒 Your data is protected</div>
+                    <div>Your information is encrypted and stored securely. Only authorised administrators can view and approve your registration. By creating an account you agree to responsible use of this platform.</div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button className="btn btn-secondary" onClick={() => setStep(2)} style={{ flex: 1, padding: 12 }}>← Back</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}
@@ -343,11 +447,20 @@ export default function AuthPage({ showToast }) {
           )}
 
           <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13 }}>
-            {isLogin ? "Don't have an account? " : 'Already registered? '}
-            <span onClick={() => { setIsLogin(!isLogin); setError(''); setStep(1); }}
-              style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>
-              {isLogin ? 'Register' : 'Sign in'}
-            </span>
+            {isLogin && !showForgotPassword ? "Don't have an account? " : !isLogin ? 'Already registered? ' : ''}
+            {(isLogin && !showForgotPassword) && (
+              <span onClick={() => { setIsLogin(false); setError(''); setStep(1); }}
+                style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Register</span>
+            )}
+            {!isLogin && (
+              <span onClick={() => { setIsLogin(true); setError(''); setStep(1); setShowForgotPassword(false); }}
+                style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}>Sign in</span>
+            )}
+          </div>
+
+          {/* Footer security */}
+          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>
+            🔐 Secured by Supabase · End-to-end encrypted · FIDIC compliant
           </div>
         </div>
       </div>

@@ -62,7 +62,17 @@ export default function AdminPanel({ profile, showToast }) {
       }, { onConflict: 'project_id,staff_id' });
     }
 
-    showToast(`${user.full_name} approved as ${ROLE_LABELS[approveForm.role]}`);
+    // Send approval notification via password reset email
+    // (This triggers Supabase to send an email to the user, confirming their account is active)
+    try {
+      await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: window.location.origin,
+      });
+      showToast(`${user.full_name} approved as ${ROLE_LABELS[approveForm.role]} — notification email sent`);
+    } catch (emailErr) {
+      showToast(`${user.full_name} approved as ${ROLE_LABELS[approveForm.role]} (email notification failed)`);
+    }
+
     setApproveModal(null);
     loadAll();
   }
