@@ -28,6 +28,59 @@ const STEPS = [
   { num: 9, label: 'Review & Submit', icon: '✅', short: 'Submit' },
 ];
 
+// ── Standard Road Construction Layers/Activities ──
+const WORK_LAYERS = [
+  // Earthworks & Formation
+  { name: 'Site Clearance', unit: 'Km', group: 'earthworks' },
+  { name: 'Top Soil Stripping', unit: 'Km', group: 'earthworks' },
+  { name: 'Compaction of OGL', unit: 'Km', group: 'earthworks' },
+  { name: 'Final Earthworks', unit: 'Km', group: 'earthworks' },
+  { name: 'Cut to Fill', unit: 'm³', group: 'earthworks' },
+  { name: 'Cut to Spoil', unit: 'm³', group: 'earthworks' },
+  { name: 'Fill from Borrow', unit: 'm³', group: 'earthworks' },
+  { name: 'Rock Excavation', unit: 'm³', group: 'earthworks' },
+  { name: 'Fill in Structures', unit: 'm³', group: 'earthworks' },
+  // Pavement Layers
+  { name: 'Bottom Subgrade', unit: 'Km', group: 'pavement' },
+  { name: 'Top Subgrade', unit: 'Km', group: 'pavement' },
+  { name: 'Improved Subgrade', unit: 'Km', group: 'pavement' },
+  { name: 'CIG Subbase', unit: 'Km', group: 'pavement' },
+  { name: 'Natural Gravel Subbase', unit: 'Km', group: 'pavement' },
+  { name: 'GCS Base', unit: 'Km', group: 'pavement' },
+  { name: 'Cement Stabilised Base', unit: 'Km', group: 'pavement' },
+  { name: 'Concrete Pavement', unit: 'Km', group: 'pavement' },
+  // Surfacing
+  { name: 'Prime Coat', unit: 'Km', group: 'surfacing' },
+  { name: 'Tack Coat', unit: 'Km', group: 'surfacing' },
+  { name: 'Binder Course (AC)', unit: 'Km', group: 'surfacing' },
+  { name: 'Wearing Course (AC)', unit: 'Km', group: 'surfacing' },
+  { name: 'Surface Dressing', unit: 'Km', group: 'surfacing' },
+  { name: 'Slurry Seal', unit: 'Km', group: 'surfacing' },
+  // Drainage & Structures
+  { name: 'Pipe Culverts & Sleeves', unit: 'm', group: 'drainage' },
+  { name: 'Box Culverts', unit: 'No.', group: 'drainage' },
+  { name: 'Side Drains / Ditches', unit: 'm', group: 'drainage' },
+  { name: 'Mitre Drains', unit: 'No.', group: 'drainage' },
+  { name: 'Scour Checks', unit: 'No.', group: 'drainage' },
+  { name: 'Headwalls / Wingwalls', unit: 'No.', group: 'drainage' },
+  { name: 'Bridge Works', unit: 'm', group: 'drainage' },
+  { name: 'Gabion / Rip-rap Protection', unit: 'm³', group: 'drainage' },
+  { name: 'Retaining Walls', unit: 'm', group: 'drainage' },
+  // Road Furniture & Finishes
+  { name: 'Guard Rails', unit: 'm', group: 'furniture' },
+  { name: 'Road Signs', unit: 'No.', group: 'furniture' },
+  { name: 'Road Marking', unit: 'Km', group: 'furniture' },
+  { name: 'Kerbing', unit: 'm', group: 'furniture' },
+  { name: 'Footpaths / Walkways', unit: 'm', group: 'furniture' },
+  { name: 'Bus Bays / Lay-bys', unit: 'No.', group: 'furniture' },
+  { name: 'Speed Bumps / Humps', unit: 'No.', group: 'furniture' },
+  { name: 'Delineator Posts', unit: 'No.', group: 'furniture' },
+  // Other
+  { name: 'Relocation of Services', unit: 'LS', group: 'other' },
+  { name: 'Environmental Mitigation', unit: 'LS', group: 'other' },
+  { name: 'Remedial / Defects Works', unit: 'LS', group: 'other' },
+];
+
 // ── Reusable Workforce Step Component ──
 function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPresence, labourEntries, setLabourEntries, showTooltips }) {
   const keyPersonnel = personnel || [];
@@ -476,12 +529,18 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
       // 2. Works Progress
       for (const w of worksEntries) {
-        if (!w.activity_id || !w.quantity) continue;
+        if (!w.layer_name) continue;
+        const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
+        const isLinear = layerDef ? layerDef.unit === 'Km' : false;
+        const autoQty = isLinear && w.start_chainage && w.end_chainage
+          ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage))
+          : parseFloat(w.quantity) || 0;
         await supabase.from('works_progress').insert({
-          project_id: selectedProject, activity_id: w.activity_id,
+          project_id: selectedProject, activity_id: w.activity_id || null,
           work_date: form.report_date, start_chainage: parseFloat(w.start_chainage) || 0,
-          end_chainage: parseFloat(w.end_chainage) || 0, side: w.side,
-          quantity: parseFloat(w.quantity) || 0, notes: w.notes, reported_by: profile.id,
+          end_chainage: parseFloat(w.end_chainage) || 0, side: w.side || 'Both',
+          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : ''),
+          reported_by: profile.id,
         });
       }
 
@@ -797,29 +856,87 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
       {step === 4 && (
         <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Select the layer/activity, enter chainage range worked today. Km is auto-calculated.
+          </p>
+
           {worksEntries.map((w, i) => {
-            const act = activities.find(a => a.id === w.activity_id);
+            const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
+            const isLinear = layerDef ? layerDef.unit === 'Km' : true;
+            const autoKm = isLinear && w.start_chainage && w.end_chainage
+              ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage)).toFixed(3)
+              : '';
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <select value={w.activity_id} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'activity_id', e.target.value)} style={{ fontSize: 12 }}>
-                    <option value="">Select activity...</option>
-                    {activities.map(a => <option key={a.id} value={a.id}>{a.activity_code ? `${a.activity_code} — ` : ''}{a.activity_name}</option>)}
-                  </select>
-                  <input type="number" placeholder={`Qty (${act?.unit || 'units'})`} value={w.quantity} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12 }} />
-                  <input type="text" placeholder="Ch. From" value={w.start_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
-                  <input type="text" placeholder="Ch. To" value={w.end_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                {/* Layer selector grouped by category */}
+                <select value={w.layer_name || ''} onChange={e => {
+                  const layer = WORK_LAYERS.find(l => l.name === e.target.value);
+                  updateEntry(setWorksEntries, worksEntries, i, 'layer_name', e.target.value);
+                  if (layer) {
+                    updateEntry(setWorksEntries, worksEntries, i, 'unit', layer.unit);
+                    // Also link to activity_id if activities are loaded
+                    const matchAct = activities.find(a => a.activity_name?.toLowerCase().includes(e.target.value.toLowerCase().split(' ')[0]));
+                    if (matchAct) updateEntry(setWorksEntries, worksEntries, i, 'activity_id', matchAct.id);
+                  }
+                }} style={{ fontSize: 12, marginBottom: 8, width: '100%' }}>
+                  <option value="">— Select Layer / Activity —</option>
+                  <optgroup label="🌍 Earthworks & Formation">
+                    {WORK_LAYERS.filter(l => l.group === 'earthworks').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                  <optgroup label="🛣️ Pavement Layers">
+                    {WORK_LAYERS.filter(l => l.group === 'pavement').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                  <optgroup label="🎨 Surfacing">
+                    {WORK_LAYERS.filter(l => l.group === 'surfacing').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                  <optgroup label="🌊 Drainage & Structures">
+                    {WORK_LAYERS.filter(l => l.group === 'drainage').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                  <optgroup label="🚧 Road Furniture & Finishes">
+                    {WORK_LAYERS.filter(l => l.group === 'furniture').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                  <optgroup label="📦 Other">
+                    {WORK_LAYERS.filter(l => l.group === 'other').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
+                  </optgroup>
+                </select>
+
+                <div style={{ display: 'grid', gridTemplateColumns: isLinear ? '1fr 1fr 80px 80px' : '1fr 80px 80px', gap: 8, marginBottom: 8 }}>
+                  {isLinear && (
+                    <>
+                      <input type="text" placeholder="Ch. From (e.g. 12+000)" value={w.start_chainage || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                      <input type="text" placeholder="Ch. To (e.g. 12+800)" value={w.end_chainage || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                    </>
+                  )}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>{isLinear ? 'Km' : `Qty (${w.unit || 'No.'})`}</div>
+                    {isLinear ? (
+                      <div style={{ fontSize: 16, fontWeight: 800, color: autoKm ? '#059669' : 'var(--text-muted)', padding: '4px 0' }}>{autoKm || '—'}</div>
+                    ) : (
+                      <input type="number" placeholder="Qty" value={w.quantity || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12, textAlign: 'center', width: '100%' }} />
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>Side</div>
+                    <select value={w.side || 'Both'} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'side', e.target.value)} style={{ fontSize: 10, padding: 2, width: '100%' }}>
+                      <option value="Both">Both</option>
+                      <option value="LHS">LHS</option>
+                      <option value="RHS">RHS</option>
+                    </select>
+                  </div>
                 </div>
-                <input type="text" placeholder="Notes (optional)" value={w.notes} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
-                {act && act.planned_quantity > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)' }}>
-                    Progress: {act.completed_quantity || 0} / {act.planned_quantity} {act.unit} ({Math.round(((act.completed_quantity || 0) / act.planned_quantity) * 100)}%)
+
+                <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
+
+                {/* Auto-calculated Km highlight */}
+                {isLinear && autoKm && (
+                  <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
+                    ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides
                   </div>
                 )}
               </EntryRow>
             );
           })}
-          <AddButton label="Add Activity Progress" onClick={addWork} />
+          <AddButton label="＋ Add Layer Progress" onClick={() => setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }])} />
           <PhotoUploader
             projectId={selectedProject}
             category="works_progress"
