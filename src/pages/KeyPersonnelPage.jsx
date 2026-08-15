@@ -104,7 +104,14 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
 
   async function deletePersonnel(id) {
     if (!window.confirm('Remove this personnel record?')) return;
-    await supabase.from('key_personnel').delete().eq('id', id);
+    // Delete related attendance records first
+    await supabase.from('personnel_attendance').delete().eq('personnel_id', id);
+    const { error } = await supabase.from('key_personnel').delete().eq('id', id);
+    if (error) {
+      showToast?.('❌ Delete failed: ' + error.message);
+      console.error('Delete error:', error);
+      return;
+    }
     showToast?.('🗑️ Removed');
     loadPersonnel();
   }
