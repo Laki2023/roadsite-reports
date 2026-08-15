@@ -111,6 +111,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [issuePhotos, setIssuePhotos] = useState([]);
   const [generalPhotos, setGeneralPhotos] = useState([]);
 
+  // ── Engineer's Team ──
+  const [engineerTeam, setEngineerTeam] = useState([]);
+  const [teamPresence, setTeamPresence] = useState({});
+
   // ── Data Loading ──
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
@@ -123,11 +127,17 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       supabase.from('equipment_register').select('id, equipment_name, equipment_type').eq('project_id', selectedProject).order('equipment_type'),
       supabase.from('structures').select('id, structure_ref, structure_type, chainage').eq('project_id', selectedProject).order('chainage'),
       supabase.from('pavement_layers').select('id, layer_type, start_chainage, end_chainage, layer_status').eq('project_id', selectedProject),
-    ]).then(([actRes, eqRes, strRes, layRes]) => {
+      supabase.from('key_personnel').select('id, name, position_title, party').eq('project_id', selectedProject).eq('status', 'active').in('party', ['engineer', 'employer']).order('position_title'),
+    ]).then(([actRes, eqRes, strRes, layRes, teamRes]) => {
       setActivities(actRes.data || []);
       setEquipment(eqRes.data || []);
       setStructures(strRes.data || []);
       setLayers(layRes.data || []);
+      setEngineerTeam(teamRes.data || []);
+      // Default all to present
+      const presence = {};
+      (teamRes.data || []).forEach(t => { presence[t.id] = true; });
+      setTeamPresence(presence);
     });
   }, [selectedProject]);
 
@@ -269,6 +279,18 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       let photoCount = 0;
       if (allPhotos.length > 0) {
         photoCount = await uploadReportPhotos(allPhotos, selectedProject, report.id, profile, form.report_date);
+      }
+
+      // 10. Save Engineer's Team Attendance
+      if (engineerTeam.length > 0) {
+        const attendanceRecords = engineerTeam.map(t => ({
+          project_id: selectedProject,
+          personnel_id: t.id,
+          attendance_date: form.report_date,
+          is_present: !!teamPresence[t.id],
+          recorded_by: profile.id,
+        }));
+        await supabase.from('personnel_attendance').upsert(attendanceRecords, { onConflict: 'personnel_id,attendance_date' });
       }
 
       setSubmitted(true);
@@ -445,6 +467,41 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           <div style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 14 }}>
             Total on Site: <strong style={{ fontSize: 20, color: 'var(--accent)' }}>{totalLabour + (parseInt(form.supervisor_count)||0)}</strong>
           </div>
+
+          {/* Engineer's Representative Team */}
+          {engineerTeam.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#059669', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                👷 Engineer's Representative Team
+                <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
+                  ({Object.values(teamPresence).filter(Boolean).length}/{engineerTeam.length} present)
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                {engineerTeam.map(t => (
+                  <div key={t.id}
+                    onClick={() => setTeamPresence({ ...teamPresence, [t.id]: !teamPresence[t.id] })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      background: teamPresence[t.id] ? 'rgba(5,150,105,0.1)' : 'var(--bg-hover)',
+                      border: `1px solid ${teamPresence[t.id] ? '#059669' : 'var(--border)'}`,
+                      borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
+                    }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: teamPresence[t.id] ? '#059669' : 'var(--bg-card)',
+                      border: `2px solid ${teamPresence[t.id] ? '#059669' : 'var(--border)'}`,
+                      color: '#fff', fontSize: 12, fontWeight: 800,
+                    }}>{teamPresence[t.id] ? '✓' : ''}</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>{t.name}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title || t.party}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </SectionCard>
       )}
 
@@ -726,6 +783,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 { icon: '⚠️', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
                 { icon: '📋', label: 'Instructions', value: instructionEntries.length },
                 { icon: '📷', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
+                { icon: '👷', label: "Eng. Team", value: `${Object.values(teamPresence).filter(Boolean).length}/${engineerTeam.length}`, color: '#059669' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
                   <div style={{ fontSize: 20 }}>{s.icon}</div>
