@@ -1,16 +1,56 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 
-const PARTIES = { contractor: '🏗️ Contractor', engineer: '👷 Engineer', employer: '🏛️ Employer', subcontractor: '📋 Subcontractor' };
-const PARTY_COLORS = { contractor: '#e87b35', engineer: '#059669', employer: '#2563eb', subcontractor: '#8b5cf6' };
+const PARTIES = {
+  client: '🏛️ Client',
+  engineer: '📐 Engineer',
+  project_manager: '👔 Project Manager',
+  engineer_rep: '👷 Engineer Representative',
+  contractor: '🏗️ Contractor',
+};
+const PARTY_COLORS = {
+  client: '#2563eb',
+  engineer: '#6366f1',
+  project_manager: '#0891b2',
+  engineer_rep: '#059669',
+  contractor: '#e87b35',
+};
 const STATUS_COLORS = { active: '#059669', replaced: '#6366f1', demobilised: '#64748b', absent: '#dc2626' };
 const CONSENT_COLORS = { 'n/a': '#64748b', pending: '#f59e0b', consented: '#059669', rejected: '#dc2626' };
 
 const COMMON_POSITIONS = {
-  contractor: ['Site Agent','Project Manager','Chief Surveyor','Materials Engineer','Plant Manager','Safety Officer','Environmental Officer','Quality Manager','Foreman','Section Engineer','Lab Technician'],
-  engineer: ['Resident Engineer','Deputy RE','Inspector of Works','Materials Inspector','Surveyor','Lab Technician','Environmental Inspector','Clerk of Works'],
-  employer: ['Project Director','Project Engineer','Procurement Officer'],
-  subcontractor: ['Subcontractor Representative','Site Foreman'],
+  client: [
+    'Director General','Deputy Director General','Director of Roads',
+    'Regional Manager','Project Coordinator','Procurement Officer',
+    'Project Accountant','Environmental Officer (Client)',
+  ],
+  engineer: [
+    'Team Leader / Principal Engineer','Deputy Team Leader',
+    'Highway / Pavement Engineer','Structural Engineer',
+    'Claims / Contract Specialist','Quantity Surveyor (HQ)',
+    'Bridge Engineer','Geotechnical Engineer',
+  ],
+  project_manager: [
+    'Project Manager','Deputy Project Manager','Project Engineer',
+    'Assistant Project Engineer','Project Accountant',
+  ],
+  engineer_rep: [
+    'Resident Engineer (RE)','Assistant Resident Engineer',
+    'Inspector of Works (Roads)','Inspector of Works (Structures)',
+    'Materials / Geotechnical Engineer','Surveyor','Quantity Surveyor',
+    'Environmental Specialist','Social / RAP Specialist',
+    'Road Safety Specialist','Laboratory Technician',
+    'Survey Assistant / Chainman','Office Administrator',
+  ],
+  contractor: [
+    'Site Agent / Construction Manager','Deputy Site Agent',
+    'Project Manager (Contractor)','General Foreman',
+    'Materials Engineer','Chief Surveyor','Plant Manager',
+    'Quality Assurance / QC Manager','Safety / OHS Officer',
+    'Environmental Officer','Camp Manager / Admin',
+    'Quantity Surveyor','Accountant / Finance Officer',
+    'Laboratory Technician','Store Keeper','Section Engineer',
+  ],
 };
 
 export default function KeyPersonnelPage({ profile, showToast, selectedProject: contextProject }) {
@@ -131,7 +171,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>👥 Key Personnel</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Contractor & Engineer staff tracking · FIDIC Cl. 6.9</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Client · Engineer · Project Manager · Engineer Rep · Contractor · FIDIC Cl. 6.9</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {selectedProject && (
@@ -158,13 +198,15 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
       {selectedProject && !loading && (
         <>
           {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 8, marginBottom: 14 }}>
             <KPI icon="👥" label="Total" value={stats.total} color="#e87b35" />
+            <KPI icon="🏛️" label="Client" value={stats.byParty.client || 0} color={PARTY_COLORS.client} />
+            <KPI icon="📐" label="Engineer" value={stats.byParty.engineer || 0} color={PARTY_COLORS.engineer} />
+            <KPI icon="👔" label="Project Mgr" value={stats.byParty.project_manager || 0} color={PARTY_COLORS.project_manager} />
+            <KPI icon="👷" label="Eng. Rep" value={stats.byParty.engineer_rep || 0} color={PARTY_COLORS.engineer_rep} />
             <KPI icon="🏗️" label="Contractor" value={stats.byParty.contractor || 0} color={PARTY_COLORS.contractor} />
-            <KPI icon="👷" label="Engineer" value={stats.byParty.engineer || 0} color={PARTY_COLORS.engineer} />
-            <KPI icon="🏛️" label="Employer" value={stats.byParty.employer || 0} color={PARTY_COLORS.employer} />
             <KPI icon="✅" label="On Site" value={stats.onSite} color="#059669" />
-            <KPI icon="⏳" label="Pending Consent" value={stats.pendingConsent} color={stats.pendingConsent > 0 ? '#f59e0b' : '#059669'} />
+            <KPI icon="⏳" label="Pending" value={stats.pendingConsent} color={stats.pendingConsent > 0 ? '#f59e0b' : '#059669'} />
           </div>
 
           {/* Attendance View */}
