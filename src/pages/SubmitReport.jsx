@@ -432,7 +432,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               { key: 'contractor_labour_skilled', label: 'Skilled Labour', icon: '🔧' },
               { key: 'contractor_labour_unskilled', label: 'Unskilled Labour', icon: '👷' },
               { key: 'subcontractor_labour', label: 'Subcontractor', icon: '🏗️' },
-              { key: 'supervisor_count', label: 'Supervisors', icon: '📋' },
+              { key: 'supervisor_count', label: "Contractor's Staff", icon: '👷' },
             ].map(f => (
               <div key={f.key} style={{ textAlign: 'center', padding: 14, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
                 <div style={{ fontSize: 24, marginBottom: 4 }}>{f.icon}</div>
