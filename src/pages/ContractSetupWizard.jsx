@@ -868,76 +868,10 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
 
       {/* ══════ STEP 5: KEY PERSONNEL ══════ */}
       {step === 5 && (
-        <div className="card" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <h3>Key Personnel</h3>
-            <SaveIndicator storageKey={storageKey} />
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-            Tick the positions on your project per FIDIC party. Add names later or now.
-          </p>
-
-          {/* Quick-add checklist grouped by party */}
-          {PARTIES.map(p => {
-            const partyRoles = STANDARD_PERSONNEL.filter(sp => sp.party === p.value);
-            return (
-              <div key={p.value} style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8,
-                  color: p.color }}>
-                  {p.icon} {p.label}
-                  <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>— {p.desc}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 6 }}>
-                  {partyRoles.map(role => {
-                    const isAdded = personnelList.some(pl => pl.position_title === role.position_title && pl.party === role.party);
-                    const existing = personnelList.find(pl => pl.position_title === role.position_title && pl.party === role.party);
-                    return (
-                      <div key={`${role.party}-${role.position_title}`} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer',
-                        background: isAdded ? 'rgba(16,185,129,0.08)' : 'var(--bg-hover)',
-                        border: `1px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
-                        borderRadius: 'var(--radius)', transition: 'all 0.15s',
-                      }} onClick={() => {
-                        if (isAdded) {
-                          setPersonnelList(prev => prev.filter(pl => !(pl.position_title === role.position_title && pl.party === role.party)));
-                        } else {
-                          setPersonnelList(prev => [...prev, { name: '', position_title: role.position_title, party: role.party, qualifications: '' }]);
-                        }
-                      }}>
-                        <div style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: isAdded ? '#10b981' : 'var(--bg-card)', border: `2px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
-                          color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{isAdded ? '✓' : ''}</div>
-                        <span style={{ fontSize: 12, fontWeight: isAdded ? 600 : 400 }}>{role.position_title}</span>
-                        {isAdded && existing?.name && (
-                          <span style={{ fontSize: 10, color: '#059669', marginLeft: 'auto' }}>{existing.name}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Editable table for names and custom additions */}
-          {personnelList.length > 0 && (
-            <>
-              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 8 }}>
-                📋 Selected Personnel ({personnelList.length}) — add names and qualifications below
-              </div>
-              <EditableTable
-                columns={[
-                  { key: 'name', label: 'Name', minWidth: 150, placeholder: 'Full name (or TBD)' },
-                  { key: 'position_title', label: 'Position', minWidth: 180, placeholder: 'e.g. Resident Engineer' },
-                  { key: 'party', label: 'Party', width: 130, type: 'select', options: PARTY_VALUES },
-                  { key: 'qualifications', label: 'Qualifications', minWidth: 140, placeholder: 'BSc Civil Eng' },
-                ]}
-                data={personnelList} setData={setPersonnelList}
-                emptyRow={{ name: '', position_title: '', party: 'contractor', qualifications: '' }}
-              />
-            </>
-          )}
-        </div>
+        <PersonnelStep
+          personnelList={personnelList} setPersonnelList={setPersonnelList}
+          storageKey={storageKey} parseExcelFile={parseExcelFile} showToast={showToast}
+        />
       )}
 
       {/* ══════ STEP 6: CONFIRM ══════ */}
@@ -992,6 +926,245 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Personnel Step with Upload Feature ──
+function PersonnelStep({ personnelList, setPersonnelList, storageKey, parseExcelFile, showToast }) {
+  const [uploadedPeople, setUploadedPeople] = useState([]);
+  const [bulkParty, setBulkParty] = useState('');
+  const [showUpload, setShowUpload] = useState(false);
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      // Parse Excel — look for name/position columns
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const people = [];
+
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rawRows.length < 2) continue;
+
+        // Find header row
+        let hdrIdx = -1;
+        for (let r = 0; r < Math.min(5, rawRows.length); r++) {
+          const rowStr = rawRows[r].map(c => String(c).toUpperCase()).join('|');
+          if (rowStr.includes('NAME') || rowStr.includes('PERSONNEL') || rowStr.includes('DESIGNATION') || rowStr.includes('POSITION')) {
+            hdrIdx = r; break;
+          }
+        }
+        if (hdrIdx < 0) hdrIdx = 0; // Assume first row is header
+
+        const hdrs = rawRows[hdrIdx].map(h => String(h).toUpperCase().trim());
+        const nameCol = hdrs.findIndex(h => h.includes('NAME') || h.includes('PERSONNEL') || h.includes('STAFF'));
+        const posCol = hdrs.findIndex(h => h.includes('POSITION') || h.includes('DESIGNATION') || h.includes('TITLE') || h.includes('ROLE'));
+        const qualCol = hdrs.findIndex(h => h.includes('QUALIFICATION') || h.includes('EDUCATION') || h.includes('DEGREE'));
+
+        // If no clear columns, use first two columns as name and position
+        const nCol = nameCol >= 0 ? nameCol : 0;
+        const pCol = posCol >= 0 ? posCol : (nameCol >= 0 ? (nameCol === 0 ? 1 : 0) : 1);
+
+        for (let r = hdrIdx + 1; r < rawRows.length; r++) {
+          const row = rawRows[r];
+          const name = String(row[nCol] || '').trim();
+          const position = String(row[pCol] || '').trim();
+          const quals = qualCol >= 0 ? String(row[qualCol] || '').trim() : '';
+
+          if (!name && !position) continue;
+          if (/^(no|s\/n|#|total|sub)/i.test(name) && name.length < 5) continue;
+
+          people.push({
+            name: name || '',
+            position_title: position || '',
+            party: '', // User will assign
+            qualifications: quals,
+            _selected: true,
+          });
+        }
+      }
+
+      if (people.length > 0) {
+        setUploadedPeople(people);
+        setShowUpload(true);
+        showToast(`Found ${people.length} people in ${file.name}`);
+      } else {
+        showToast('No personnel found in this file. Check the format.', 'error');
+      }
+    } catch (err) {
+      showToast(`Error reading file: ${err.message}`, 'error');
+    }
+  }
+
+  function applyBulkParty() {
+    if (!bulkParty) return;
+    setUploadedPeople(prev => prev.map(p => ({ ...p, party: p.party || bulkParty })));
+  }
+
+  function addUploadedToList() {
+    const toAdd = uploadedPeople.filter(p => p._selected && p.party);
+    if (toAdd.length === 0) {
+      showToast('Select people and assign a party first', 'error');
+      return;
+    }
+    setPersonnelList(prev => [...prev, ...toAdd.map(({ _selected, ...rest }) => rest)]);
+    setUploadedPeople([]);
+    setShowUpload(false);
+    showToast(`Added ${toAdd.length} personnel`);
+  }
+
+  return (
+    <div className="card" style={{ padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h3>Key Personnel</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ ...btnSecondary, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', padding: '6px 12px' }}>
+            📊 Upload Personnel List
+            <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileUpload} />
+          </label>
+          <SaveIndicator storageKey={storageKey} />
+        </div>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+        Tick standard roles below, or upload an Excel list from the contractor/consultant/employer.
+      </p>
+
+      {/* ── Uploaded Personnel Review ── */}
+      {showUpload && uploadedPeople.length > 0 && (
+        <div style={{ marginBottom: 20, padding: 16, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+              📊 Imported {uploadedPeople.length} people — assign party and add
+            </div>
+            <button onClick={() => { setShowUpload(false); setUploadedPeople([]); }}
+              style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Cancel</button>
+          </div>
+
+          {/* Bulk party assignment */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Assign all to:</span>
+            <select value={bulkParty} onChange={e => setBulkParty(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }}>
+              <option value="">Select party...</option>
+              {PARTIES.map(p => <option key={p.value} value={p.value}>{p.icon} {p.label}</option>)}
+            </select>
+            <button onClick={applyBulkParty} disabled={!bulkParty}
+              style={{ ...btnSecondary, fontSize: 11, padding: '4px 10px', opacity: bulkParty ? 1 : 0.5 }}>Apply</button>
+          </div>
+
+          {/* Review table */}
+          <div style={{ maxHeight: 350, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-hover)', position: 'sticky', top: 0 }}>
+                  <th style={{ ...thStyle, width: 30 }}>✓</th>
+                  <th style={thStyle}>Name</th>
+                  <th style={thStyle}>Position</th>
+                  <th style={{ ...thStyle, width: 150 }}>Party</th>
+                </tr>
+              </thead>
+              <tbody>
+                {uploadedPeople.map((p, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: p._selected ? 'transparent' : 'rgba(0,0,0,0.05)' }}>
+                    <td style={tdStyle}>
+                      <input type="checkbox" checked={p._selected}
+                        onChange={e => setUploadedPeople(prev => prev.map((pp, idx) => idx === i ? { ...pp, _selected: e.target.checked } : pp))} />
+                    </td>
+                    <td style={tdStyle}>
+                      <input type="text" value={p.name} onChange={e => setUploadedPeople(prev => prev.map((pp, idx) => idx === i ? { ...pp, name: e.target.value } : pp))}
+                        style={{ ...inputStyle, fontWeight: 600 }} />
+                    </td>
+                    <td style={tdStyle}>
+                      <input type="text" value={p.position_title} onChange={e => setUploadedPeople(prev => prev.map((pp, idx) => idx === i ? { ...pp, position_title: e.target.value } : pp))}
+                        style={inputStyle} />
+                    </td>
+                    <td style={tdStyle}>
+                      <select value={p.party} onChange={e => setUploadedPeople(prev => prev.map((pp, idx) => idx === i ? { ...pp, party: e.target.value } : pp))}
+                        style={{ ...inputStyle, color: p.party ? 'var(--text)' : '#ef4444', fontWeight: p.party ? 400 : 700 }}>
+                        <option value="">⚠ Assign party</option>
+                        {PARTIES.map(pt => <option key={pt.value} value={pt.value}>{pt.icon} {pt.label}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+            <button onClick={addUploadedToList} style={{ ...btnPrimary, fontSize: 13, padding: '8px 16px' }}>
+              ✅ Add {uploadedPeople.filter(p => p._selected && p.party).length} personnel to project
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {uploadedPeople.filter(p => p._selected && !p.party).length > 0 &&
+                `⚠ ${uploadedPeople.filter(p => p._selected && !p.party).length} still need a party assigned`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Standard FIDIC roles checklist ── */}
+      {PARTIES.map(p => {
+        const partyRoles = STANDARD_PERSONNEL.filter(sp => sp.party === p.value);
+        return (
+          <div key={p.value} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, color: p.color }}>
+              {p.icon} {p.label}
+              <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>— {p.desc}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 6 }}>
+              {partyRoles.map(role => {
+                const isAdded = personnelList.some(pl => pl.position_title === role.position_title && pl.party === role.party);
+                const existing = personnelList.find(pl => pl.position_title === role.position_title && pl.party === role.party);
+                return (
+                  <div key={`${role.party}-${role.position_title}`} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer',
+                    background: isAdded ? 'rgba(16,185,129,0.08)' : 'var(--bg-hover)',
+                    border: `1px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius)', transition: 'all 0.15s',
+                  }} onClick={() => {
+                    if (isAdded) {
+                      setPersonnelList(prev => prev.filter(pl => !(pl.position_title === role.position_title && pl.party === role.party)));
+                    } else {
+                      setPersonnelList(prev => [...prev, { name: '', position_title: role.position_title, party: role.party, qualifications: '' }]);
+                    }
+                  }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: isAdded ? '#10b981' : 'var(--bg-card)', border: `2px solid ${isAdded ? '#10b981' : 'var(--border)'}`,
+                      color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{isAdded ? '✓' : ''}</div>
+                    <span style={{ fontSize: 12, fontWeight: isAdded ? 600 : 400 }}>{role.position_title}</span>
+                    {isAdded && existing?.name && (
+                      <span style={{ fontSize: 10, color: '#059669', marginLeft: 'auto' }}>{existing.name}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Editable table */}
+      {personnelList.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 8 }}>
+            📋 Selected Personnel ({personnelList.length}) — add names and qualifications below
+          </div>
+          <EditableTable
+            columns={[
+              { key: 'name', label: 'Name', minWidth: 150, placeholder: 'Full name (or TBD)' },
+              { key: 'position_title', label: 'Position', minWidth: 180, placeholder: 'e.g. Resident Engineer' },
+              { key: 'party', label: 'Party', width: 130, type: 'select', options: PARTY_VALUES },
+              { key: 'qualifications', label: 'Qualifications', minWidth: 140, placeholder: 'BSc Civil Eng' },
+            ]}
+            data={personnelList} setData={setPersonnelList}
+            emptyRow={{ name: '', position_title: '', party: 'contractor', qualifications: '' }}
+          />
+        </>
+      )}
     </div>
   );
 }
