@@ -654,6 +654,11 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
 
           <DropZone onFiles={handleFiles} files={files} label="Drop contract documents here" />
 
+          <div style={{ marginTop: 10, padding: 10, background: 'rgba(16,185,129,0.06)', borderRadius: 'var(--radius)',
+            border: '1px solid rgba(16,185,129,0.15)', fontSize: 11, color: '#059669', display: 'flex', alignItems: 'center', gap: 8 }}>
+            🔒 Files are processed in your browser only — they are <strong>never uploaded or stored</strong> on the server. Only the extracted data (BoQ items, equipment, personnel) is saved to your project.
+          </div>
+
           {files.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Uploaded Files:</div>
