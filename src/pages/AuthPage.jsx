@@ -53,6 +53,24 @@ export default function AuthPage({ showToast }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetComplete, setResetComplete] = useState(false);
+
+  // Detect password reset link from URL
+  useState(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setIsResetMode(true);
+    }
+    // Also listen for Supabase auth events
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResetMode(true);
+      }
+    });
+  }, []);
 
   const finalPosition = position === '__custom__' ? customPosition : position;
   const finalQualification = qualification === 'Other' ? customQualification : qualification;
@@ -137,6 +155,25 @@ export default function AuthPage({ showToast }) {
     }
   }
 
+  // Reset password (after clicking email link)
+  async function handleResetPassword() {
+    if (!newPassword) { setError('Enter a new password'); return; }
+    if (newPassword.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setResetComplete(true);
+      showToast('Password updated successfully');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const inputStyle = { width: '100%', padding: '10px 14px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-card)', color: 'var(--text)', transition: 'border 0.2s' };
   const labelStyle = { fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, display: 'block' };
 
@@ -171,6 +208,73 @@ export default function AuthPage({ showToast }) {
               onClick={() => { setSuccess(false); setIsLogin(true); setStep(1); }}>
               Go to sign in
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══ PASSWORD RESET FORM ═══
+  if (isResetMode) {
+    const rpStrength = getPasswordStrength(newPassword);
+    return (
+      <div className="auth-page">
+        <div style={{ maxWidth: 440, margin: '0 auto', padding: 24 }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: 32, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #059669, #3b82f6)' }} />
+
+            {resetComplete ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#05966920', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 28 }}>✓</div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px' }}>Password updated</h2>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 20px' }}>Your password has been changed successfully</p>
+                <button className="btn btn-primary" onClick={() => { setIsResetMode(false); setIsLogin(true); window.location.hash = ''; }}
+                  style={{ width: '100%', padding: 12 }}>Sign in with new password</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#3b82f615', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24 }}>🔑</div>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Set new password</h2>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Choose a strong password for your account</p>
+                </div>
+
+                {error && (
+                  <div style={{ background: '#ef444415', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 16, border: '1px solid #ef444430' }}>{error}</div>
+                )}
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={labelStyle}>New password</label>
+                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} placeholder="Min 6 characters" />
+                  {newPassword && (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                        {[1,2,3,4].map(i => (
+                          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= rpStrength.level ? rpStrength.color : 'var(--border)', transition: 'all 0.3s' }} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 10, color: rpStrength.color, fontWeight: 600 }}>{rpStrength.label}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={labelStyle}>Confirm password</label>
+                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} placeholder="Re-enter your new password" />
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>Passwords do not match</div>
+                  )}
+                  {confirmPassword && newPassword === confirmPassword && (
+                    <div style={{ fontSize: 11, color: '#059669', marginTop: 4 }}>✓ Passwords match</div>
+                  )}
+                </div>
+
+                <button className="btn btn-primary" onClick={handleResetPassword} disabled={loading || !newPassword || newPassword !== confirmPassword}
+                  style={{ width: '100%', padding: 12, fontSize: 14, opacity: (!newPassword || newPassword !== confirmPassword) ? 0.5 : 1 }}>
+                  {loading ? '⏳ Updating...' : '🔐 Update password'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
