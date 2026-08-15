@@ -95,11 +95,8 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
         </div>
         {hasRole(profile.role, 'engineer') && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={() => navigateTo('contract-setup')}>
-              📄 Setup from Contract
-            </button>
-            <button className="btn btn-secondary" onClick={() => { setForm(EMPTY_PROJECT); setEditId(null); setShowModal(true); }}>
-              + Quick Create
+            <button className="btn btn-primary" onClick={() => { setForm(EMPTY_PROJECT); setEditId(null); setShowModal(true); }}>
+              + New Project
             </button>
           </div>
         )}

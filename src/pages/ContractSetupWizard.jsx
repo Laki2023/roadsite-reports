@@ -113,7 +113,8 @@ function DropZone({ onFiles, files, accept, label }) {
 }
 
 // ── Main Wizard ──
-export default function ContractSetupWizard({ profile, showToast, navigateTo }) {
+export default function ContractSetupWizard({ profile, showToast, navigateTo, selectedProject: existingProject }) {
+  const isImportMode = !!existingProject?.id;
   const [step, setStep] = useState(1);
   const [files, setFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
@@ -296,43 +297,68 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
 
   // ── Save Everything to Database ──
   async function handleConfirm() {
-    if (!contractDetails.name) { showToast('Project name is required', 'error'); return; }
     setSaving(true);
+    let projectId = existingProject?.id;
+    let project = existingProject;
 
     try {
-      // 1. Create project
-      const projectPayload = {
-        name: contractDetails.name,
-        contract_no: contractDetails.contract_no || null,
-        employer: contractDetails.employer || 'KeNHA',
-        contractor_name: contractDetails.contractor_name || null,
-        fidic_edition: contractDetails.fidic_edition || 'Red Book 1999',
-        contract_sum: contractDetails.contract_sum ? parseFloat(contractDetails.contract_sum) : null,
-        original_contract_sum: contractDetails.contract_sum ? parseFloat(contractDetails.contract_sum) : null,
-        commencement_date: contractDetails.commencement_date || null,
-        original_completion_date: contractDetails.original_completion_date || null,
-        original_contract_period: contractDetails.original_contract_period ? parseInt(contractDetails.original_contract_period) : null,
-        defects_liability_period: parseInt(contractDetails.defects_liability_period) || 365,
-        start_chainage: contractDetails.start_chainage ? parseFloat(contractDetails.start_chainage) : null,
-        end_chainage: contractDetails.end_chainage ? parseFloat(contractDetails.end_chainage) : null,
-        road_class: contractDetails.road_class || null,
-        county: contractDetails.county || null,
-        region: contractDetails.region || null,
-        category: contractDetails.category || 'Construction',
-        current_phase: contractDetails.current_phase || 'Mobilization',
-        status: 'active',
-      };
+      if (isImportMode) {
+        // IMPORT MODE — update existing project details if provided
+        const updates = {};
+        if (contractDetails.contractor_name) updates.contractor_name = contractDetails.contractor_name;
+        if (contractDetails.contract_no) updates.contract_no = contractDetails.contract_no;
+        if (contractDetails.fidic_edition) updates.fidic_edition = contractDetails.fidic_edition;
+        if (contractDetails.contract_sum) {
+          updates.contract_sum = parseFloat(contractDetails.contract_sum);
+          updates.original_contract_sum = parseFloat(contractDetails.contract_sum);
+        }
+        if (contractDetails.commencement_date) updates.commencement_date = contractDetails.commencement_date;
+        if (contractDetails.original_completion_date) updates.original_completion_date = contractDetails.original_completion_date;
+        if (contractDetails.original_contract_period) updates.original_contract_period = parseInt(contractDetails.original_contract_period);
+        if (contractDetails.start_chainage) updates.start_chainage = parseFloat(contractDetails.start_chainage);
+        if (contractDetails.end_chainage) updates.end_chainage = parseFloat(contractDetails.end_chainage);
+        if (contractDetails.county) updates.county = contractDetails.county;
+        if (contractDetails.road_class) updates.road_class = contractDetails.road_class;
 
-      const { data: project, error: projErr } = await supabase.from('projects').insert(projectPayload).select().single();
-      if (projErr) throw projErr;
-      const projectId = project.id;
+        if (Object.keys(updates).length > 0) {
+          const { error } = await supabase.from('projects').update(updates).eq('id', projectId);
+          if (error) throw error;
+        }
+      } else {
+        // CREATE MODE — create new project
+        if (!contractDetails.name) { showToast('Project name is required', 'error'); setSaving(false); return; }
+        const projectPayload = {
+          name: contractDetails.name,
+          contract_no: contractDetails.contract_no || null,
+          employer: contractDetails.employer || 'KeNHA',
+          contractor_name: contractDetails.contractor_name || null,
+          fidic_edition: contractDetails.fidic_edition || 'Red Book 1999',
+          contract_sum: contractDetails.contract_sum ? parseFloat(contractDetails.contract_sum) : null,
+          original_contract_sum: contractDetails.contract_sum ? parseFloat(contractDetails.contract_sum) : null,
+          commencement_date: contractDetails.commencement_date || null,
+          original_completion_date: contractDetails.original_completion_date || null,
+          original_contract_period: contractDetails.original_contract_period ? parseInt(contractDetails.original_contract_period) : null,
+          defects_liability_period: parseInt(contractDetails.defects_liability_period) || 365,
+          start_chainage: contractDetails.start_chainage ? parseFloat(contractDetails.start_chainage) : null,
+          end_chainage: contractDetails.end_chainage ? parseFloat(contractDetails.end_chainage) : null,
+          road_class: contractDetails.road_class || null,
+          county: contractDetails.county || null,
+          region: contractDetails.region || null,
+          category: contractDetails.category || 'Construction',
+          current_phase: contractDetails.current_phase || 'Mobilization',
+          status: 'active',
+        };
+        const { data: newProj, error: projErr } = await supabase.from('projects').insert(projectPayload).select().single();
+        if (projErr) throw projErr;
+        projectId = newProj.id;
+        project = newProj;
 
-      // 2. Seed default construction elements
-      try {
-        await supabase.rpc('seed_project_elements', { p_project_id: projectId, p_category: projectPayload.category });
-      } catch (e) { /* ignore if RPC doesn't exist */ }
+        try {
+          await supabase.rpc('seed_project_elements', { p_project_id: projectId, p_category: projectPayload.category });
+        } catch (e) { /* ignore if RPC doesn't exist */ }
+      }
 
-      // 3. Insert BoQ / Works Activities
+      // Insert BoQ / Works Activities
       if (boqItems.length > 0) {
         const boqPayload = boqItems.map((item, i) => ({
           project_id: projectId,
@@ -349,7 +375,7 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
         if (boqErr) throw boqErr;
       }
 
-      // 4. Insert Equipment
+      // Insert Equipment
       if (equipmentList.length > 0) {
         const eqPayload = equipmentList.map(eq => ({
           project_id: projectId,
@@ -361,7 +387,7 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
         if (eqErr) throw eqErr;
       }
 
-      // 5. Insert Key Personnel
+      // Insert Key Personnel
       if (personnelList.length > 0) {
         const kpPayload = personnelList.map(kp => ({
           project_id: projectId,
@@ -374,7 +400,10 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
         if (kpErr) throw kpErr;
       }
 
-      showToast(`🎉 Project created with ${boqItems.length} BoQ items, ${equipmentList.length} equipment, ${personnelList.length} personnel!`);
+      const msg = isImportMode
+        ? `✅ Imported ${boqItems.length} BoQ items, ${equipmentList.length} equipment, ${personnelList.length} personnel into ${existingProject.name}`
+        : `🎉 Project created with ${boqItems.length} BoQ items, ${equipmentList.length} equipment, ${personnelList.length} personnel!`;
+      showToast(msg);
       navigateTo('project-dashboard', project);
     } catch (err) {
       showToast(`Error: ${err.message}`, 'error');
@@ -388,10 +417,17 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
     <div>
       <div className="page-header">
         <div>
-          <h2>📄 Contract Setup Wizard</h2>
-          <div className="subtitle">Upload your contract documents to auto-populate project data</div>
+          <h2>📄 {isImportMode ? `Import Contract Data` : 'Contract Setup Wizard'}</h2>
+          <div className="subtitle">
+            {isImportMode
+              ? `Importing into: ${existingProject.name}`
+              : 'Upload your contract documents to auto-populate project data'}
+          </div>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigateTo('projects')}>← Back to Projects</button>
+        <button className="btn btn-secondary"
+          onClick={() => isImportMode ? navigateTo('project-dashboard', existingProject) : navigateTo('projects')}>
+          ← {isImportMode ? 'Back to Dashboard' : 'Back to Projects'}
+        </button>
       </div>
 
       {/* Step Navigator */}
@@ -631,16 +667,16 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo }) 
             ))}
           </div>
 
-          {!contractDetails.name && (
+          {!isImportMode && !contractDetails.name && (
             <div style={{ padding: 12, background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius)', border: '1px solid rgba(239,68,68,0.2)',
               fontSize: 12, color: '#ef4444', marginBottom: 16 }}>
               ⚠️ Project name is required. Go back to Step 2 to fill it in.
             </div>
           )}
 
-          <button onClick={handleConfirm} disabled={saving || !contractDetails.name}
-            style={{ ...btnPrimary, width: '100%', padding: 14, fontSize: 16, opacity: saving || !contractDetails.name ? 0.5 : 1 }}>
-            {saving ? '⏳ Creating Project...' : '✅ Create Project & Import All Data'}
+          <button onClick={handleConfirm} disabled={saving || (!isImportMode && !contractDetails.name)}
+            style={{ ...btnPrimary, width: '100%', padding: 14, fontSize: 16, opacity: saving || (!isImportMode && !contractDetails.name) ? 0.5 : 1 }}>
+            {saving ? '⏳ Saving...' : isImportMode ? `✅ Import Data into ${existingProject.name}` : '✅ Create Project & Import All Data'}
           </button>
         </div>
       )}

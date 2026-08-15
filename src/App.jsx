@@ -179,7 +179,7 @@ export default function App() {
     switch (page) {
       case 'dashboard': return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
       case 'projects': return <ProjectsPage {...ctx} />;
-      case 'contract-setup': return <ContractSetupWizard {...ctx} />;
+      case 'contract-setup': return <ContractSetupWizard {...ctx} selectedProject={selectedProject} />;
       case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'submit-report': return <SubmitReport {...ctx} />;
       case 'reports': return <ReportsPage {...ctx} />;
