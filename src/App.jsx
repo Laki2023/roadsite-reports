@@ -27,6 +27,7 @@ import ProgrammePage from './pages/ProgrammePage';
 import ClaimsPage from './pages/ClaimsPage';
 import KeyPersonnelPage from './pages/KeyPersonnelPage';
 import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
+import TakingOffPage from './pages/TakingOffPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
@@ -46,6 +47,7 @@ const NAV_ITEMS = [
   { key: 'programme', label: 'Programme of Works', icon: '📅', minRole: 'resident_engineer' },
   { section: 'Contract Admin' },
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
+  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'inspector' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
@@ -188,6 +190,7 @@ export default function App() {
       case 'equipment': return <EquipmentPage {...ctx} />;
       case 'structures': return <StructuresPage {...ctx} />;
       case 'boq': return <BoQPage {...ctx} />;
+      case 'taking-off': return <TakingOffPage {...ctx} />;
       case 'ipc': return <IPCPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
