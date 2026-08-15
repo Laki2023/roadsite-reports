@@ -280,7 +280,6 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
           unit: item.unit || 'LS',
           boq_quantity: item.boq_quantity || 0,
           rate: item.rate || 0,
-          boq_amount: item.boq_amount || 0,
           payment_type: 'Re-measurement',
           sort_order: item.sort_order || 0,
         }));
