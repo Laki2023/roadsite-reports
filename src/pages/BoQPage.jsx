@@ -280,6 +280,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
           unit: item.unit || 'LS',
           boq_quantity: item.boq_quantity || 0,
           rate: item.rate || 0,
+          boq_amount: item.boq_amount || 0,
           payment_type: 'Re-measurement',
           sort_order: item.sort_order || 0,
         }));
@@ -300,8 +301,16 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
     }
   }
 
-  // Financial summaries
+  // Financial summaries with VoP, Contingencies, VAT
   const contractSum = items.reduce((s, i) => s + (i.boq_amount || 0), 0);
+  const vopPct = 15; // Will come from project settings later
+  const contingenciesPct = 10;
+  const vatPct = 16;
+  const vopAmount = contractSum * (vopPct / 100);
+  const contingenciesAmount = contractSum * (contingenciesPct / 100);
+  const subTotal2 = contractSum + vopAmount + contingenciesAmount;
+  const vatAmount = subTotal2 * (vatPct / 100);
+  const grandTotal = subTotal2 + vatAmount;
   const valueToDate = items.reduce((s, i) => s + (i.value_to_date || 0), 0);
   const remaining = contractSum - valueToDate;
   const overMeasured = items.filter(i => i.completed_quantity > i.boq_quantity && i.boq_quantity > 0);
@@ -426,26 +435,35 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
       {selectedProject && items.length > 0 && (
         <>
           {/* Financial Summary */}
-          <div className="stats-grid" style={{ marginBottom: 16 }}>
-            <div className="stat-card">
-              <div className="stat-label">Contract Sum</div>
-              <div className="stat-value" style={{ fontSize: 16 }}>{fmt(contractSum)}</div>
+          <div style={{ marginBottom: 16, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>💰 Contract Financial Summary</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 24px', fontSize: 13 }}>
+              <div>(A) Sub-total (Works)</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>{fmt(contractSum)}</div>
+              
+              <div style={{ color: 'var(--text-muted)' }}>(B) Add {vopPct}% Variation of Price</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vopAmount)}</div>
+              
+              <div style={{ color: 'var(--text-muted)' }}>(C) Add {contingenciesPct}% Contingencies</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(contingenciesAmount)}</div>
+              
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 4, fontWeight: 500 }}>(D) Sub-total (A+B+C)</div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 4, textAlign: 'right', fontFamily: 'monospace', fontWeight: 500 }}>{fmt(subTotal2)}</div>
+              
+              <div style={{ color: 'var(--text-muted)' }}>(E) Add {vatPct}% VAT</div>
+              <div style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(vatAmount)}</div>
+              
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, fontWeight: 600, fontSize: 14 }}>Total Contract Sum</div>
+              <div style={{ borderTop: '2px solid var(--border)', paddingTop: 6, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, fontSize: 14, color: '#059669' }}>{fmt(grandTotal)}</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Value to Date</div>
-              <div className="stat-value text-accent" style={{ fontSize: 16 }}>{fmt(valueToDate)}</div>
-              <div className="progress-bar mt-16" style={{ height: 6 }}>
-                <div className="fill green" style={{ width: `${contractSum > 0 ? (valueToDate / contractSum) * 100 : 0}%` }} />
+            
+            {valueToDate > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span>Value certified to date: <strong style={{ color: '#059669' }}>{fmt(valueToDate)}</strong></span>
+                <span>Remaining: <strong>{fmt(remaining)}</strong></span>
+                <span>Progress: <strong>{contractSum > 0 ? Math.round((valueToDate / contractSum) * 100) : 0}%</strong></span>
               </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Remaining</div>
-              <div className="stat-value" style={{ fontSize: 16 }}>{fmt(remaining)}</div>
-            </div>
-            <div className="stat-card" style={{ borderColor: variationItems.length > 0 ? 'var(--danger)' : 'var(--border)' }}>
-              <div className="stat-label">Variation Flags (±25%)</div>
-              <div className="stat-value" style={{ color: variationItems.length > 0 ? 'var(--danger)' : 'inherit' }}>{variationItems.length}</div>
-            </div>
+            )}
           </div>
 
           <div className="tabs">
