@@ -154,8 +154,8 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
         const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         if (rawRows.length < 3) continue;
 
-        // Skip pure summary sheets
-        if (/^summary$/i.test(sheetName) && rawRows.length < 25) continue;
+        // Skip summary sheets entirely — they only contain bill totals
+        if (/^summary/i.test(sheetName)) continue;
 
         // Find header row
         let headerRowIdx = -1;
