@@ -143,140 +143,143 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
     setFiles(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  // ── Excel Parsing (client-side, no AI needed) ──
-  async function parseExcelFile(file) {
+  // ── Excel Parsing (client-side + optional AI format detection) ──
+  async function parseExcelFile(file, useAI = false) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array' });
     const results = { boq: [], equipment: [], personnel: [] };
 
     for (const sheetName of wb.SheetNames) {
       const ws = wb.Sheets[sheetName];
+      const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (rawRows.length < 2) continue;
+      if (/^summary$/i.test(sheetName) && rawRows.length < 25) continue;
 
-      // ── Kenya Standard BoQ Format Detection ──
-      // Sheets named "Bill X - ..." or "Summary" with headers in row 3
-      const isBillSheet = /^bill\s*\d|^summary/i.test(sheetName);
+      // ── Try AI format detection first (if API key configured) ──
+      if (useAI) {
+        try {
+          const sampleRows = rawRows.slice(0, Math.min(12, rawRows.length));
+          const mapping = await detectFormatWithAI(sheetName, sampleRows);
+          if (mapping && mapping.desc_col >= 0) {
+            const items = extractWithMapping(rawRows, mapping, sheetName);
+            if (items.length > 0) { results.boq.push(...items); continue; }
+          }
+        } catch (e) { console.log('AI detection fallback for', sheetName); }
+      }
 
+      // ── Rule-based: Kenya Standard BoQ (Bill X - ...) ──
+      const isBillSheet = /^bill\s*\d/i.test(sheetName);
       if (isBillSheet) {
-        // Read raw rows (array of arrays) to handle header on row 3
-        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        if (rawRows.length < 4) continue;
-
-        // Find the header row (contains ITEM + DESCRIPTION or similar)
         let headerRowIdx = -1;
-        for (let r = 0; r < Math.min(5, rawRows.length); r++) {
+        for (let r = 0; r < Math.min(6, rawRows.length); r++) {
           const rowStr = rawRows[r].map(c => String(c).toUpperCase()).join('|');
-          if (rowStr.includes('ITEM') && (rowStr.includes('DESCRIPTION') || rowStr.includes('PARTICULARS'))) {
-            headerRowIdx = r;
-            break;
-          }
+          if ((rowStr.includes('ITEM') || rowStr.includes('REF')) &&
+              (rowStr.includes('DESCRIPTION') || rowStr.includes('PARTICULARS'))) { headerRowIdx = r; break; }
         }
-        if (headerRowIdx < 0) continue;
-
-        // Map column indices by header keywords
-        const hdrs = rawRows[headerRowIdx].map(h => String(h).toUpperCase().trim());
-        const colItem = hdrs.findIndex(h => h === 'ITEM' || h === 'ITEM NO' || h === 'ITEM NO.' || h === 'REF');
-        const colDesc = hdrs.findIndex(h => h.includes('DESCRIPTION') || h.includes('PARTICULARS'));
-        const colUnit = hdrs.findIndex(h => h === 'UNIT' || h === 'UNITS');
-        const colQty = hdrs.findIndex(h => h === 'QTY' || h.includes('QUANTITY'));
-        const colRate = hdrs.findIndex(h => h.includes('RATE'));
-        const colAmt = hdrs.findIndex(h => h.includes('AMOUNT') || h.includes('TOTAL'));
-
-        if (colDesc < 0) continue; // Must have description column
-
-        // Determine bill category from sheet name
-        const billCategory = guessCategoryFromBill(sheetName);
-
-        // Skip summary sheet for line items (it only has bill totals)
-        if (/^summary$/i.test(sheetName)) continue;
-
-        // Parse data rows
-        for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
-          const row = rawRows[r];
-          if (!row || row.length === 0) continue;
-
-          const itemNo = colItem >= 0 ? String(row[colItem] || '').trim() : '';
-          const desc = colDesc >= 0 ? String(row[colDesc] || '').trim() : '';
-          const unit = colUnit >= 0 ? String(row[colUnit] || '').trim() : '';
-          const qty = colQty >= 0 ? parseNum(row[colQty]) : 0;
-          const rate = colRate >= 0 ? parseNum(row[colRate]) : 0;
-          const amount = colAmt >= 0 ? parseNum(row[colAmt]) : 0;
-
-          // Skip empty rows, note rows, total/summary rows, sub-headers
-          if (!desc) continue;
-          if (/^bill\s*no\.?\s*\d.*total|carried.*forward|grand.*summary|^note:|^n\.b/i.test(desc)) continue;
-          if (!itemNo && !qty && !amount && !unit) continue; // Sub-header or note row
-
-          // Accept rows that have: an item number, OR a unit+quantity, OR an amount
-          if (itemNo || (unit && qty) || amount > 0) {
-            results.boq.push({
-              item_no: itemNo,
-              description: desc.length > 200 ? desc.substring(0, 200) + '...' : desc,
-              unit: unit || 'LS',
-              quantity: qty,
-              rate: rate,
-              amount: amount || (qty * rate) || 0,
-              category: billCategory,
-            });
-          }
-        }
-        continue; // Don't run generic parser on bill sheets
-      }
-
-      // ── Generic format (non-bill sheets, equipment, personnel) ──
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      if (rows.length === 0) continue;
-      const headers = Object.keys(rows[0]).map(h => h.toLowerCase().trim());
-
-      // Generic BoQ detection (for non-Kenya-standard formats)
-      if (headers.some(h => h.includes('item') || h.includes('bill')) &&
-          headers.some(h => h.includes('description') || h.includes('desc')) &&
-          headers.some(h => h.includes('qty') || h.includes('quantity') || h.includes('amount'))) {
-        for (const row of rows) {
-          const itemNo = findCol(row, headers, ['item', 'no', 'ref', 'bill']);
-          const desc = findCol(row, headers, ['description', 'desc', 'particulars', 'item description']);
-          const unit = findCol(row, headers, ['unit', 'units']);
-          const qty = parseNum(findCol(row, headers, ['qty', 'quantity']));
-          const rate = parseNum(findCol(row, headers, ['rate', 'unit rate', 'price']));
-          const amount = parseNum(findCol(row, headers, ['amount', 'total', 'sum']));
-          if (desc && (qty || amount)) {
-            results.boq.push({
-              item_no: String(itemNo || ''), description: String(desc), unit: String(unit || 'LS'),
-              quantity: qty || 0, rate: rate || 0, amount: amount || (qty * rate) || 0,
-              category: guessBoqCategory(String(desc)),
-            });
-          }
+        if (headerRowIdx >= 0) {
+          const hdrs = rawRows[headerRowIdx].map(h => String(h).toUpperCase().trim());
+          const items = extractWithMapping(rawRows, {
+            item_col: hdrs.findIndex(h => h === 'ITEM' || h === 'ITEM NO' || h === 'ITEM NO.' || h === 'REF' || h === 'NO.'),
+            desc_col: hdrs.findIndex(h => h.includes('DESCRIPTION') || h.includes('PARTICULARS')),
+            unit_col: hdrs.findIndex(h => h === 'UNIT' || h === 'UNITS'),
+            qty_col: hdrs.findIndex(h => h === 'QTY' || h.includes('QUANTITY')),
+            rate_col: hdrs.findIndex(h => h.includes('RATE')),
+            amt_col: hdrs.findIndex(h => h.includes('AMOUNT') || (h.includes('TOTAL') && !h.includes('ITEM'))),
+            data_start: headerRowIdx + 1,
+            category: guessCategoryFromBill(sheetName),
+          }, sheetName);
+          results.boq.push(...items);
+          continue;
         }
       }
 
-      // Detect Equipment sheet
-      if (headers.some(h => h.includes('equipment') || h.includes('plant') || h.includes('machine'))) {
-        for (const row of rows) {
-          const name = findCol(row, headers, ['equipment', 'plant', 'machine', 'description', 'name', 'type']);
-          const qty = parseNum(findCol(row, headers, ['qty', 'quantity', 'no', 'number']));
-          if (name && String(name).length > 2) {
-            results.equipment.push({
-              equipment_name: String(name), equipment_type: guessEquipType(String(name)),
-              quantity: qty || 1, ownership: 'Owned',
-            });
+      // ── Generic format detection (any layout — scans first 6 rows for headers) ──
+      let foundBoq = false;
+      for (let r = 0; r < Math.min(6, rawRows.length); r++) {
+        const hdrs = rawRows[r].map(h => String(h).toUpperCase().trim());
+        const hasDesc = hdrs.findIndex(h => h.includes('DESCRIPTION') || h.includes('PARTICULARS') || h.includes('ACTIVITY') || h.includes('WORK ITEM'));
+        const hasQtyOrAmt = hdrs.findIndex(h => h.includes('QTY') || h.includes('QUANTITY') || h.includes('AMOUNT') || h.includes('TOTAL'));
+        if (hasDesc >= 0 && hasQtyOrAmt >= 0) {
+          const items = extractWithMapping(rawRows, {
+            item_col: hdrs.findIndex(h => h.includes('ITEM') || h.includes('REF') || h.includes('NO') || h.includes('CODE')),
+            desc_col: hasDesc,
+            unit_col: hdrs.findIndex(h => h === 'UNIT' || h === 'UNITS' || h === 'UOM'),
+            qty_col: hdrs.findIndex(h => h === 'QTY' || h.includes('QUANTITY') || h.includes('QUANT')),
+            rate_col: hdrs.findIndex(h => h.includes('RATE') || h.includes('PRICE') || h.includes('UNIT COST')),
+            amt_col: hdrs.findIndex(h => h.includes('AMOUNT') || h.includes('TOTAL') || h.includes('SUM') || h.includes('VALUE')),
+            data_start: r + 1,
+            category: guessBoqCategory(sheetName),
+          }, sheetName);
+          if (items.length > 0) { results.boq.push(...items); foundBoq = true; break; }
+        }
+      }
+      if (foundBoq) continue;
+
+      // ── Equipment / Personnel detection ──
+      const sheetText = rawRows.slice(0, 3).map(r => (r||[]).join(' ')).join(' ').toLowerCase();
+      if (/equipment|plant\s*schedule|machine/i.test(sheetText) || /equipment|plant/i.test(sheetName)) {
+        for (let r = 1; r < rawRows.length; r++) {
+          const name = String(rawRows[r][0] || rawRows[r][1] || '').trim();
+          if (name.length > 3 && !/^(no|item|equipment|plant|description)/i.test(name)) {
+            results.equipment.push({ equipment_name: name, equipment_type: guessEquipType(name),
+              quantity: parseNum(rawRows[r][2] || rawRows[r][3]) || 1, ownership: 'Owned' });
           }
         }
       }
-
-      // Detect Personnel sheet
-      if (headers.some(h => h.includes('personnel') || h.includes('staff') || h.includes('position') || h.includes('designation'))) {
-        for (const row of rows) {
-          const name = findCol(row, headers, ['name', 'staff name', 'personnel']);
-          const position = findCol(row, headers, ['position', 'designation', 'title', 'role']);
-          if (position) {
-            results.personnel.push({
-              name: String(name || ''), position_title: String(position),
-              party: guessParty(String(position)), qualifications: '',
-            });
+      if (/personnel|staff|key.*expert/i.test(sheetText) || /personnel|staff/i.test(sheetName)) {
+        for (let r = 1; r < rawRows.length; r++) {
+          const vals = rawRows[r];
+          const name = String(vals[0] || vals[1] || '').trim();
+          const position = String(vals[1] || vals[2] || '').trim();
+          if (position.length > 3 && !/^(no|name|position|title)/i.test(position)) {
+            results.personnel.push({ name, position_title: position, party: guessParty(position), qualifications: '' });
           }
         }
       }
     }
     return results;
+  }
+
+  // ── Extract rows using a column mapping ──
+  function extractWithMapping(rawRows, mapping, sheetName) {
+    const items = [];
+    const { item_col, desc_col, unit_col, qty_col, rate_col, amt_col, data_start, category } = mapping;
+    for (let r = data_start; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!row || row.length === 0) continue;
+      const itemNo = item_col >= 0 ? String(row[item_col] || '').trim() : '';
+      const desc = desc_col >= 0 ? String(row[desc_col] || '').trim() : '';
+      const unit = unit_col >= 0 ? String(row[unit_col] || '').trim() : '';
+      const qty = qty_col >= 0 ? parseNum(row[qty_col]) : 0;
+      const rate = rate_col >= 0 ? parseNum(row[rate_col]) : 0;
+      const amount = amt_col >= 0 ? parseNum(row[amt_col]) : 0;
+      if (!desc) continue;
+      if (/bill\s*no\.?\s*\d.*total|carried.*forward|grand.*summary|^note:|^n\.b|^sub.*total|^total$/i.test(desc)) continue;
+      if (!itemNo && !qty && !amount && !unit) continue;
+      if (itemNo || (unit && qty) || amount > 0) {
+        items.push({ item_no: itemNo, description: desc.length > 250 ? desc.substring(0, 250) + '...' : desc,
+          unit: unit || 'LS', quantity: qty, rate: rate, amount: amount || (qty * rate) || 0,
+          category: category || guessCategoryFromBill(sheetName) || guessBoqCategory(desc) });
+      }
+    }
+    return items;
+  }
+
+  // ── AI Format Detection (sends only headers + sample rows — ~KES 0.50) ──
+  async function detectFormatWithAI(sheetName, sampleRows) {
+    try {
+      const sampleText = sampleRows.map((r, i) => `Row ${i}: ${r.map((c, j) => `[Col${j}]${c}`).join(' | ')}`).join('\n');
+      const response = await fetch('/api/extract-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_base64: btoa(unescape(encodeURIComponent(`Sheet: ${sheetName}\n${sampleText}`))),
+          file_type: 'text/plain', section: 'detect_format',
+        }),
+      });
+      if (!response.ok) return null;
+      return response.json();
+    } catch (e) { return null; }
   }
 
   // ── AI Extraction (via Vercel API route) ──
@@ -305,7 +308,7 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
   }
 
   // ── Process All Files ──
-  async function processFiles() {
+  async function processFiles(withAI = false) {
     if (files.length === 0) { showToast('Please upload at least one file', 'error'); return; }
     setProcessing(true);
     let allBoq = [], allEquip = [], allPersonnel = [];
@@ -317,12 +320,14 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
         const isExcel = /\.(xlsx?|csv)$/i.test(file.name);
 
         if (isExcel) {
-          setProcessStatus(`Parsing Excel: ${file.name}...`);
-          const result = await parseExcelFile(file);
+          setProcessStatus(withAI
+            ? `AI analyzing format of ${file.name}...`
+            : `Parsing Excel: ${file.name}...`);
+          const result = await parseExcelFile(file, withAI);
           allBoq.push(...result.boq);
           allEquip.push(...result.equipment);
           allPersonnel.push(...result.personnel);
-          setExtractionSource('excel');
+          setExtractionSource(withAI ? 'ai' : 'excel');
         } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
           setProcessStatus(`AI extracting from: ${file.name}... (this may take 30-60 seconds)`);
           try {
@@ -559,14 +564,23 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
             </div>
           )}
 
-          <div style={{ marginTop: 20, display: 'flex', gap: 12 }}>
-            <button onClick={processFiles} disabled={processing || files.length === 0}
+          <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button onClick={() => processFiles(false)} disabled={processing || files.length === 0}
               style={{ ...btnPrimary, opacity: processing || files.length === 0 ? 0.5 : 1 }}>
-              {processing ? '⏳ Processing...' : '🤖 Extract & Import Data'}
+              {processing ? '⏳ Processing...' : '📊 Import Data'}
+            </button>
+            <button onClick={() => processFiles(true)} disabled={processing || files.length === 0}
+              style={{ ...btnSecondary, opacity: processing || files.length === 0 ? 0.5 : 1 }}
+              title="Uses AI to detect any spreadsheet format — requires API key">
+              {processing ? '⏳ Processing...' : '🤖 Smart Import (any format)'}
             </button>
             <button onClick={() => { setExtractionSource('manual'); setStep(2); }} style={btnSecondary}>
               ✏️ Skip — Enter Manually
             </button>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+            <strong>📊 Import Data</strong> — works instantly for Kenya Standard BoQ and common formats. No API key needed.<br/>
+            <strong>🤖 Smart Import</strong> — uses AI to understand any spreadsheet format. Requires API key in Vercel settings.
           </div>
         </div>
       )}

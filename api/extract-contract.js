@@ -91,11 +91,25 @@ RULES:
       equipment: `Extract the equipment/plant schedule from this document. Return JSON: { "equipment": [...] }. Include equipment_name, equipment_type, quantity, ownership.`,
 
       personnel: `Extract the key personnel schedule from this document. Return JSON: { "key_personnel": [...] }. Include name, position_title, party, qualifications.`,
+
+      detect_format: `You are analyzing a spreadsheet to detect its column layout.
+Given these sample rows, identify which column index (0-based) contains each field.
+Return ONLY valid JSON — no markdown, no backticks:
+{
+  "item_col": <col index for item/reference number, or -1>,
+  "desc_col": <col index for description/particulars, or -1>,
+  "unit_col": <col index for unit of measurement, or -1>,
+  "qty_col": <col index for quantity, or -1>,
+  "rate_col": <col index for rate/unit price, or -1>,
+  "amt_col": <col index for amount/total, or -1>,
+  "data_start": <row index where actual data begins (after headers/titles)>,
+  "category": "<best guess: Preliminary|Earthworks|Pavement|Drainage|Structures|Surfacing|Road Furniture|Dayworks|Other>"
+}`,
     };
 
     const systemPrompt = prompts[section || 'all'];
 
-    // Build content array — PDF as document, images as image
+    // Build content array — PDF as document, images as image, text as text
     const content = [];
     if (mediaType === 'application/pdf') {
       content.push({
@@ -107,8 +121,14 @@ RULES:
         type: 'image',
         source: { type: 'base64', media_type: mediaType, data: file_base64 },
       });
+    } else if (mediaType === 'text/plain' || section === 'detect_format') {
+      // For format detection, decode the base64 text and send as plain text
+      const textContent = Buffer.from(file_base64, 'base64').toString('utf-8');
+      content.push({ type: 'text', text: textContent + '\n\n' + systemPrompt });
     }
-    content.push({ type: 'text', text: systemPrompt });
+    if (mediaType !== 'text/plain' && section !== 'detect_format') {
+      content.push({ type: 'text', text: systemPrompt });
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
