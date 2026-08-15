@@ -21,7 +21,41 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
   const [filterBill, setFilterBill] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
+  const [myParty, setMyParty] = useState(null); // 'contractor', 'engineer', or null (RE/admin sees all)
+
+  const isPlatformAdmin = profile?.is_platform_admin;
+  const isRE = hasRole(profile?.role, 'resident_engineer') || isPlatformAdmin;
+  const isEngineer = hasRole(profile?.role, 'project_engineer') || hasRole(profile?.role, 'engineer');
+  const canManage = isRE;
+
+  // Determine user's party from their key_personnel record
+  useEffect(() => {
+    if (!selectedProject || !profile?.id) return;
+    if (isPlatformAdmin) { setMyParty(null); return; } // Admin sees all
+    supabase.from('key_personnel').select('party')
+      .eq('project_id', selectedProject)
+      .ilike('email', profile.email || '')
+      .limit(1).single()
+      .then(({ data }) => {
+        if (data?.party === 'contractor' || data?.party === 'subcontractor') setMyParty('contractor');
+        else if (data?.party === 'engineer' || data?.party === 'engineer_rep') setMyParty('engineer');
+        else if (isRE) setMyParty(null); // RE sees all
+        else if (isEngineer) setMyParty('engineer');
+        else setMyParty(null);
+      })
+      .catch(() => {
+        // Fallback: use role
+        if (isRE) setMyParty(null);
+        else if (isEngineer) setMyParty('engineer');
+        else setMyParty(null);
+      });
+  }, [selectedProject, profile]);
+
+  // Visibility helpers
+  const canSeeContractor = myParty === null || myParty === 'contractor'; // RE/admin or contractor
+  const canSeeEngineer = myParty === null || myParty === 'engineer'; // RE/admin or engineer
+  const canHarmonise = myParty === null; // Only RE/admin
+  const myLabel = myParty === 'contractor' ? '🏗️ Contractor' : myParty === 'engineer' ? '👷 Engineer' : '👔 Resident Engineer';
 
   const emptyForm = {
     boq_item_id: '', entry_date: new Date().toISOString().split('T')[0],
@@ -163,7 +197,16 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📐 Taking Off Sheet</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Dual measurement · Contractor vs Engineer · RE harmonisation</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            {myParty === null ? 'Full visibility — Contractor vs Engineer · RE harmonisation' :
+             myParty === 'contractor' ? 'Contractor measurement — Engineer quantities hidden' :
+             'Engineer measurement — Contractor quantities hidden'}
+            <span style={{ marginLeft: 8, padding: '2px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600,
+              background: myParty === 'contractor' ? '#e87b3520' : myParty === 'engineer' ? '#05966920' : '#3b82f620',
+              color: myParty === 'contractor' ? '#e87b35' : myParty === 'engineer' ? '#059669' : '#3b82f6' }}>
+              {myLabel}
+            </span>
+          </p>
         </div>
         {selectedProject && (
           <button className="btn btn-primary" onClick={() => { setEditEntry(null); setForm({ ...emptyForm }); setShowForm(true); }}>
@@ -241,8 +284,12 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-hover)' }}>
-                    {['Date', 'BoQ Item', 'Location', 'Contractor', 'Engineer', 'Agreed', 'Status', 'Actions'].map(h => (
-                      <th key={h} style={{ padding: '10px 10px', textAlign: h === 'Contractor' || h === 'Engineer' || h === 'Agreed' ? 'right' : 'left', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                    {['Date', 'BoQ Item', 'Location',
+                      ...(canSeeContractor ? ['🏗️ Contractor'] : []),
+                      ...(canSeeEngineer ? ['👷 Engineer'] : []),
+                      ...(canHarmonise ? ['✅ Agreed'] : []),
+                      'Status', 'Actions'].map(h => (
+                      <th key={h} style={{ padding: '10px 10px', textAlign: h.includes('Contractor') || h.includes('Engineer') || h.includes('Agreed') ? 'right' : 'left', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -265,14 +312,24 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                           {entry.start_chainage ? `Ch. ${entry.start_chainage} – ${entry.end_chainage}` : entry.location_description || '—'}
                           {entry.side !== 'Both' && <span style={{ color: 'var(--text-muted)' }}> ({entry.side})</span>}
                         </td>
-                        <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#e87b35' }}>{fmt(entry.contractor_qty)}</td>
-                        <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#059669' }}>{fmt(entry.engineer_qty)}</td>
-                        <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: entry.agreed_qty != null ? '#3b82f6' : 'var(--text-muted)' }}>
-                          {entry.agreed_qty != null ? fmt(entry.agreed_qty) : '—'}
-                        </td>
+                        {canSeeContractor && (
+                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#e87b35' }}>
+                            {entry.contractor_qty > 0 ? fmt(entry.contractor_qty) : <span style={{ color: 'var(--text-muted)' }}>pending</span>}
+                          </td>
+                        )}
+                        {canSeeEngineer && (
+                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#059669' }}>
+                            {entry.engineer_qty > 0 ? fmt(entry.engineer_qty) : <span style={{ color: 'var(--text-muted)' }}>pending</span>}
+                          </td>
+                        )}
+                        {canHarmonise && (
+                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: entry.agreed_qty != null ? '#3b82f6' : 'var(--text-muted)' }}>
+                            {entry.agreed_qty != null ? fmt(entry.agreed_qty) : '—'}
+                          </td>
+                        )}
                         <td style={{ padding: '10px' }}>
                           <span style={{ background: st.bg, color: st.color, padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600 }}>{st.label}</span>
-                          {hasDiff && entry.status !== 'agreed' && (
+                          {canHarmonise && hasDiff && entry.status !== 'agreed' && (
                             <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>Δ {fmt(diff)} {entry.unit}</div>
                           )}
                         </td>
@@ -280,7 +337,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button onClick={() => { setEditEntry(entry); setForm({ ...entry, contractor_qty: entry.contractor_qty || '', engineer_qty: entry.engineer_qty || '', agreed_qty: entry.agreed_qty ?? '' }); setShowForm(true); }}
                               style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--accent)' }}>Edit</button>
-                            {entry.status !== 'agreed' && canManage && entry.contractor_qty > 0 && entry.engineer_qty > 0 && (
+                            {entry.status !== 'agreed' && canHarmonise && entry.contractor_qty > 0 && entry.engineer_qty > 0 && (
                               <button onClick={() => {
                                 const qty = prompt('Enter agreed quantity:', entry.engineer_qty);
                                 if (qty !== null) harmonise(entry.id, qty);
@@ -380,35 +437,52 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
               <div><label style={ls}>Location note</label><input type="text" placeholder="e.g. Near river crossing" value={form.location_description || ''} onChange={e => set('location_description', e.target.value)} style={fs} /></div>
             </div>
 
-            {/* Dual Measurement */}
+            {/* Dual Measurement — role-based visibility */}
             <div style={{ marginBottom: 12, padding: 14, background: 'var(--bg-hover)', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Measured quantities ({form.unit || boqItems.find(b => b.id === form.boq_item_id)?.unit || 'units'})</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ ...ls, color: '#e87b35' }}>🏗️ Contractor qty</label>
-                  <input type="number" step="0.01" value={form.contractor_qty} onChange={e => set('contractor_qty', e.target.value)}
-                    style={{ ...fs, borderColor: '#e87b35', fontWeight: 600 }} placeholder="0" />
-                  <textarea placeholder="Contractor notes..." value={form.contractor_notes || ''} onChange={e => set('contractor_notes', e.target.value)}
-                    style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11 }} />
-                </div>
-                <div>
-                  <label style={{ ...ls, color: '#059669' }}>👷 Engineer qty</label>
-                  <input type="number" step="0.01" value={form.engineer_qty} onChange={e => set('engineer_qty', e.target.value)}
-                    style={{ ...fs, borderColor: '#059669', fontWeight: 600 }} placeholder="0" />
-                  <textarea placeholder="Engineer notes..." value={form.engineer_notes || ''} onChange={e => set('engineer_notes', e.target.value)}
-                    style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11 }} />
-                </div>
-                <div>
-                  <label style={{ ...ls, color: '#3b82f6' }}>✅ Agreed qty</label>
-                  <input type="number" step="0.01" value={form.agreed_qty} onChange={e => set('agreed_qty', e.target.value)}
-                    style={{ ...fs, borderColor: '#3b82f6', fontWeight: 700 }} placeholder="—" />
-                  <textarea placeholder="RE notes..." value={form.re_notes || ''} onChange={e => set('re_notes', e.target.value)}
-                    style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11 }} />
-                </div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>
+                Measured quantities ({form.unit || boqItems.find(b => b.id === form.boq_item_id)?.unit || 'units'})
+                {myParty && <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>— entering as {myLabel}</span>}
               </div>
-              {form.contractor_qty && form.engineer_qty && parseFloat(form.contractor_qty) !== parseFloat(form.engineer_qty) && (
+              <div style={{ display: 'grid', gridTemplateColumns: canHarmonise ? '1fr 1fr 1fr' : '1fr', gap: 10 }}>
+                {canSeeContractor && (
+                  <div>
+                    <label style={{ ...ls, color: '#e87b35' }}>🏗️ Contractor qty</label>
+                    <input type="number" step="0.01" value={form.contractor_qty}
+                      onChange={e => set('contractor_qty', e.target.value)}
+                      disabled={myParty === 'engineer'}
+                      style={{ ...fs, borderColor: '#e87b35', fontWeight: 600, opacity: myParty === 'engineer' ? 0.5 : 1 }} placeholder="0" />
+                    <textarea placeholder="Contractor notes..." value={form.contractor_notes || ''} onChange={e => set('contractor_notes', e.target.value)}
+                      disabled={myParty === 'engineer'}
+                      style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11, opacity: myParty === 'engineer' ? 0.5 : 1 }} />
+                  </div>
+                )}
+                {canSeeEngineer && (
+                  <div>
+                    <label style={{ ...ls, color: '#059669' }}>👷 Engineer qty</label>
+                    <input type="number" step="0.01" value={form.engineer_qty}
+                      onChange={e => set('engineer_qty', e.target.value)}
+                      disabled={myParty === 'contractor'}
+                      style={{ ...fs, borderColor: '#059669', fontWeight: 600, opacity: myParty === 'contractor' ? 0.5 : 1 }} placeholder="0" />
+                    <textarea placeholder="Engineer notes..." value={form.engineer_notes || ''} onChange={e => set('engineer_notes', e.target.value)}
+                      disabled={myParty === 'contractor'}
+                      style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11, opacity: myParty === 'contractor' ? 0.5 : 1 }} />
+                  </div>
+                )}
+                {canHarmonise && (
+                  <div>
+                    <label style={{ ...ls, color: '#3b82f6' }}>✅ Agreed qty (RE only)</label>
+                    <input type="number" step="0.01" value={form.agreed_qty} onChange={e => set('agreed_qty', e.target.value)}
+                      style={{ ...fs, borderColor: '#3b82f6', fontWeight: 700 }} placeholder="—" />
+                    <textarea placeholder="RE harmonisation notes..." value={form.re_notes || ''} onChange={e => set('re_notes', e.target.value)}
+                      style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11 }} />
+                  </div>
+                )}
+              </div>
+              {canHarmonise && form.contractor_qty && form.engineer_qty && parseFloat(form.contractor_qty) !== parseFloat(form.engineer_qty) && (
                 <div style={{ marginTop: 8, fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
                   ⚠️ Difference: {Math.abs(parseFloat(form.contractor_qty) - parseFloat(form.engineer_qty)).toLocaleString()} {form.unit}
+                  {Math.abs(parseFloat(form.contractor_qty) - parseFloat(form.engineer_qty)) / Math.max(parseFloat(form.contractor_qty), parseFloat(form.engineer_qty)) > 0.1 &&
+                    ' — exceeds 10%, joint re-measurement recommended'}
                 </div>
               )}
             </div>
