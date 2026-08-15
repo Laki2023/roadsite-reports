@@ -5,10 +5,11 @@ import * as XLSX from 'xlsx';
 const BOQ_CATEGORIES = ['Preliminary', 'Earthworks', 'Pavement', 'Drainage', 'Structures', 'Surfacing', 'Road Furniture', 'Dayworks', 'Other'];
 const EQUIP_TYPES = ['Grader', 'Excavator', 'Roller', 'Loader', 'Dozer', 'Tipper', 'Bowser', 'Paver', 'Crusher', 'Compressor', 'Generator', 'Concrete Mixer', 'Bitumen Distributor', 'Water Tanker', 'Other'];
 const PARTIES = [
-  { value: 'employer', label: 'Employer / Client', desc: 'KeNHA, KURA, KeRRA, County Govt' },
-  { value: 'engineer', label: 'Engineer / Consultant', desc: 'Supervision consultant (RE office)' },
-  { value: 'contractor', label: 'Contractor', desc: 'Main contractor' },
-  { value: 'subcontractor', label: 'Subcontractor', desc: 'Nominated or domestic sub' },
+  { value: 'employer', label: 'Employer / Client', desc: 'KeNHA, KURA, KeRRA, County Govt', icon: '🏛️', color: '#6366f1' },
+  { value: 'engineer', label: 'Engineer', desc: 'Consulting firm appointed under FIDIC', icon: '📐', color: '#2563eb' },
+  { value: 'engineer_rep', label: "Engineer's Representative", desc: 'RE & supervision team on site', icon: '👷', color: '#059669' },
+  { value: 'contractor', label: 'Contractor', desc: 'Main contractor', icon: '🏗️', color: '#e87b35' },
+  { value: 'subcontractor', label: 'Subcontractor', desc: 'Nominated or domestic sub', icon: '🔧', color: '#8b5cf6' },
 ];
 const PARTY_VALUES = PARTIES.map(p => p.value);
 const FIDIC_EDITIONS = ['Red Book 1999', 'Red Book 2017', 'Yellow Book 1999', 'Pink Book MDB', 'FIDIC 1987 4th Ed'];
@@ -21,23 +22,27 @@ const STANDARD_PERSONNEL = [
   { position_title: 'Project Engineer', party: 'employer' },
   { position_title: 'Project Accountant', party: 'employer' },
   { position_title: 'Procurement Officer', party: 'employer' },
-  // Engineer / Consultant (Supervision)
+  // Engineer (Consulting Firm — the "Engineer" under FIDIC)
   { position_title: 'Team Leader / Principal Engineer', party: 'engineer' },
-  { position_title: 'Resident Engineer (RE)', party: 'engineer' },
-  { position_title: 'Assistant Resident Engineer', party: 'engineer' },
-  { position_title: 'Inspector of Works (Roads)', party: 'engineer' },
-  { position_title: 'Inspector of Works (Structures)', party: 'engineer' },
-  { position_title: 'Materials / Geotechnical Engineer', party: 'engineer' },
+  { position_title: 'Deputy Team Leader', party: 'engineer' },
   { position_title: 'Highway / Pavement Engineer', party: 'engineer' },
-  { position_title: 'Surveyor', party: 'engineer' },
-  { position_title: 'Quantity Surveyor', party: 'engineer' },
-  { position_title: 'Environmental Specialist', party: 'engineer' },
-  { position_title: 'Social / RAP Specialist', party: 'engineer' },
-  { position_title: 'Road Safety Specialist', party: 'engineer' },
+  { position_title: 'Structural Engineer', party: 'engineer' },
   { position_title: 'Claims / Contract Specialist', party: 'engineer' },
-  { position_title: 'Laboratory Technician', party: 'engineer' },
-  { position_title: 'Survey Assistant / Chainman', party: 'engineer' },
-  { position_title: 'Office Administrator', party: 'engineer' },
+  { position_title: 'Quantity Surveyor (HQ)', party: 'engineer' },
+  // Engineer's Representative (RE & site supervision team)
+  { position_title: 'Resident Engineer (RE)', party: 'engineer_rep' },
+  { position_title: 'Assistant Resident Engineer', party: 'engineer_rep' },
+  { position_title: 'Inspector of Works (Roads)', party: 'engineer_rep' },
+  { position_title: 'Inspector of Works (Structures)', party: 'engineer_rep' },
+  { position_title: 'Materials / Geotechnical Engineer', party: 'engineer_rep' },
+  { position_title: 'Surveyor', party: 'engineer_rep' },
+  { position_title: 'Quantity Surveyor', party: 'engineer_rep' },
+  { position_title: 'Environmental Specialist', party: 'engineer_rep' },
+  { position_title: 'Social / RAP Specialist', party: 'engineer_rep' },
+  { position_title: 'Road Safety Specialist', party: 'engineer_rep' },
+  { position_title: 'Laboratory Technician', party: 'engineer_rep' },
+  { position_title: 'Survey Assistant / Chainman', party: 'engineer_rep' },
+  { position_title: 'Office Administrator', party: 'engineer_rep' },
   // Contractor
   { position_title: 'Project Manager', party: 'contractor' },
   { position_title: 'Site Agent / Construction Manager', party: 'contractor' },
@@ -878,8 +883,8 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
             return (
               <div key={p.value} style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8,
-                  color: p.value === 'employer' ? '#6366f1' : p.value === 'engineer' ? '#059669' : p.value === 'contractor' ? '#e87b35' : '#8b5cf6' }}>
-                  {p.value === 'employer' ? '🏛️' : p.value === 'engineer' ? '👷' : p.value === 'contractor' ? '🏗️' : '🔧'} {p.label}
+                  color: p.color }}>
+                  {p.icon} {p.label}
                   <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>— {p.desc}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 6 }}>
