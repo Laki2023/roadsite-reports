@@ -346,7 +346,15 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
               <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleExcelUpload} disabled={uploading} />
             </label>
             <button className="btn btn-secondary" onClick={() => setShowAddItem(true)}>+ Add Item</button>
-            <button className="btn btn-secondary" onClick={() => setShowBulkImport(true)}>📥 Paste Import</button>
+            {items.length > 0 && (
+              <button className="btn btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={async () => {
+                if (!window.confirm(`Delete all ${items.length} BoQ items and ${sections.length} sections for this project?`)) return;
+                await supabase.from('boq_items').delete().eq('project_id', selectedProject);
+                await supabase.from('boq_sections').delete().eq('project_id', selectedProject);
+                showToast('🗑️ All BoQ data cleared');
+                loadData();
+              }}>🗑️ Clear All BoQ</button>
+            )}
           </div>
         )}
       </div>
