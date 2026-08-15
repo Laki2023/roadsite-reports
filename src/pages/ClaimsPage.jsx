@@ -93,6 +93,39 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
       await sendClaimNotifications(claim, selectedProject, newStatus === 'submitted' ? 'claim_submitted' : 'claim_decided');
     }
 
+    // Auto-create contract amendment when claim is approved
+    if (claim && newStatus === 'approved' && (claim.eot_days_claimed > 0 || claim.cost_claimed > 0)) {
+      const { data: lastAmend } = await supabase.from('contract_amendments')
+        .select('amendment_number').eq('project_id', selectedProject)
+        .order('amendment_number', { ascending: false }).limit(1).maybeSingle();
+
+      const { data: project } = await supabase.from('projects')
+        .select('revised_completion_date, original_completion_date, end_date, revised_contract_sum, original_contract_sum, contract_sum')
+        .eq('id', selectedProject).single();
+
+      const prevEnd = project?.revised_completion_date || project?.original_completion_date || project?.end_date;
+      const prevSum = project?.revised_contract_sum || project?.original_contract_sum || project?.contract_sum || 0;
+      const newEnd = claim.eot_days_claimed > 0 && prevEnd
+        ? new Date(new Date(prevEnd).getTime() + claim.eot_days_claimed * 86400000).toISOString().split('T')[0]
+        : null;
+      const newSum = claim.cost_claimed > 0 ? prevSum + claim.cost_claimed : null;
+
+      await supabase.from('contract_amendments').insert({
+        project_id: selectedProject,
+        amendment_number: (lastAmend?.amendment_number || 0) + 1,
+        amendment_type: claim.claim_type === 'eot' ? 'eot_award' : claim.claim_type === 'interest' ? 'price_adjustment' : 'eot_award',
+        title: `${claim.claim_number}: ${claim.title}`,
+        fidic_clause: claim.fidic_clause,
+        eot_days: claim.eot_days_claimed || 0,
+        cost_increase: claim.cost_claimed || 0,
+        previous_completion_date: prevEnd,
+        new_completion_date: newEnd,
+        previous_contract_sum: prevSum,
+        new_contract_sum: newSum,
+        approved_by: profile?.id,
+      });
+    }
+
     showToast?.(`✅ Claim status updated to ${newStatus.replace(/_/g, ' ')}`);
     loadClaims();
   }

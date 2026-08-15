@@ -100,19 +100,25 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   const { p, boq, works, equip, structs, issues, layers, tests, ipcs, risks, miles, mats, reports, instructions } = d;
 
   // ── Computed Metrics ──
-  const contractSum = boq.reduce((s,i)=>s+(i.boq_amount||0),0) || p.contract_sum || 0;
+  const originalContractSum = p.original_contract_sum || p.contract_sum || 0;
+  const revisedContractSum = p.revised_contract_sum || originalContractSum;
+  const contractSum = revisedContractSum || boq.reduce((s,i)=>s+(i.boq_amount||0),0) || 0;
   const valueDone = boq.reduce((s,i)=>s+(i.value_to_date||0),0);
   const finPct = pct(valueDone, contractSum);
   const roadLen = p.end_chainage && p.start_chainage ? (p.end_chainage - p.start_chainage) : (p.road_length || 0);
 
   const startDt = p.commencement_date || p.start_date;
-  const endDt = p.original_completion_date || p.end_date;
+  const originalEndDt = p.original_completion_date || p.end_date;
+  const revisedEndDt = p.revised_completion_date || originalEndDt;
+  const endDt = revisedEndDt;
   const totalDays = daysBetween(startDt, endDt);
   const elapsedDays = daysBetween(startDt, new Date().toISOString().slice(0,10));
   const remainingDays = Math.max(0, totalDays - elapsedDays);
   const timePct = pct(elapsedDays, totalDays);
   const totalMonths = Math.round(totalDays / 30);
   const elapsedMonths = Math.round(elapsedDays / 30);
+  const totalEOT = p.total_eot_awarded || 0;
+  const hasRevisions = p.revised_completion_date || p.revised_contract_sum;
 
   const compActs = works.filter(w=>w.status==='Completed'||w.status==='Approved').length;
   const physPct = pct(compActs, works.length);
@@ -1011,6 +1017,43 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
               </div>
             </div>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:50 }}>No IPC data yet — generate certificates from the IPC page</div>}
+
+          {/* Contract Details — Original vs Revised */}
+          {hasRevisions && (
+            <div style={{ marginTop: 14, padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>📋 CONTRACT AMENDMENTS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 10 }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Contract Sum</div>
+                  <div style={{ textDecoration: revisedContractSum !== originalContractSum ? 'line-through' : 'none', color: 'var(--text-muted)' }}>
+                    KES {Number(originalContractSum).toLocaleString()}
+                  </div>
+                  {revisedContractSum !== originalContractSum && (
+                    <div style={{ fontWeight: 700, color: '#059669' }}>KES {Number(revisedContractSum).toLocaleString()}</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Completion Date</div>
+                  <div style={{ textDecoration: revisedEndDt !== originalEndDt ? 'line-through' : 'none', color: 'var(--text-muted)' }}>
+                    {originalEndDt || '—'}
+                  </div>
+                  {revisedEndDt !== originalEndDt && (
+                    <div style={{ fontWeight: 700, color: '#6366f1' }}>{revisedEndDt}</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>EOT Awarded</div>
+                  <div style={{ fontWeight: 700, color: '#6366f1' }}>{totalEOT} days</div>
+                  {p.total_variations_amount ? (
+                    <>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 9, marginTop: 4 }}>Variations</div>
+                      <div style={{ fontWeight: 700, color: '#059669' }}>KES {Number(p.total_variations_amount).toLocaleString()}</div>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Contract financial progress bar */}
           <div style={{ marginTop:14 }}>
