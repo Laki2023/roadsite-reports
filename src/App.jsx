@@ -30,12 +30,12 @@ import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
 import TakingOffPage from './pages/TakingOffPage';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
+  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
   { section: 'Projects' },
-  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'viewer' },
+  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'contractor_qs' },
   { section: 'Field Operations' },
   { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'inspector' },
-  { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'viewer' },
+  { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'inspector' },
   { key: 'works', label: 'Works Activities', icon: '⛏️', minRole: 'inspector' },
   { key: 'issues', label: 'Site Issues', icon: '⚠️', minRole: 'inspector' },
   { key: 'emergency', label: 'Emergency', icon: '🚨', minRole: 'inspector' },
@@ -46,8 +46,8 @@ const NAV_ITEMS = [
   { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
   { key: 'programme', label: 'Programme of Works', icon: '📅', minRole: 'resident_engineer' },
   { section: 'Contract Admin' },
-  { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector' },
-  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'inspector' },
+  { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector', hideRates: 'contractor_qs' },
+  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'contractor_qs' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },

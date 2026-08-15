@@ -15,6 +15,7 @@ const ROLE_LEVELS = {
   project_engineer: 4,
   resident_engineer: 3,
   inspector: 2,
+  contractor_qs: 1.5,
   viewer: 1,
   pending: 0,
 };
@@ -31,7 +32,7 @@ export function assignableRoles(userRole) {
   return ALL_ROLES.filter(r => ROLE_LEVELS[r] < level && r !== 'pending');
 }
 
-export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'resident_engineer', 'inspector', 'viewer', 'pending'];
+export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'resident_engineer', 'inspector', 'contractor_qs', 'viewer', 'pending'];
 
 export const ROLE_LABELS = {
   director_general: 'Director General',
@@ -40,6 +41,7 @@ export const ROLE_LABELS = {
   project_engineer: 'Project Engineer',
   resident_engineer: 'Resident Engineer',
   inspector: 'Inspector',
+  contractor_qs: "Contractor's QS",
   viewer: 'Viewer',
   pending: 'Pending Approval',
 };
@@ -51,6 +53,7 @@ export const ROLE_COLORS = {
   project_engineer: { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
   resident_engineer: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
   inspector:   { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' },
+  contractor_qs: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
   viewer:      { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' },
   pending:     { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
 };

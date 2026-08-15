@@ -28,10 +28,16 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
   const isEngineer = hasRole(profile?.role, 'project_engineer') || hasRole(profile?.role, 'engineer');
   const canManage = isRE;
 
-  // Determine user's party from their key_personnel record
+  // Determine user's party from their role and key_personnel record
   useEffect(() => {
     if (!selectedProject || !profile?.id) return;
-    if (isPlatformAdmin) { setMyParty(null); return; } // Admin sees all
+    if (isPlatformAdmin) { setMyParty(null); return; }
+    
+    // Role-based shortcut
+    if (profile?.role === 'contractor_qs') { setMyParty('contractor'); return; }
+    if (isRE) { setMyParty(null); return; }
+    
+    // Try to match from key_personnel
     supabase.from('key_personnel').select('party')
       .eq('project_id', selectedProject)
       .ilike('email', profile.email || '')
@@ -39,14 +45,11 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
       .then(({ data }) => {
         if (data?.party === 'contractor' || data?.party === 'subcontractor') setMyParty('contractor');
         else if (data?.party === 'engineer' || data?.party === 'engineer_rep') setMyParty('engineer');
-        else if (isRE) setMyParty(null); // RE sees all
         else if (isEngineer) setMyParty('engineer');
         else setMyParty(null);
       })
       .catch(() => {
-        // Fallback: use role
-        if (isRE) setMyParty(null);
-        else if (isEngineer) setMyParty('engineer');
+        if (isEngineer) setMyParty('engineer');
         else setMyParty(null);
       });
   }, [selectedProject, profile]);
