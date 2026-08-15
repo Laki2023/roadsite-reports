@@ -1146,6 +1146,10 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         <button className="btn btn-primary" onClick={() => navigateTo('monthly-report', p)}>📋 Monthly Report</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('programme', p)}>📅 Programme</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('claims', p)}>⚖️ Claims</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('key-personnel', p)}>👥 Key Personnel</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('approvals-matrix', p)}>🔐 Approvals Matrix</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('key-personnel', p)}>👥 Personnel</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('approvals-matrix', p)}>🔐 Approvals</button>
       </div>
     </div>
   );
