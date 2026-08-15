@@ -108,6 +108,11 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     if (payload.years_experience === '' || payload.years_experience === undefined) payload.years_experience = null;
     else payload.years_experience = parseInt(payload.years_experience) || null;
     if (!payload.title_prefix) payload.title_prefix = null;
+    // Set is_on_site based on site_presence for backward compatibility
+    if (payload.site_presence) {
+      payload.is_on_site = (payload.site_presence === 'full_time' || payload.site_presence === 'part_time');
+    }
+    if (!payload.site_presence) payload.site_presence = null;
 
     let error;
     if (editItem?.id) {
@@ -180,7 +185,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     const byParty = {};
     Object.keys(PARTIES).forEach(p => { byParty[p] = active.filter(x => x.party === p).length; });
     const pendingConsent = personnel.filter(p => p.replacement_consent_status === 'pending').length;
-    const onSite = active.filter(p => p.is_on_site).length;
+    const onSite = active.filter(p => p.site_presence === 'full_time' || p.site_presence === 'part_time' || p.is_on_site).length;
     return { total: personnel.length, active: active.length, byParty, pendingConsent, onSite };
   }, [personnel]);
 
@@ -189,7 +194,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
   const emptyItem = {
     name: '', title_prefix: '', party: 'contractor', position_title: '', qualifications: '',
     years_experience: '', nationality: 'Kenyan', id_number: '', phone: '', email: '',
-    date_mobilised: '', is_on_site: true, status: 'active',
+    date_mobilised: '', site_presence: 'full_time', status: 'active',
     replacement_consent_status: 'n/a', fidic_clause: 'Cl. 6.9', notes: '',
   };
 
@@ -288,7 +293,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                       <thead>
-                        <tr>{['', 'Name', 'Position', 'Party', 'Qualifications', 'Exp', 'On Site', 'Status', 'Consent', 'Actions'].map((h, i) => (
+                        <tr>{['', 'Name', 'Position', 'Party', 'Qualifications', 'Exp', 'Presence', 'Status', 'Consent', 'Actions'].map((h, i) => (
                           <th key={i} style={{ background: 'var(--accent)', color: '#fff', padding: '6px 8px', textAlign: 'left', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}</tr>
                       </thead>
@@ -311,7 +316,14 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
                             </td>
                             <td style={{ padding: '6px 8px', fontSize: 10, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.qualifications || '—'}</td>
                             <td style={{ padding: '6px 8px', textAlign: 'center' }}>{p.years_experience || '—'}</td>
-                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>{p.is_on_site ? '✅' : '❌'}</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                              {(() => {
+                                const pr = p.site_presence || (p.is_on_site ? 'full_time' : 'management');
+                                const labels = { full_time: 'Full-time', part_time: 'Part-time', periodic: 'Periodic', management: 'Mgmt' };
+                                const colors = { full_time: '#059669', part_time: '#0891b2', periodic: '#f59e0b', management: '#64748b' };
+                                return <span style={{ background: colors[pr] + '20', color: colors[pr], padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700 }}>{labels[pr]}</span>;
+                              })()}
+                            </td>
                             <td style={{ padding: '6px 8px' }}>
                               <span style={{ background: STATUS_COLORS[p.status], color: '#fff', padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700 }}>
                                 {p.status}
@@ -440,10 +452,14 @@ function PersonnelForm({ initial, personnel, onSave, onCancel, onDelete }) {
             <option value="demobilised">Demobilised</option><option value="absent">Absent</option>
           </select>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 18 }}>
-          <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input type="checkbox" checked={form.is_on_site || false} onChange={e => set('is_on_site', e.target.checked)} /> On Site
-          </label>
+        <div>
+          <label style={ls}>Site Presence</label>
+          <select value={form.site_presence || 'full_time'} onChange={e => set('site_presence', e.target.value)} style={fs}>
+            <option value="full_time">Full-time on Site</option>
+            <option value="part_time">Part-time on Site</option>
+            <option value="periodic">Periodic Visits</option>
+            <option value="management">Management / Off-site</option>
+          </select>
         </div>
       </div>
       {form.party === 'contractor' && (
