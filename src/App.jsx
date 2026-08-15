@@ -235,7 +235,7 @@ export default function App() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
-          <div className="brand-sub">v14.9 — Road Project Management</div>
+          <div className="brand-sub">v15.0 — Road Project Management</div>
         </div>
 
         {/* Project Context Banner */}

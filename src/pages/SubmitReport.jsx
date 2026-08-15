@@ -18,14 +18,230 @@ const MATERIAL_TYPES = ['Cement', 'Bitumen', 'Aggregate', 'Sand', 'Steel', 'Fuel
 
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
-  { num: 2, label: 'Manpower & Labour', icon: '👷', short: 'Labour' },
-  { num: 3, label: 'Works Progress', icon: '⛏️', short: 'Works' },
-  { num: 4, label: 'Equipment', icon: '🚜', short: 'Equipment' },
-  { num: 5, label: 'Quality & Materials', icon: '🧪', short: 'Quality' },
-  { num: 6, label: 'Structures', icon: '🌉', short: 'Structures' },
-  { num: 7, label: 'Issues & Instructions', icon: '⚠️', short: 'Issues' },
-  { num: 8, label: 'Review & Submit', icon: '✅', short: 'Submit' },
+  { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
+  { num: 3, label: 'Supervision Workforce', icon: '👷', short: 'Supervision' },
+  { num: 4, label: 'Works Progress', icon: '⛏️', short: 'Works' },
+  { num: 5, label: 'Equipment', icon: '🚜', short: 'Equipment' },
+  { num: 6, label: 'Quality & Materials', icon: '🧪', short: 'Quality' },
+  { num: 7, label: 'Structures', icon: '🌉', short: 'Structures' },
+  { num: 8, label: 'Issues & Instructions', icon: '⚠️', short: 'Issues' },
+  { num: 9, label: 'Review & Submit', icon: '✅', short: 'Submit' },
 ];
+
+// ── Reusable Workforce Step Component ──
+function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPresence, labourEntries, setLabourEntries, showTooltips }) {
+  const keyPersonnel = personnel || [];
+  const skilledRoles = roles.filter(r => r.party === party && r.category === 'skilled');
+  const unskilledRoles = roles.filter(r => r.party === party && r.category === 'unskilled');
+  const [showCustom, setShowCustom] = useState(false);
+  const [customRole, setCustomRole] = useState({ role_title: '', category: 'skilled', male_count: 0, female_count: 0 });
+
+  // Initialize entries from roles if empty
+  useEffect(() => {
+    if (labourEntries.length === 0 && roles.length > 0) {
+      const partyRoles = roles.filter(r => r.party === party);
+      setLabourEntries(partyRoles.map(r => ({
+        role_title: r.role_title, category: r.category, male_count: 0, female_count: 0,
+        description: r.description, ref_id: r.id,
+      })));
+    }
+  }, [roles, party]);
+
+  function updateLabour(roleTitle, field, value) {
+    setLabourEntries(prev => prev.map(e =>
+      e.role_title === roleTitle ? { ...e, [field]: Math.max(0, parseInt(value) || 0) } : e
+    ));
+  }
+
+  function addCustomRole() {
+    if (!customRole.role_title.trim()) return;
+    setLabourEntries(prev => [...prev, {
+      role_title: customRole.role_title, category: customRole.category,
+      male_count: parseInt(customRole.male_count) || 0,
+      female_count: parseInt(customRole.female_count) || 0,
+      description: 'Custom role', ref_id: null,
+    }]);
+    setCustomRole({ role_title: '', category: 'skilled', male_count: 0, female_count: 0 });
+    setShowCustom(false);
+  }
+
+  // Compute totals
+  const entries = labourEntries.filter(e => e.category !== 'key_personnel');
+  const totalMale = entries.reduce((s, e) => s + (e.male_count || 0), 0);
+  const totalFemale = entries.reduce((s, e) => s + (e.female_count || 0), 0);
+  const totalWorkers = totalMale + totalFemale;
+  const skilledTotal = entries.filter(e => e.category === 'skilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+  const unskilledTotal = entries.filter(e => e.category === 'unskilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+  const kpPresent = Object.values(presence).filter(Boolean).length;
+
+  function RoleTable({ title, icon, category, roleList }) {
+    const catEntries = labourEntries.filter(e => e.category === category);
+    const catTotal = catEntries.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+    const [collapsed, setCollapsed] = useState(false);
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div onClick={() => setCollapsed(!collapsed)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
+          <span style={{ fontSize: 16 }}>{icon}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{title}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 10 }}>
+            {catTotal} on site
+          </span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{collapsed ? '▸' : '▾'}</span>
+        </div>
+        {!collapsed && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 60px', gap: 0, padding: '6px 10px',
+              background: 'var(--bg-hover)', borderBottom: '1px solid var(--border)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>
+              <div>Role</div><div style={{ textAlign: 'center' }}>♂ Male</div><div style={{ textAlign: 'center' }}>♀ Female</div><div style={{ textAlign: 'center' }}>Total</div>
+            </div>
+            {/* Rows */}
+            {catEntries.map((entry, i) => {
+              const total = (entry.male_count || 0) + (entry.female_count || 0);
+              const isActive = total > 0;
+              return (
+                <div key={entry.role_title} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px 60px', gap: 0,
+                  padding: '5px 10px', borderBottom: i < catEntries.length - 1 ? '1px solid var(--border)' : 'none',
+                  background: isActive ? 'rgba(16,185,129,0.04)' : 'transparent', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: isActive ? 'var(--text)' : 'var(--text-muted)' }}>{entry.role_title}</span>
+                    {entry.description && showTooltips && (
+                      <span title={entry.description} style={{ cursor: 'help', fontSize: 10, color: 'var(--accent)' }}>ⓘ</span>
+                    )}
+                  </div>
+                  <input type="number" min="0" value={entry.male_count || ''} placeholder="0"
+                    onChange={e => updateLabour(entry.role_title, 'male_count', e.target.value)}
+                    style={{ width: 50, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
+                      border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
+                  <input type="number" min="0" value={entry.female_count || ''} placeholder="0"
+                    onChange={e => updateLabour(entry.role_title, 'female_count', e.target.value)}
+                    style={{ width: 50, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
+                      border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
+                  <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: isActive ? '#059669' : 'var(--text-muted)' }}>{total}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? '🏗️' : '👷'}
+      count={totalWorkers + kpPresent} color={totalWorkers + kpPresent > 0 ? '#10b981' : '#6b7280'}>
+
+      {/* Key Personnel Attendance */}
+      {keyPersonnel.length > 0 && (
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#6366f1', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            👔 Key Personnel
+            <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
+              ({kpPresent}/{keyPersonnel.length} present)
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {keyPersonnel.map(t => (
+              <div key={t.id}
+                onClick={() => setPresence({ ...presence, [t.id]: !presence[t.id] })}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                  background: presence[t.id] ? 'rgba(99,102,241,0.08)' : 'var(--bg-hover)',
+                  border: `1px solid ${presence[t.id] ? '#6366f1' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
+                }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: presence[t.id] ? '#6366f1' : 'var(--bg-card)',
+                  border: `2px solid ${presence[t.id] ? '#6366f1' : 'var(--border)'}`,
+                  color: '#fff', fontSize: 12, fontWeight: 800,
+                }}>{presence[t.id] ? '✓' : ''}</div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>{t.name}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Skilled Labour Table */}
+      <RoleTable title="Skilled Labour" icon="🔧" category="skilled" roleList={skilledRoles} />
+
+      {/* Unskilled Labour Table */}
+      <RoleTable title="Unskilled Labour" icon="🦺" category="unskilled" roleList={unskilledRoles} />
+
+      {/* Add Custom Role */}
+      <div style={{ marginTop: 12 }}>
+        {!showCustom ? (
+          <button onClick={() => setShowCustom(true)} className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 12px' }}>
+            ＋ Add Custom Role
+          </button>
+        ) : (
+          <div style={{ padding: 12, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: 1, minWidth: 140, marginBottom: 0 }}>
+              <label style={{ fontSize: 10 }}>Role Title</label>
+              <input type="text" value={customRole.role_title} onChange={e => setCustomRole({ ...customRole, role_title: e.target.value })}
+                placeholder="e.g. Crane Operator" style={{ fontSize: 12 }} />
+            </div>
+            <div className="form-group" style={{ width: 110, marginBottom: 0 }}>
+              <label style={{ fontSize: 10 }}>Category</label>
+              <select value={customRole.category} onChange={e => setCustomRole({ ...customRole, category: e.target.value })} style={{ fontSize: 12 }}>
+                <option value="skilled">Skilled</option>
+                <option value="unskilled">Unskilled</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ width: 60, marginBottom: 0 }}>
+              <label style={{ fontSize: 10 }}>♂</label>
+              <input type="number" min="0" value={customRole.male_count} onChange={e => setCustomRole({ ...customRole, male_count: e.target.value })} style={{ fontSize: 12, textAlign: 'center' }} />
+            </div>
+            <div className="form-group" style={{ width: 60, marginBottom: 0 }}>
+              <label style={{ fontSize: 10 }}>♀</label>
+              <input type="number" min="0" value={customRole.female_count} onChange={e => setCustomRole({ ...customRole, female_count: e.target.value })} style={{ fontSize: 12, textAlign: 'center' }} />
+            </div>
+            <button onClick={addCustomRole} className="btn btn-primary" style={{ fontSize: 11, padding: '6px 12px' }}>Add</button>
+            <button onClick={() => setShowCustom(false)} className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 12px' }}>Cancel</button>
+          </div>
+        )}
+      </div>
+
+      {/* Summary Footer */}
+      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10, textAlign: 'center', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#6366f1' }}>{kpPresent}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Key Personnel</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#059669' }}>{skilledTotal}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Skilled</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>{unskilledTotal}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Unskilled</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{totalWorkers + kpPresent}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Total</div>
+          </div>
+        </div>
+        {/* Gender Ratio Bar */}
+        {totalWorkers > 0 && (
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+              <span>♂ Male: {totalMale} ({Math.round(totalMale / totalWorkers * 100)}%)</span>
+              <span>♀ Female: {totalFemale} ({Math.round(totalFemale / totalWorkers * 100)}%)</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: '#fecaca', overflow: 'hidden' }}>
+              <div style={{ width: `${totalMale / totalWorkers * 100}%`, height: '100%', background: '#3b82f6', borderRadius: 4 }} />
+            </div>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
 
 function SectionCard({ title, icon, children, count, color = 'var(--accent)' }) {
   return (
@@ -111,13 +327,23 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [issuePhotos, setIssuePhotos] = useState([]);
   const [generalPhotos, setGeneralPhotos] = useState([]);
 
-  // ── Engineer's Team ──
-  const [engineerTeam, setEngineerTeam] = useState([]);
-  const [teamPresence, setTeamPresence] = useState({});
+  // ── Workforce ──
+  const [labourRoles, setLabourRoles] = useState([]);
+  const [contractorPersonnel, setContractorPersonnel] = useState([]);
+  const [supervisionPersonnel, setSupervisionPersonnel] = useState([]);
+  const [contractorPresence, setContractorPresence] = useState({});
+  const [supervisionPresence, setSupervisionPresence] = useState({});
+  const [contractorLabour, setContractorLabour] = useState([]);
+  const [supervisionLabour, setSupervisionLabour] = useState([]);
+  // Keep legacy aliases for engineer team
+  const engineerTeam = supervisionPersonnel;
+  const teamPresence = supervisionPresence;
+  const setTeamPresence = setSupervisionPresence;
 
   // ── Data Loading ──
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
+    supabase.from('labour_role_reference').select('*').eq('is_active', true).order('display_order').then(({ data }) => setLabourRoles(data || []));
   }, []);
 
   useEffect(() => {
@@ -127,18 +353,27 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       supabase.from('equipment_register').select('id, equipment_name, equipment_type').eq('project_id', selectedProject).order('equipment_type'),
       supabase.from('structures').select('id, structure_ref, structure_type, chainage').eq('project_id', selectedProject).order('chainage'),
       supabase.from('pavement_layers').select('id, layer_type, start_chainage, end_chainage, layer_status').eq('project_id', selectedProject),
+      supabase.from('key_personnel').select('id, name, position_title, party').eq('project_id', selectedProject).eq('status', 'active').in('party', ['contractor', 'subcontractor']).order('position_title'),
       supabase.from('key_personnel').select('id, name, position_title, party').eq('project_id', selectedProject).eq('status', 'active').in('party', ['engineer', 'employer']).order('position_title'),
-    ]).then(([actRes, eqRes, strRes, layRes, teamRes]) => {
+    ]).then(([actRes, eqRes, strRes, layRes, contKpRes, supKpRes]) => {
       setActivities(actRes.data || []);
       setEquipment(eqRes.data || []);
       setStructures(strRes.data || []);
       setLayers(layRes.data || []);
-      setEngineerTeam(teamRes.data || []);
-      // Default all to present
-      const presence = {};
-      (teamRes.data || []).forEach(t => { presence[t.id] = true; });
-      setTeamPresence(presence);
+      // Contractor key personnel
+      setContractorPersonnel(contKpRes.data || []);
+      const contPresence = {};
+      (contKpRes.data || []).forEach(t => { contPresence[t.id] = true; });
+      setContractorPresence(contPresence);
+      // Supervision key personnel
+      setSupervisionPersonnel(supKpRes.data || []);
+      const supPresence = {};
+      (supKpRes.data || []).forEach(t => { supPresence[t.id] = true; });
+      setSupervisionPresence(supPresence);
     });
+    // Reset labour entries when project changes
+    setContractorLabour([]);
+    setSupervisionLabour([]);
   }, [selectedProject]);
 
   // ── Entry Helpers ──
@@ -156,13 +391,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   // ── Completeness ──
   const stepComplete = [
     selectedProject && form.report_date && form.weather_conditions, // Step 1
-    true, // Step 2 always ok
-    true, // Step 3
-    true, // Step 4
-    true, // Step 5
-    true, // Step 6
-    true, // Step 7
-    true, // Step 8
+    true, // Step 2 Contractor Workforce
+    true, // Step 3 Supervision Workforce
+    true, // Step 4 Works
+    true, // Step 5 Equipment
+    true, // Step 6 Quality
+    true, // Step 7 Structures
+    true, // Step 8 Issues
+    true, // Step 9 Review
   ];
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
@@ -281,16 +517,51 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         photoCount = await uploadReportPhotos(allPhotos, selectedProject, report.id, profile, form.report_date);
       }
 
-      // 10. Save Engineer's Team Attendance
-      if (engineerTeam.length > 0) {
-        const attendanceRecords = engineerTeam.map(t => ({
+      // 10. Save Key Personnel Attendance (both parties)
+      const allPersonnel = [
+        ...contractorPersonnel.map(t => ({ ...t, presenceMap: contractorPresence })),
+        ...supervisionPersonnel.map(t => ({ ...t, presenceMap: supervisionPresence })),
+      ];
+      if (allPersonnel.length > 0) {
+        const attendanceRecords = allPersonnel.map(t => ({
           project_id: selectedProject,
           personnel_id: t.id,
           attendance_date: form.report_date,
-          is_present: !!teamPresence[t.id],
+          is_present: !!t.presenceMap[t.id],
           recorded_by: profile.id,
         }));
         await supabase.from('personnel_attendance').upsert(attendanceRecords, { onConflict: 'personnel_id,attendance_date' });
+      }
+
+      // 11. Save Daily Labour (Contractor + Supervision)
+      const allLabour = [
+        ...contractorLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'contractor' })),
+        ...supervisionLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'supervision' })),
+      ];
+      if (allLabour.length > 0) {
+        const labourRecords = allLabour.map(e => ({
+          daily_report_id: report.id,
+          project_id: selectedProject,
+          report_date: form.report_date,
+          party: e.party,
+          category: e.category,
+          role_title: e.role_title,
+          male_count: e.male_count || 0,
+          female_count: e.female_count || 0,
+          key_personnel_id: null,
+          is_present: true,
+        }));
+        await supabase.from('daily_labour').insert(labourRecords);
+      }
+
+      // Also update legacy labour columns on daily_reports for backward compatibility
+      const contSkilled = contractorLabour.filter(e => e.category === 'skilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+      const contUnskilled = contractorLabour.filter(e => e.category === 'unskilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+      if (contSkilled > 0 || contUnskilled > 0) {
+        await supabase.from('daily_reports').update({
+          contractor_labour_skilled: contSkilled,
+          contractor_labour_unskilled: contUnskilled,
+        }).eq('id', report.id);
       }
 
       setSubmitted(true);
@@ -320,7 +591,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           {totalPhotos > 0 && <span className="badge badge-accent">📷 {totalPhotos} photos uploaded</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]); setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]); }}>
+          <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]); setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]); setContractorLabour([]); setSupervisionLabour([]); }}>
             📝 Submit Another Report
           </button>
           <button className="btn btn-secondary" onClick={() => navigateTo('dashboard')}>📊 Go to Dashboard</button>
@@ -330,7 +601,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   }
 
   const projName = projects.find(p => p.id === selectedProject)?.name;
-  const totalLabour = (parseInt(form.contractor_labour_skilled)||0) + (parseInt(form.contractor_labour_unskilled)||0) + (parseInt(form.subcontractor_labour)||0);
+  const contLabourTotal = contractorLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+  const supLabourTotal = supervisionLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
+  const contKpPresent = Object.values(contractorPresence).filter(Boolean).length;
+  const supKpPresent = Object.values(supervisionPresence).filter(Boolean).length;
+  const totalLabour = contLabourTotal + supLabourTotal;
+  const totalWorkforce = totalLabour + contKpPresent + supKpPresent;
 
   return (
     <div>
@@ -446,67 +722,30 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 2: LABOUR ══════ */}
+      {/* ══════ STEP 2: CONTRACTOR WORKFORCE ══════ */}
       {step === 2 && (
-        <SectionCard title="Manpower & Labour" icon="👷" count={totalLabour} color={totalLabour > 0 ? '#10b981' : '#6b7280'}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-            {[
-              { key: 'contractor_labour_skilled', label: 'Skilled Labour', icon: '🔧' },
-              { key: 'contractor_labour_unskilled', label: 'Unskilled Labour', icon: '👷' },
-              { key: 'subcontractor_labour', label: 'Subcontractor', icon: '🏗️' },
-              { key: 'supervisor_count', label: "Contractor's Staff", icon: '👷' },
-            ].map(f => (
-              <div key={f.key} style={{ textAlign: 'center', padding: 14, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
-                <div style={{ fontSize: 24, marginBottom: 4 }}>{f.icon}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>{f.label}</div>
-                <input type="number" min="0" value={form[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                  style={{ width: 70, textAlign: 'center', fontSize: 20, fontWeight: 800, padding: '6px 8px', border: '2px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-card)' }} />
-              </div>
-            ))}
-          </div>
-          <div style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 14 }}>
-            Total on Site: <strong style={{ fontSize: 20, color: 'var(--accent)' }}>{totalLabour + (parseInt(form.supervisor_count)||0)}</strong>
-          </div>
-
-          {/* Engineer's Representative Team */}
-          {engineerTeam.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#059669', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                👷 Engineer's Representative Team
-                <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
-                  ({Object.values(teamPresence).filter(Boolean).length}/{engineerTeam.length} present)
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-                {engineerTeam.map(t => (
-                  <div key={t.id}
-                    onClick={() => setTeamPresence({ ...teamPresence, [t.id]: !teamPresence[t.id] })}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                      background: teamPresence[t.id] ? 'rgba(5,150,105,0.1)' : 'var(--bg-hover)',
-                      border: `1px solid ${teamPresence[t.id] ? '#059669' : 'var(--border)'}`,
-                      borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
-                    }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: teamPresence[t.id] ? '#059669' : 'var(--bg-card)',
-                      border: `2px solid ${teamPresence[t.id] ? '#059669' : 'var(--border)'}`,
-                      color: '#fff', fontSize: 12, fontWeight: 800,
-                    }}>{teamPresence[t.id] ? '✓' : ''}</div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600 }}>{t.name}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title || t.party}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </SectionCard>
+        <WorkforceStep
+          party="contractor" partyLabel="Contractor"
+          roles={labourRoles} personnel={contractorPersonnel}
+          presence={contractorPresence} setPresence={setContractorPresence}
+          labourEntries={contractorLabour} setLabourEntries={setContractorLabour}
+          showTooltips={true}
+        />
       )}
 
-      {/* ══════ STEP 3: WORKS PROGRESS ══════ */}
+      {/* ══════ STEP 3: SUPERVISION WORKFORCE ══════ */}
       {step === 3 && (
+        <WorkforceStep
+          party="supervision" partyLabel="Supervision"
+          roles={labourRoles} personnel={supervisionPersonnel}
+          presence={supervisionPresence} setPresence={setSupervisionPresence}
+          labourEntries={supervisionLabour} setLabourEntries={setSupervisionLabour}
+          showTooltips={true}
+        />
+      )}
+
+      {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
+      {step === 4 && (
         <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
           {worksEntries.map((w, i) => {
             const act = activities.find(a => a.id === w.activity_id);
@@ -542,8 +781,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 4: EQUIPMENT ══════ */}
-      {step === 4 && (
+      {/* ══════ STEP 5: EQUIPMENT ══════ */}
+      {step === 5 && (
         <SectionCard title="Equipment Status" icon="🚜" count={equipEntries.length}>
           {equipEntries.map((eq, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setEquipEntries, equipEntries, i)}>
@@ -572,8 +811,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 5: QUALITY & MATERIALS ══════ */}
-      {step === 5 && (
+      {/* ══════ STEP 6: QUALITY & MATERIALS ══════ */}
+      {step === 6 && (
         <>
           <SectionCard title="Quality Tests" icon="🧪" count={testEntries.length}>
             {testEntries.map((t, i) => (
@@ -624,8 +863,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </>
       )}
 
-      {/* ══════ STEP 6: STRUCTURES ══════ */}
-      {step === 6 && (
+      {/* ══════ STEP 7: STRUCTURES ══════ */}
+      {step === 7 && (
         <SectionCard title="Structures Progress" icon="🌉" count={structEntries.length}>
           {structEntries.map((s, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setStructEntries, structEntries, i)}>
@@ -658,8 +897,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 7: ISSUES & INSTRUCTIONS ══════ */}
-      {step === 7 && (
+      {/* ══════ STEP 8: ISSUES & INSTRUCTIONS ══════ */}
+      {step === 8 && (
         <>
           <SectionCard title="Site Issues" icon="⚠️" count={issueEntries.length} color="#ef4444">
             {issueEntries.map((iss, i) => (
@@ -709,8 +948,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </>
       )}
 
-      {/* ══════ STEP 8: REVIEW & SUBMIT ══════ */}
-      {step === 8 && (
+      {/* ══════ STEP 9: REVIEW & SUBMIT ══════ */}
+      {step === 9 && (
         <div>
           <SectionCard title="General Observations" icon="📝">
             <div className="form-group mb-16">
@@ -774,7 +1013,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
               {[
                 { icon: '🌤️', label: 'Weather', value: form.weather_conditions },
-                { icon: '👷', label: 'Labour', value: totalLabour, color: totalLabour > 0 ? '#10b981' : '#ef4444' },
+                { icon: '🏗️', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
+                { icon: '👷', label: 'Supervision', value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
                 { icon: '⛏️', label: 'Activities', value: worksEntries.length },
                 { icon: '🚜', label: 'Equipment', value: equipEntries.length },
                 { icon: '🧪', label: 'Tests', value: testEntries.length },
@@ -783,7 +1023,6 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 { icon: '⚠️', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
                 { icon: '📋', label: 'Instructions', value: instructionEntries.length },
                 { icon: '📷', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
-                { icon: '👷', label: "Eng. Team", value: `${Object.values(teamPresence).filter(Boolean).length}/${engineerTeam.length}`, color: '#059669' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
                   <div style={{ fontSize: 20 }}>{s.icon}</div>
