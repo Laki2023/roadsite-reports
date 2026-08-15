@@ -265,7 +265,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
                                   </>
                                 )}
                                 <button onClick={() => deletePersonnel(p.id)}
-                                  style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: '1px solid #ef4444', borderRadius: 4, background: 'rgba(239,68,68,0.08)', cursor: 'pointer', color: '#ef4444' }}
+                                  style={{ padding: '3px 8px', fontSize: 10, fontWeight: 700, border: 'none', borderRadius: 4, background: '#ef4444', cursor: 'pointer', color: '#fff' }}
                                   title="Delete">🗑️ Delete</button>
                               </div>
                             </td>
@@ -373,8 +373,8 @@ function PersonnelForm({ initial, personnel, onSave, onCancel, onDelete }) {
       <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
         {onDelete ? (
           <button onClick={onDelete}
-            style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, border: '1px solid #ef4444', borderRadius: 'var(--radius)',
-              background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer' }}>
+            style={{ padding: '8px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 'var(--radius)',
+              background: '#ef4444', color: '#fff', cursor: 'pointer' }}>
             🗑️ Delete Personnel
           </button>
         ) : <div />}
