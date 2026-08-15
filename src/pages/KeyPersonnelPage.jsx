@@ -5,7 +5,7 @@ const PARTIES = {
   client: '🏛️ Client',
   engineer: '📐 Engineer',
   project_manager: '👔 Project Manager',
-  engineer_rep: '👷 Engineer Representative',
+  engineer_rep: "👷 Engineer's Representative",
   contractor: '🏗️ Contractor',
   subcontractor: '🔧 Subcontractor',
 };
