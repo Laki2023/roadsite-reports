@@ -98,6 +98,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     // Convert empty strings to null for numeric fields
     if (payload.years_experience === '' || payload.years_experience === undefined) payload.years_experience = null;
     else payload.years_experience = parseInt(payload.years_experience) || null;
+    if (!payload.title_prefix) payload.title_prefix = null;
 
     let error;
     if (editItem?.id) {
@@ -177,7 +178,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
   const filtered = activeTab === 'all' ? personnel : personnel.filter(p => p.party === activeTab);
 
   const emptyItem = {
-    name: '', party: 'contractor', position_title: '', qualifications: '',
+    name: '', title_prefix: '', party: 'contractor', position_title: '', qualifications: '',
     years_experience: '', nationality: 'Kenyan', id_number: '', phone: '', email: '',
     date_mobilised: '', is_on_site: true, status: 'active',
     replacement_consent_status: 'n/a', fidic_clause: 'Cl. 6.9', notes: '',
@@ -289,6 +290,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
                               <div style={{ width: 8, height: 8, borderRadius: '50%', background: PARTY_COLORS[p.party] }} />
                             </td>
                             <td style={{ padding: '6px 8px', fontWeight: 600 }}>
+                              {p.title_prefix && <span style={{ color: 'var(--accent)', marginRight: 4 }}>{p.title_prefix}</span>}
                               {p.name}
                               {p.phone && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{p.phone}</div>}
                             </td>
@@ -370,7 +372,25 @@ function PersonnelForm({ initial, personnel, onSave, onCancel, onDelete }) {
 
   return (
     <div>
-      <div style={row}>
+      <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={ls}>Title</label>
+          <select value={form.title_prefix || ''} onChange={e => set('title_prefix', e.target.value)} style={fs}>
+            <option value="">—</option>
+            <option value="Eng.">Eng.</option>
+            <option value="Prof.">Prof.</option>
+            <option value="Dr.">Dr.</option>
+            <option value="Mr.">Mr.</option>
+            <option value="Ms.">Ms.</option>
+            <option value="Mrs.">Mrs.</option>
+            <option value="Arch.">Arch.</option>
+            <option value="QS.">QS.</option>
+            <option value="Surv.">Surv.</option>
+            <option value="Capt.">Capt.</option>
+            <option value="Hon.">Hon.</option>
+            <option value="Cpl.">Cpl.</option>
+          </select>
+        </div>
         <div><label style={ls}>Full Name *</label><input value={form.name || ''} onChange={e => set('name', e.target.value)} style={fs} placeholder="e.g. John Kamau" /></div>
         <div>
           <label style={ls}>Party *</label>
