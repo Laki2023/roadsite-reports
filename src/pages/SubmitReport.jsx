@@ -152,40 +152,61 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
     <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? '🏗️' : '👷'}
       count={totalWorkers + kpPresent} color={totalWorkers + kpPresent > 0 ? '#10b981' : '#6b7280'}>
 
-      {/* Key Personnel Attendance */}
-      {keyPersonnel.length > 0 && (
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#6366f1', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            👔 Key Personnel
-            <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
-              ({kpPresent}/{keyPersonnel.length} present)
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-            {keyPersonnel.map(t => (
-              <div key={t.id}
-                onClick={() => setPresence({ ...presence, [t.id]: !presence[t.id] })}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                  background: presence[t.id] ? 'rgba(99,102,241,0.08)' : 'var(--bg-hover)',
-                  border: `1px solid ${presence[t.id] ? '#6366f1' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
-                }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: presence[t.id] ? '#6366f1' : 'var(--bg-card)',
-                  border: `2px solid ${presence[t.id] ? '#6366f1' : 'var(--border)'}`,
-                  color: '#fff', fontSize: 12, fontWeight: 800,
-                }}>{presence[t.id] ? '✓' : ''}</div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600 }}>{t.title_prefix ? `${t.title_prefix} ` : ''}{t.name}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title}</div>
-                </div>
+      {/* Key Personnel Attendance — grouped by party */}
+      {keyPersonnel.length > 0 && (() => {
+        const PARTY_CONFIG = {
+          client: { icon: '🏛️', label: 'Client', color: '#2563eb' },
+          engineer: { icon: '📐', label: 'Engineer', color: '#6366f1' },
+          project_manager: { icon: '👔', label: 'Project Manager', color: '#0891b2' },
+          engineer_rep: { icon: '👷', label: "Engineer's Representative", color: '#059669' },
+          contractor: { icon: '🏗️', label: 'Contractor', color: '#e87b35' },
+          subcontractor: { icon: '🔧', label: 'Subcontractor', color: '#8b5cf6' },
+          employer: { icon: '🏛️', label: 'Employer', color: '#2563eb' },
+        };
+        const partyGroups = {};
+        keyPersonnel.forEach(t => {
+          const p = t.party || 'contractor';
+          if (!partyGroups[p]) partyGroups[p] = [];
+          partyGroups[p].push(t);
+        });
+        return Object.entries(partyGroups).map(([partyKey, members]) => {
+          const cfg = PARTY_CONFIG[partyKey] || { icon: '👤', label: partyKey, color: '#64748b' };
+          const presentCount = members.filter(t => presence[t.id]).length;
+          return (
+            <div key={partyKey} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: cfg.color, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {cfg.icon} {cfg.label}
+                <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
+                  ({presentCount}/{members.length} present)
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                {members.map(t => (
+                  <div key={t.id}
+                    onClick={() => setPresence({ ...presence, [t.id]: !presence[t.id] })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      background: presence[t.id] ? `${cfg.color}14` : 'var(--bg-hover)',
+                      border: `1px solid ${presence[t.id] ? cfg.color : 'var(--border)'}`,
+                      borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
+                    }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: presence[t.id] ? cfg.color : 'var(--bg-card)',
+                      border: `2px solid ${presence[t.id] ? cfg.color : 'var(--border)'}`,
+                      color: '#fff', fontSize: 12, fontWeight: 800,
+                    }}>{presence[t.id] ? '✓' : ''}</div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>{t.title_prefix ? `${t.title_prefix} ` : ''}{t.name}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        });
+      })()}
 
       {/* Skilled Labour Table */}
       <RoleTable title="Skilled Labour" icon="🔧" category="skilled" roleList={skilledRoles} />
