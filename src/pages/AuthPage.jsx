@@ -133,15 +133,17 @@ export default function AuthPage({ showToast }) {
             phone: phone || null,
             title: title || null,
             designation: finalPosition || null,
+            party: party || null,
+            profession: finalQualification || null,
+            region: regBody ? `${regBody} ${regNumber}` : null,
+            county: yearsExperience ? `${yearsExperience} years` : null,
             bio: [
-              party ? `Party: ${PARTY_OPTIONS.find(p => p.value === party)?.label || party}` : '',
-              finalPosition ? `Position: ${finalPosition}` : '',
-              finalQualification ? `Qualification: ${finalQualification}` : '',
-              yearsExperience ? `Experience: ${yearsExperience} years` : '',
-              regBody ? `Registration: ${regBody} ${regNumber}` : '',
+              finalQualification || '',
+              yearsExperience ? `${yearsExperience} yrs exp` : '',
+              regBody ? `${regBody} ${regNumber}` : '',
               idNumber ? `ID: ${idNumber}` : '',
               bio || '',
-            ].filter(Boolean).join(' | '),
+            ].filter(Boolean).join(' · '),
             role: 'pending',
           });
         }

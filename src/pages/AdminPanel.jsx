@@ -30,9 +30,16 @@ export default function AdminPanel({ profile, showToast }) {
 
   function openApproveModal(user) {
     setApproveModal(user);
+    // Auto-suggest role based on user's party
+    const autoRole = user.party === 'contractor' || user.party === 'subcontractor' ? 'contractor_qs' :
+                     user.party === 'engineer_rep' ? 'inspector' :
+                     user.party === 'engineer' ? 'project_engineer' :
+                     user.party === 'client' || user.party === 'project_manager' ? 'engineer' : 'inspector';
     setApproveForm({
-      role: 'inspector',
-      designation: user.designation || 'Inspector',
+      role: autoRole,
+      party: user.party || '',
+      designation: user.designation || '',
+      full_name: user.full_name || '',
       project_id: '',
       project_role: 'Inspector',
     });
@@ -43,13 +50,17 @@ export default function AdminPanel({ profile, showToast }) {
     const user = approveModal;
     if (!user) return;
 
-    // Update role and designation
-    const { error } = await supabase.from('profiles').update({
+    // Update role, party, designation, and name
+    const updates = {
       role: approveForm.role,
       designation: approveForm.designation,
       approved_at: new Date().toISOString(),
       approved_by: profile.id,
-    }).eq('id', user.id);
+    };
+    if (approveForm.party) updates.party = approveForm.party;
+    if (approveForm.full_name && approveForm.full_name !== user.full_name) updates.full_name = approveForm.full_name;
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
     if (error) { showToast(error.message, 'error'); return; }
 
     // Optionally assign to project
@@ -275,7 +286,7 @@ export default function AdminPanel({ profile, showToast }) {
           <table>
             <thead>
               <tr>
-                <th>Name</th><th>Email</th><th>Designation</th><th>Region</th><th>Role</th>
+                <th>Name</th><th>Email</th><th>Party</th><th>Designation</th><th>Role</th>
                 {isSuperAdmin && <th>Super</th>}
                 <th>Change Role</th>
                 {isSuperAdmin && <th></th>}
@@ -289,8 +300,14 @@ export default function AdminPanel({ profile, showToast }) {
                     {u.id === profile.id && <span className="badge badge-muted" style={{ marginLeft: 6 }}>You</span>}
                   </td>
                   <td className="text-sm">{u.email}</td>
+                  <td>{u.party ? (
+                    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600,
+                      background: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b3520' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
+                      color: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b35' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
+                      {u.party === 'contractor' ? '🏗️' : u.party === 'engineer' ? '📐' : u.party === 'engineer_rep' ? '👷' : u.party === 'client' ? '🏛️' : '🔧'} {u.party}
+                    </span>
+                  ) : <span className="text-muted">—</span>}</td>
                   <td className="text-sm">{u.designation || '—'}</td>
-                  <td className="text-sm">{u.region ? `${u.region}${u.county ? ` / ${u.county}` : ''}` : '—'}</td>
                   <td><span className="badge badge-accent">{ROLE_LABELS[u.role]}</span></td>
                   {isSuperAdmin && (
                     <td>{u.is_super_admin && <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑</span>}</td>
@@ -347,8 +364,16 @@ export default function AdminPanel({ profile, showToast }) {
                 <div><span className="text-muted">Email:</span> {approveModal.email}</div>
                 <div><span className="text-muted">Phone:</span> {approveModal.phone || '—'}</div>
                 <div><span className="text-muted">Designation:</span> {approveModal.designation || '—'}</div>
-                <div><span className="text-muted">Region:</span> {approveModal.region || '—'}</div>
-                <div><span className="text-muted">County:</span> {approveModal.county || '—'}</div>
+                <div><span className="text-muted">Party:</span> {approveModal.party ? (
+                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                    background: approveModal.party === 'contractor' ? '#e87b3520' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
+                    color: approveModal.party === 'contractor' ? '#e87b35' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
+                    {approveModal.party}
+                  </span>
+                ) : '—'}</div>
+                <div><span className="text-muted">Qualification:</span> {approveModal.profession || '—'}</div>
+                <div><span className="text-muted">Registration:</span> {approveModal.region || '—'}</div>
+                <div><span className="text-muted">Experience:</span> {approveModal.county || '—'}</div>
                 <div><span className="text-muted">Registered:</span> {approveModal.created_at?.split('T')[0]}</div>
               </div>
               {approveModal.bio && (
@@ -361,6 +386,26 @@ export default function AdminPanel({ profile, showToast }) {
             <form onSubmit={handleApprove}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-16">
+                  <label>Party (organisation side) *</label>
+                  <select value={approveForm.party || approveModal.party || ''} onChange={e => {
+                    const p = e.target.value;
+                    setApproveForm({ ...approveForm, party: p,
+                      role: p === 'contractor' || p === 'subcontractor' ? 'contractor_qs' :
+                            p === 'engineer_rep' ? 'inspector' :
+                            p === 'engineer' ? 'project_engineer' :
+                            p === 'client' || p === 'project_manager' ? 'engineer' : approveForm.role
+                    });
+                  }}>
+                    <option value="">— Select party —</option>
+                    <option value="client">🏛️ Client / Employer</option>
+                    <option value="engineer">📐 Engineer (Consulting Firm)</option>
+                    <option value="project_manager">👔 Project Manager</option>
+                    <option value="engineer_rep">👷 Engineer's Representative</option>
+                    <option value="contractor">🏗️ Contractor</option>
+                    <option value="subcontractor">🔧 Subcontractor</option>
+                  </select>
+                </div>
+                <div className="form-group mb-16">
                   <label>System Role *</label>
                   <select value={approveForm.role} onChange={e => setApproveForm({ ...approveForm, role: e.target.value })} required>
                     {ROLES.filter(r => r !== 'pending').map(r => (
@@ -368,14 +413,18 @@ export default function AdminPanel({ profile, showToast }) {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-16">
-                  <label>Designation</label>
-                  <select value={approveForm.designation} onChange={e => setApproveForm({ ...approveForm, designation: e.target.value })}>
-                    <option value="">—</option>
-                    {['Project Manager','Engineer','Resident Engineer','Inspector','Surveyor','Materials Technician','Environmental Officer','Accounts Officer'].map(d => (
-                      <option key={d}>{d}</option>
-                    ))}
-                  </select>
+                  <label>Position / Designation</label>
+                  <input value={approveForm.designation} onChange={e => setApproveForm({ ...approveForm, designation: e.target.value })}
+                    placeholder="e.g. Quantity Surveyor" />
+                </div>
+                <div className="form-group mb-16">
+                  <label>Full Name (editable)</label>
+                  <input value={approveForm.full_name || approveModal.full_name || ''} onChange={e => setApproveForm({ ...approveForm, full_name: e.target.value })}
+                    placeholder="Correct name if needed" />
                 </div>
               </div>
 
