@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
+import { supabase, ROLE_LABELS, ROLE_LEVELS, hasRole, assignableRoles } from '../lib/supabase';
 
 const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
 
@@ -39,6 +39,8 @@ export default function AdminPanel({ profile, showToast }) {
   const [approveForm, setApproveForm] = useState({ role: 'inspector', designation: '', project_id: '', project_role: 'Inspector' });
 
   const isSuperAdmin = profile.is_platform_admin === true || profile.is_super_admin === true;
+  const isRE = hasRole(profile.role, 'resident_engineer');
+  const canApprove = isSuperAdmin || isRE; // RE can approve their team
 
   useEffect(() => { loadAll(); }, []);
 
@@ -350,10 +352,10 @@ export default function AdminPanel({ profile, showToast }) {
                   )}
                   <td>
                     <select value={u.role} onChange={e => updateRole(u.id, e.target.value)}
-                      disabled={u.role === 'super_admin' && !isSuperAdmin}
+                      disabled={!isSuperAdmin && ROLE_LEVELS[u.role] >= ROLE_LEVELS[profile.role]}
                       style={{ padding: '5px 10px', fontSize: 12 }}>
-                      {ROLES.filter(r => r !== 'pending').map(r => (
-                        <option key={r} value={r} disabled={r === 'super_admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                      {(isSuperAdmin ? ROLES.filter(r => r !== 'pending') : [u.role, ...assignableRoles(profile.role)].filter((v, i, a) => a.indexOf(v) === i)).map(r => (
+                        <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
                       ))}
                     </select>
                   </td>
@@ -444,8 +446,8 @@ export default function AdminPanel({ profile, showToast }) {
                 <div className="form-group mb-16">
                   <label>System Role *</label>
                   <select value={approveForm.role} onChange={e => setApproveForm({ ...approveForm, role: e.target.value })} required>
-                    {ROLES.filter(r => r !== 'pending').map(r => (
-                      <option key={r} value={r} disabled={r === 'super_admin' && !isSuperAdmin}>{ROLE_LABELS[r]}</option>
+                    {(isSuperAdmin ? ROLES.filter(r => r !== 'pending') : assignableRoles(profile.role)).map(r => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                     ))}
                   </select>
                 </div>

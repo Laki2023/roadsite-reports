@@ -56,9 +56,9 @@ const NAV_ITEMS = [
   { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐', minRole: 'resident_engineer' },
   { section: 'Administration' },
   { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
-  { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'engineer' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'resident_engineer' },
   { key: 'org-mgmt', label: 'Organisations', icon: '🏛️', minRole: 'director_general' },
-  { key: 'admin', label: 'System Settings', icon: '⚙️', minRole: 'super_admin' },
+  { key: 'admin', label: 'System Settings', icon: '⚙️', minRole: 'resident_engineer' },
 ];
 
 export default function App() {

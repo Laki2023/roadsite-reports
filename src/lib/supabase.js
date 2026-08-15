@@ -41,7 +41,7 @@ export const ROLE_LABELS = {
   project_engineer: 'Project Engineer',
   resident_engineer: 'Resident Engineer',
   inspector: 'Inspector',
-  contractor_qs: "Contractor's QS",
+  contractor_qs: "Contractor Staff",
   viewer: 'Viewer',
   pending: 'Pending Approval',
 };
