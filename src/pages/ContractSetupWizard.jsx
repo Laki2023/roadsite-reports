@@ -441,8 +441,6 @@ export default function ContractSetupWizard({ profile, showToast, navigateTo, se
           activity_name: item.description,
           unit: item.unit || 'LS',
           planned_quantity: parseFloat(item.quantity) || 0,
-          rate: parseFloat(item.rate) || 0,
-          boq_amount: parseFloat(item.amount) || 0,
           category: item.category || 'Other',
           sort_order: i + 1,
         }));
