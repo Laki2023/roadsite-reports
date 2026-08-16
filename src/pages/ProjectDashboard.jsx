@@ -585,31 +585,96 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
 
           {/* ══════ PROGRESS SUMMARY TABLE ══════ */}
-          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>📋 Progress Summary</h3>
+          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>📋 Progress Summary — Key Layers</h3>
           {(() => {
-            // Build the display list: if a parent has components, show the components; if not, show the parent
-            const parents = works.filter(w => !w.is_component && !w.parent_activity_id && w.category !== 'Other');
-            const childrenOf = (pid) => works.filter(w => w.parent_activity_id === pid).sort((a,b) => (a.component_order||0) - (b.component_order||0));
-            const displayItems = [];
-            parents.forEach(p => {
-              const kids = childrenOf(p.id);
-              if (kids.length > 0) {
-                kids.forEach(k => displayItems.push({ ...k, parentName: p.activity_name, displayCategory: k.category || p.category }));
-              } else if (p.unit !== 'LS' && p.planned_quantity > 1) {
-                // Only show parents without components if they have real measurable quantities
-                displayItems.push({ ...p, parentName: null, displayCategory: p.category });
-              }
+            // Curated list: the critical-path layers every RE tracks
+            const KEY_LAYERS = [
+              'Site Clearance', 'Topsoil Stripping', 'Compaction of OGL', 'Final Earthworks',
+              'Bottom Subgrade', 'Top Subgrade', 'Subbase', 'Base',
+              'Asphalt Concrete', 'Surface Dressing', 'Concrete Pavement',
+            ];
+            // Match against project activities (components + parents), flexible name matching
+            const matchActivity = (keyword) => {
+              const kw = keyword.toLowerCase();
+              return works.find(w => {
+                const n = (w.activity_name || '').toLowerCase();
+                // Exact or contains match
+                if (n === kw) return true;
+                if (n.includes(kw)) return true;
+                // Specific mappings
+                if (kw === 'site clearance' && n === 'bush clearing') return true;
+                if (kw === 'topsoil stripping' && (n === 'topsoil stripping' || n === 'top soil stripping')) return true;
+                if (kw === 'compaction of ogl' && n.includes('compaction') && (w.category === 'Earthworks' || (w.parent?.activity_name || '').toLowerCase().includes('ogl'))) return true;
+                if (kw === 'final earthworks' && (n.includes('formation') || n === 'excavation to formation' || n === 'shaping & trimming')) return true;
+                if (kw === 'bottom subgrade' && n.includes('bottom') && n.includes('subgrade')) return true;
+                if (kw === 'top subgrade' && n.includes('top') && n.includes('subgrade')) return true;
+                if (kw === 'subbase' && (n.includes('subbase') || n.includes('sub-base') || n.includes('cig') || n.includes('natural material'))) return true;
+                if (kw === 'base' && (n.includes('gcs base') || n.includes('graded crushed') || n.includes('cement stab') || n.includes('lime/cement'))) return true;
+                if (kw === 'asphalt concrete' && (n.includes('binder course') || n.includes('wearing course') || n.includes('asphalt laying') || n.includes('ac'))) return true;
+                if (kw === 'surface dressing' && n.includes('surface dressing')) return true;
+                if (kw === 'concrete pavement' && n.includes('concrete pavement')) return true;
+                return false;
+              });
+            };
+            const rows = KEY_LAYERS.map((name, i) => {
+              const act = matchActivity(name);
+              // If matched a component, also check the parent for planned quantities
+              const parent = act?.parent_activity_id ? works.find(w => w.id === act.parent_activity_id) : null;
+              const planned = act?.planned_quantity || parent?.planned_quantity || 0;
+              const done = act?.completed_quantity || 0;
+              const unit = act?.unit || 'Km';
+              const pctRaw = planned > 0 ? (done / planned) * 100 : 0;
+              const pctDisplay = Math.min(100, Math.round(pctRaw));
+              const isLive = act?.last_progress_date === today;
+              return { name, act, planned, done, unit, pctDisplay, isLive, itemNo: i + 1 };
             });
-            if (displayItems.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
-            // Group by category
-            const catGroups = {};
-            displayItems.forEach(d => { const c = d.displayCategory || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(d); });
-            const catOrder = ['Earthworks','Pavement','Surfacing','Drainage','Structures','Road Furniture','Traffic Management','Environment','Preliminaries'];
-            const sortedCats = Object.entries(catGroups).sort((a,b) => {
-              const ai = catOrder.indexOf(a[0]), bi = catOrder.indexOf(b[0]);
-              return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-            });
-            let itemNo = 0;
+
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ borderBottom:'2px solid var(--border)' }}>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:35 }}>No.</th>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Layer</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:45 }}>Unit</th>
+                      <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:65 }}>Billed</th>
+                      <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:75 }}>Achieved</th>
+                      <th style={{ padding:'8px 6px', width:90 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(r => (
+                      <tr key={r.itemNo} style={{ borderBottom:'1px solid var(--border)', background: r.isLive ? '#10b98108' : 'transparent' }}>
+                        <td style={{ textAlign:'center', padding:'6px', fontWeight:600, color:'var(--text-muted)' }}>{r.itemNo}</td>
+                        <td style={{ padding:'6px', fontWeight:500 }}>
+                          {r.isLive && <span style={{ width:7, height:7, borderRadius:'50%', background:'#10b981', display:'inline-block', marginRight:5, boxShadow:'0 0 5px #10b981', animation:'pulse 1.5s infinite' }} />}
+                          {r.name}
+                        </td>
+                        <td style={{ textAlign:'center', padding:'6px', color:'var(--text-muted)' }}>{r.unit}</td>
+                        <td className="text-mono" style={{ textAlign:'right', padding:'6px' }}>{r.planned > 0 ? Number(r.planned).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) : '—'}</td>
+                        <td className="text-mono" style={{ textAlign:'right', padding:'6px', fontWeight:700,
+                          color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.done > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                          {r.done > 0 ? Number(r.done).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
+                        </td>
+                        <td style={{ padding:'6px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <div style={{ width:50, height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${r.pctDisplay}%`, borderRadius:3,
+                                background: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.pctDisplay > 0 ? '#ef4444' : 'transparent' }} />
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:600, minWidth:28,
+                              color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.pctDisplay > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                              {r.pctDisplay > 0 ? r.pctDisplay + '%' : ''}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
             return (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
