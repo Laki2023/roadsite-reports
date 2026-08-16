@@ -28,8 +28,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
 
   async function loadData() {
     const [actRes, progRes] = await Promise.all([
-      supabase.from('works_activities').select('*').eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('works_progress').select('*, activity:activity_id(activity_name, activity_code), reporter:reported_by(full_name)')
+      supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name, activity_code)').eq('project_id', selectedProject).order('sort_order'),
+      supabase.from('works_progress').select('*, activity:activity_id(activity_name, activity_code, parent_activity_id, is_component), reporter:reported_by(full_name)')
         .eq('project_id', selectedProject).order('work_date', { ascending: false }).limit(50),
     ]);
     setActivities(actRes.data || []);
@@ -79,7 +79,10 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   }
 
   const grouped = {};
-  activities.forEach(a => { if (!grouped[a.category]) grouped[a.category] = []; grouped[a.category].push(a); });
+  // Group: show parents with their children nested, hide standalone components from top level
+  const parentActs = activities.filter(a => !a.is_component && !a.parent_activity_id);
+  const childrenOf = (pid) => activities.filter(a => a.parent_activity_id === pid).sort((a,b) => (a.component_order||0) - (b.component_order||0));
+  parentActs.forEach(a => { if (!grouped[a.category]) grouped[a.category] = []; grouped[a.category].push(a); });
 
   return (
     <div>
@@ -137,10 +140,12 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                       <tbody>
                         {acts.map(a => {
                           const pct = a.planned_quantity > 0 ? Math.min(100, (a.completed_quantity / a.planned_quantity) * 100) : 0;
+                          const children = childrenOf(a.id);
                           return (
-                            <tr key={a.id}>
+                            <React.Fragment key={a.id}>
+                            <tr>
                               <td className="text-mono" style={{ fontWeight: 600 }}>{a.activity_code}</td>
-                              <td style={{ fontWeight: 500 }}>{a.activity_name}</td>
+                              <td style={{ fontWeight: 600 }}>{a.activity_name} {children.length > 0 && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({children.length} components)</span>}</td>
                               <td className="text-mono">{a.planned_quantity} {a.unit}</td>
                               <td className="text-mono">{a.completed_quantity} {a.unit}</td>
                               <td>
@@ -158,13 +163,35 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                               </td>
                               <td>
                                 <div className="btn-group">
-                                  <button className="btn btn-sm btn-primary" onClick={() => setShowProgressModal(a.id)}>+ Log</button>
+                                  {children.length === 0 && <button className="btn btn-sm btn-primary" onClick={() => setShowProgressModal(a.id)}>+ Log</button>}
                                   {canManage && a.status === 'In Progress' && (
                                     <button className="btn btn-sm btn-success" onClick={() => updateActivityStatus(a.id, 'Completed')}>✓</button>
                                   )}
                                 </div>
                               </td>
                             </tr>
+                            {children.map(ch => {
+                              const chPct = ch.planned_quantity > 0 ? Math.min(100, (ch.completed_quantity / ch.planned_quantity) * 100) : 0;
+                              return (
+                                <tr key={ch.id} style={{ background: 'var(--bg-hover)' }}>
+                                  <td className="text-mono" style={{ paddingLeft: 24, fontSize: 11, color: 'var(--text-muted)' }}>↳</td>
+                                  <td style={{ paddingLeft: 24, fontSize: 12 }}>{ch.activity_name}</td>
+                                  <td className="text-mono" style={{ fontSize: 11 }}>{ch.planned_quantity} {ch.unit}</td>
+                                  <td className="text-mono" style={{ fontSize: 11 }}>{ch.completed_quantity} {ch.unit}</td>
+                                  <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 80 }}>
+                                      <div className="progress-bar" style={{ flex: 1, height: 4 }}>
+                                        <div className={`fill ${chPct >= 80 ? 'green' : chPct >= 40 ? 'orange' : 'red'}`} style={{ width: `${chPct}%` }} />
+                                      </div>
+                                      <span className="text-mono" style={{ fontSize: 10 }}>{chPct.toFixed(0)}%</span>
+                                    </div>
+                                  </td>
+                                  <td></td>
+                                  <td><button className="btn btn-sm btn-primary" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setShowProgressModal(ch.id)}>+ Log</button></td>
+                                </tr>
+                              );
+                            })}
+                            </React.Fragment>
                           );
                         })}
                       </tbody>
@@ -183,7 +210,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                   {progress.map(p => (
                     <tr key={p.id}>
                       <td className="text-mono">{p.work_date}</td>
-                      <td><span className="text-mono" style={{ marginRight: 6 }}>{p.activity?.activity_code}</span>{p.activity?.activity_name}</td>
+                      <td>{p.activity?.activity_name}{p.activity?.parent_activity_id ? <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 6 }}>({p.notes?.split(' — ')[0] || ''})</span> : ''}</td>
                       <td className="text-mono">{p.start_chainage}–{p.end_chainage}</td>
                       <td>{p.side}</td>
                       <td className="text-mono">{p.quantity}</td>
