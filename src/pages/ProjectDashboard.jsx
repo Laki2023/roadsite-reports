@@ -584,57 +584,87 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             </>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
 
-          {/* Key Activities — Km Progress */}
-          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>Key Activities — Progress</h3>
-          <div style={{ maxHeight:320, overflowY:'auto' }}>
-            {(() => {
-              // Show parent activities with aggregated child progress
-              const parents = works.filter(w => !w.is_component && !w.parent_activity_id && w.category !== 'Other');
-              const childrenOf = (pid) => works.filter(w => w.parent_activity_id === pid);
-              if (parents.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
-              // Group by category
-              const catGroups = {};
-              parents.forEach(p => { const c = p.category || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(p); });
-              return Object.entries(catGroups).sort((a,b) => a[0].localeCompare(b[0])).map(([cat, items]) => (
-                <div key={cat} style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{cat}</div>
-                  {items.map(a => {
-                    const planned = a.planned_quantity || 0;
-                    const done = Math.min(a.completed_quantity || 0, planned || Infinity);
-                    const unit = a.unit || 'Km';
-                    const rawPct = planned > 0 ? Math.round(done / planned * 100) : 0;
-                    const displayPct = Math.min(100, rawPct);
-                    const remaining = Math.max(0, planned - done);
-                    const isLive = a.last_progress_date === today;
-                    const children = childrenOf(a.id);
-                    return (
-                      <div key={a.id} style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, marginBottom:3 }}>
-                          <span style={{ fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
-                            {isLive && <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block',
-                              boxShadow:'0 0 6px #10b981', animation:'pulse 1.5s infinite' }} />}
-                            {a.activity_code ? a.activity_code + ' ' : ''}{a.activity_name}
-                          </span>
-                          <span style={{ fontWeight:700, fontSize:13, color: displayPct>=80?'#10b981':displayPct>=40?'#e87b35':'#ef4444' }}>{displayPct}%</span>
-                        </div>
-                        <div style={{ height:6, background:'var(--border)', borderRadius:3, overflow:'hidden', marginBottom:4 }}>
-                          <div style={{ height:'100%', width:`${displayPct}%`, borderRadius:3, transition:'width 0.8s ease',
-                            background: isLive ? 'linear-gradient(90deg, #10b981, #34d399)' : displayPct>=80 ? '#10b981' : displayPct>=40 ? '#e87b35' : '#ef4444' }} />
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)' }}>
-                          <span>Done: <b style={{ color:'var(--text)' }}>{Number(done).toFixed(2)} {unit}</b></span>
-                          <span>of <b style={{ color:'var(--text)' }}>{Number(planned).toFixed(2)} {unit}</b></span>
-                          <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight:600 }}>
-                            {remaining > 0 ? `${Number(remaining).toFixed(2)} ${unit} remaining` : '✅ Complete'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ));
-            })()}
-          </div>
+          {/* ══════ PROGRESS SUMMARY TABLE ══════ */}
+          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>📋 Progress Summary</h3>
+          {(() => {
+            const parents = works.filter(w => !w.is_component && !w.parent_activity_id && w.category !== 'Other');
+            if (parents.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
+            // Group by category for section headers
+            const catGroups = {};
+            parents.forEach(p => { const c = p.category || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(p); });
+            const catOrder = ['Earthworks','Pavement','Surfacing','Drainage','Structures','Road Furniture','Traffic Management','Environment','Preliminaries'];
+            const sortedCats = Object.entries(catGroups).sort((a,b) => {
+              const ai = catOrder.indexOf(a[0]), bi = catOrder.indexOf(b[0]);
+              return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+            let itemNo = 0;
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ borderBottom:'2px solid var(--border)' }}>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:40 }}>No.</th>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Description</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:50 }}>Unit</th>
+                      <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:80 }}>Billed</th>
+                      <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:90 }}>Achieved</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:60 }}>%</th>
+                      <th style={{ padding:'8px 6px', width:100 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedCats.map(([cat, items]) => {
+                      return (
+                        <React.Fragment key={cat}>
+                          <tr><td colSpan={7} style={{ padding:'8px 6px 4px', fontWeight:700, fontSize:11, color:'var(--accent)', textTransform:'uppercase', letterSpacing:'0.04em', borderBottom:'1px solid var(--border)' }}>{cat}</td></tr>
+                          {items.map(a => {
+                            itemNo++;
+                            const planned = a.planned_quantity || 0;
+                            const done = a.completed_quantity || 0;
+                            const unit = a.unit || 'Km';
+                            const pctRaw = planned > 0 ? (done / planned) * 100 : 0;
+                            const pctDisplay = Math.min(100, Math.round(pctRaw));
+                            const isLive = a.last_progress_date === today;
+                            return (
+                              <tr key={a.id} style={{ borderBottom:'1px solid var(--border)',
+                                background: isLive ? '#10b98108' : 'transparent' }}>
+                                <td style={{ textAlign:'center', padding:'6px', fontWeight:600, color:'var(--text-muted)' }}>{itemNo}</td>
+                                <td style={{ padding:'6px', fontWeight:500 }}>
+                                  {isLive && <span style={{ width:7, height:7, borderRadius:'50%', background:'#10b981', display:'inline-block', marginRight:5, boxShadow:'0 0 5px #10b981', animation:'pulse 1.5s infinite' }} />}
+                                  {a.activity_name}
+                                </td>
+                                <td style={{ textAlign:'center', padding:'6px', color:'var(--text-muted)' }}>{unit}</td>
+                                <td className="text-mono" style={{ textAlign:'right', padding:'6px' }}>{planned > 0 ? Number(planned).toLocaleString(undefined, {minimumFractionDigits: unit === 'Km' ? 1 : 0, maximumFractionDigits: 2}) : '—'}</td>
+                                <td className="text-mono" style={{ textAlign:'right', padding:'6px', fontWeight:700,
+                                  color: pctDisplay >= 80 ? '#10b981' : pctDisplay >= 40 ? '#e87b35' : done > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                                  {done > 0 ? Number(done).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '—'}
+                                </td>
+                                <td style={{ textAlign:'center', padding:'6px' }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:4, justifyContent:'center' }}>
+                                    <div style={{ width:40, height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                                      <div style={{ height:'100%', width:`${pctDisplay}%`, borderRadius:3,
+                                        background: pctDisplay >= 80 ? '#10b981' : pctDisplay >= 40 ? '#e87b35' : pctDisplay > 0 ? '#ef4444' : 'transparent' }} />
+                                    </div>
+                                    <span style={{ fontSize:10, fontWeight:600, color: pctDisplay >= 80 ? '#10b981' : pctDisplay >= 40 ? '#e87b35' : 'var(--text-muted)' }}>{pctDisplay > 0 ? pctDisplay + '%' : ''}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding:'6px', textAlign:'right' }}>
+                                  {planned > 0 && done > 0 && done < planned && (
+                                    <span style={{ fontSize:9, color:'#e87b35' }}>{Number(planned - done).toFixed(2)} {unit} left</span>
+                                  )}
+                                  {done >= planned && planned > 0 && <span style={{ fontSize:9, color:'#10b981' }}>✅</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
