@@ -214,7 +214,9 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                           </div>
                           {/* Grouped list */}
                           <div style={{ overflowY: 'auto', flex: 1 }}>
-                            {Object.entries(filteredGrouped).map(([cat, items]) => (
+                            {(pickerSearch.trim() ? Object.entries(filteredGrouped) :
+                              ACTIVITY_CATEGORIES.map(cat => [cat, filteredGrouped[cat]]).filter(([, items]) => items?.length)
+                            ).map(([cat, items]) => (
                               <div key={cat}>
                                 <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 700,
                                   color: CATEGORY_COLORS[cat] || 'var(--text-muted)',

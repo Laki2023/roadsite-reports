@@ -394,7 +394,7 @@ export const ACTIVITIES_LIST = [
   { name: 'Day works — materials', category: 'Day Works & Variations' },
   { name: 'Variation works', category: 'Day Works & Variations' },
   { name: 'Emergency / remedial works', category: 'Day Works & Variations' },
-].sort((a, b) => a.name.localeCompare(b.name));
+]; // Construction sequence order — NOT alphabetically sorted
 
 // ─────────────────────────────────────────────
 // QUALITY TESTS — Kenya RDM + lab standards
