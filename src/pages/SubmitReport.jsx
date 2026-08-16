@@ -573,7 +573,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     }
     setWeatherOverride(false);
     Promise.all([
-      supabase.from('works_activities').select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity').eq('project_id', selectedProject).order('sort_order'),
+      supabase.from('works_activities').select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity, parent_activity_id, is_component, component_order').eq('project_id', selectedProject).order('sort_order'),
       supabase.from('equipment_register').select('id, equipment_name, equipment_type').eq('project_id', selectedProject).order('equipment_type'),
       supabase.from('structures').select('id, structure_ref, structure_type, chainage').eq('project_id', selectedProject).order('chainage'),
       supabase.from('pavement_layers').select('id, layer_type, start_chainage, end_chainage, layer_status').eq('project_id', selectedProject),
@@ -608,7 +608,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   }, [selectedProject]);
 
   // ── Entry Helpers ──
-  function addWork() { setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }]); }
+  function addWork() { setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', component_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }]); }
   function addEquip() { setEquipEntries([...equipEntries, { equipment_id: '', equipment_name: '', status: 'Operational', hours_worked: 0, notes: '' }]); }
   function addStruct() { setStructEntries([...structEntries, { structure_id: '', structure_name: '', stage: '', status: 'In Progress', concrete_volume_m3: '', rebar_kg: '', notes: '' }]); }
   function addTest() { setTestEntries([...testEntries, { test_type: '', location: '', chainage: '', sample_id: '', result_value: '', spec_limit: '', result_status: 'Pending', notes: '' }]); }
@@ -664,10 +664,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       if (repErr) throw repErr;
 
       // 2. Works Progress — linked to project activity register where possible
+      // Component takes priority: if inspector selected a component, that's where progress tracks.
       for (const w of worksEntries) {
         if (!w.layer_name) continue;
-        // Resolve activity link: explicit selection, or auto-match by name
-        let actId = w.activity_id || null;
+        // Resolve: component_id > activity_id > name-match
+        let actId = w.component_id || w.activity_id || null;
         if (!actId) {
           const match = activities.find(a => a.activity_name.toLowerCase() === w.layer_name.toLowerCase());
           if (match) actId = match.id;
@@ -1034,119 +1035,116 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       )}
 
       {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
-      {step === 4 && (
+      {step === 4 && (() => {
+        // Build hierarchy: parents with their children
+        const parentActivities = activities.filter(a => !a.is_component && !a.parent_activity_id);
+        const childrenOf = (parentId) => activities.filter(a => a.parent_activity_id === parentId).sort((a, b) => (a.component_order || 0) - (b.component_order || 0));
+        const hasChildren = parentActivities.some(p => childrenOf(p.id).length > 0);
+
+        return (
         <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
           {activities.length > 0 && (
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
-              📌 This project has {activities.length} registered activities — pick from "Project Activities" to link your entry directly to the activity register, BoQ and IPC. No re-entry needed.
+              {hasChildren
+                ? '📌 Pick the activity, then select the specific operation. Progress tracks at component level and auto-rolls up.'
+                : '📌 Pick from project activities to link directly to the register, BoQ and IPC.'}
             </p>
           )}
           {worksEntries.map((w, i) => {
-            // Linked project activity (if selected from register)
-            const linkedAct = w.activity_id ? activities.find(a => a.id === w.activity_id) : null;
-            const unit = linkedAct?.unit || (WORK_LAYERS.find(l => l.name === w.layer_name)?.unit) || 'Km';
+            const reportActId = w.component_id || w.activity_id;
+            const linkedAct = reportActId ? activities.find(a => a.id === reportActId) : null;
+            const parentAct = w.activity_id ? activities.find(a => a.id === w.activity_id) : null;
+            const unit = linkedAct?.unit || parentAct?.unit || (WORK_LAYERS.find(l => l.name === w.layer_name)?.unit) || 'Km';
             const isLinear = unit === 'Km' || unit === 'km';
             const chFrom = parseChainage(w.start_chainage);
             const chTo = parseChainage(w.end_chainage);
-            const autoKm = isLinear && chFrom != null && chTo != null
-              ? Math.abs(chTo - chFrom).toFixed(3) : null;
-            const remaining = linkedAct && linkedAct.planned_quantity > 0
-              ? Math.max(0, linkedAct.planned_quantity - (linkedAct.completed_quantity || 0)) : null;
-            // Last reported chainage for this activity — guides the inspector to continue, not repeat
-            const actHistory = w.activity_id ? recentProgress.filter(p => p.activity_id === w.activity_id) : [];
+            const autoKm = isLinear && chFrom != null && chTo != null ? Math.abs(chTo - chFrom).toFixed(3) : null;
+            const remaining = linkedAct && linkedAct.planned_quantity > 0 ? Math.max(0, linkedAct.planned_quantity - (linkedAct.completed_quantity || 0)) : null;
+            const trackId = reportActId || w.activity_id;
+            const actHistory = trackId ? recentProgress.filter(p => p.activity_id === trackId) : [];
             const lastEntry = actHistory.length > 0 ? actHistory[0] : null;
-            // Overlap check against previous entries
-            const overlaps = (chFrom != null && chTo != null && w.activity_id)
-              ? findOverlaps(recentProgress, w.activity_id, chFrom, chTo, w.side || 'Both') : [];
+            const overlaps = (chFrom != null && chTo != null && trackId) ? findOverlaps(recentProgress, trackId, chFrom, chTo, w.side || 'Both') : [];
+            const components = w.activity_id ? childrenOf(w.activity_id) : [];
+
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
+                {/* Level 1: Parent Activity */}
                 <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3, display: 'block' }}>Activity</label>
                   <SearchableDropdown
                     items={[
-                      // Project's registered activities FIRST — linking these avoids double entry
-                      ...activities.map(a => ({
-                        name: `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}`,
-                        category: `Project Activities — ${a.category || 'General'}`,
-                      })),
-                      // Reference layers as fallback for unregistered work
-                      ...WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement Layers', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage & Structures', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })),
+                      ...parentActivities.map(a => ({ name: `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}`, category: `Project — ${a.category || 'General'}` })),
+                      ...WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })),
                     ]}
-                    value={w.layer_name}
+                    value={parentAct ? `${parentAct.activity_code ? parentAct.activity_code + ' — ' : ''}${parentAct.activity_name}` : w.layer_name}
                     onChange={val => {
-                      // Try to match a project activity (by "CODE — Name" or plain name)
-                      const projAct = activities.find(a =>
-                        `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}` === val ||
-                        a.activity_name === val ||
-                        a.activity_name.toLowerCase() === val.toLowerCase()
-                      );
+                      const projAct = parentActivities.find(a => `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}` === val || a.activity_name === val);
                       const copy = [...worksEntries];
-                      if (projAct) {
-                        copy[i] = { ...copy[i], activity_id: projAct.id, layer_name: projAct.activity_name, unit: projAct.unit || 'Km' };
-                      } else {
-                        const def = WORK_LAYERS.find(l => l.name === val);
-                        copy[i] = { ...copy[i], activity_id: '', layer_name: val, unit: def?.unit || 'Km' };
-                      }
+                      if (projAct) { copy[i] = { ...copy[i], activity_id: projAct.id, component_id: '', layer_name: projAct.activity_name, unit: projAct.unit || 'Km' }; }
+                      else { const def = WORK_LAYERS.find(l => l.name === val); copy[i] = { ...copy[i], activity_id: '', component_id: '', layer_name: val, unit: def?.unit || 'Km' }; }
                       setWorksEntries(copy);
                     }}
-                    placeholder={activities.length > 0 ? `Search ${activities.length} project activities...` : 'Search activity / layer...'}
+                    placeholder={parentActivities.length > 0 ? `Search ${parentActivities.length} activities...` : 'Search activity / layer...'}
                   />
                 </div>
-                {/* Live activity context — planned vs done */}
-                {linkedAct && (
-                  <div style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 10, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>🔗 Linked to register</span>
-                    <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
-                    <span>Done: <b>{(linkedAct.completed_quantity || 0).toFixed ? Number(linkedAct.completed_quantity || 0).toFixed(2) : linkedAct.completed_quantity} {unit}</b></span>
-                    {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
-                    {lastEntry && (
-                      <span style={{ width: '100%', color: 'var(--text-muted)' }}>
-                        📍 Last reported: Ch {fmtChainage(lastEntry.start_chainage)} → {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side || 'Both'}) on {lastEntry.work_date} — enter only <b>today's new section</b>
-                      </span>
-                    )}
+
+                {/* Level 2: Component buttons */}
+                {components.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3, display: 'block' }}>↳ What was done today? *</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {components.map(comp => {
+                        const isSel = w.component_id === comp.id;
+                        const compPct = comp.planned_quantity > 0 ? Math.min(100, Math.round((comp.completed_quantity || 0) / comp.planned_quantity * 100)) : 0;
+                        return (
+                          <button key={comp.id} type="button"
+                            onClick={() => { const copy = [...worksEntries]; copy[i] = { ...copy[i], component_id: isSel ? '' : comp.id }; setWorksEntries(copy); }}
+                            style={{ padding: '5px 10px', borderRadius: 'var(--radius)', border: `1.5px solid ${isSel ? '#3b82f6' : 'var(--border)'}`, background: isSel ? '#3b82f620' : 'transparent', color: isSel ? '#3b82f6' : 'var(--text)', fontSize: 11, fontWeight: isSel ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {isSel ? '✅ ' : ''}{comp.activity_name}
+                            {comp.planned_quantity > 0 && <span style={{ fontSize: 9, color: compPct >= 100 ? '#10b981' : 'var(--text-muted)', fontWeight: 600 }}>{compPct}%</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!w.component_id && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠ Select the operation performed today</div>}
                   </div>
                 )}
+
+                {/* Context strip */}
+                {linkedAct && (
+                  <div style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 10, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>🔗 {linkedAct.is_component ? linkedAct.activity_name + ' (→ ' + (parentAct?.activity_name || '') + ')' : 'Linked to register'}</span>
+                    <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
+                    <span>Done: <b>{Number(linkedAct.completed_quantity || 0).toFixed(2)} {unit}</b></span>
+                    {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
+                    {lastEntry && <span style={{ width: '100%', color: 'var(--text-muted)' }}>📍 Last: Ch {fmtChainage(lastEntry.start_chainage)} → {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side}) on {lastEntry.work_date} — enter <b>today\'s new section</b> only</span>}
+                  </div>
+                )}
+
+                {/* Chainage + side + quantity */}
                 <div style={{ display: 'grid', gridTemplateColumns: isLinear ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
                   <input type="text" placeholder="Start Ch. e.g. 5+200" value={w.start_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
                   <input type="text" placeholder="End Ch. e.g. 7+850" value={w.end_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
                   <select value={w.side} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'side', e.target.value)} style={{ fontSize: 12 }}>
                     {['Both', 'LHS', 'RHS', 'Centre'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  {!isLinear && (
-                    <input type="number" step="0.01" placeholder={`Qty (${unit})`} value={w.quantity || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12 }} />
-                  )}
+                  {!isLinear && <input type="number" step="0.01" placeholder={`Qty (${unit})`} value={w.quantity || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12 }} />}
                 </div>
-                <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
+                <input type="text" placeholder="Notes" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
+
                 {isLinear && autoKm && overlaps.length === 0 && (() => {
                   const uiSf = sideFactor(w.layer_name, w.side || 'Both');
                   const eqKm = (parseFloat(autoKm) * uiSf.factor).toFixed(3);
-                  return (
-                    <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
-                      ✅ {uiSf.factor !== 1
-                        ? `${autoKm} Km measured on ${w.side} → ${eqKm} Km equivalent (${uiSf.label})`
-                        : `${autoKm} Km of ${w.layer_name} — ${w.side || 'Both'} sides${uiSf.label ? ` (${uiSf.label})` : ''}`}
-                      {linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
-                    </div>
-                  );
+                  return (<div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
+                    ✅ {uiSf.factor !== 1 ? `${autoKm} Km on ${w.side} → ${eqKm} Km eq. (${uiSf.label})` : `${autoKm} Km — ${w.side || 'Both'} sides`}{linkedAct ? ' → auto-syncs' : ''}
+                  </div>);
                 })()}
+                {!isLinear && w.quantity > 0 && (<div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>✅ {w.quantity} {unit}{linkedAct ? ' → auto-syncs' : ''}</div>)}
                 {overlaps.length > 0 && (
                   <div style={{ marginTop: 6, padding: '8px 10px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 10 }}>
-                    <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>
-                      ⚠ OVERLAP — this range was already reported for this activity:
-                    </div>
-                    {overlaps.slice(0, 3).map((o, oi) => (
-                      <div key={oi} style={{ color: 'var(--text-muted)' }}>
-                        • Ch {fmtChainage(o.start_chainage)} → {fmtChainage(o.end_chainage)} ({o.side || 'Both'}) on {o.work_date}
-                      </div>
-                    ))}
-                    <div style={{ color: 'var(--text)', marginTop: 4 }}>
-                      If today you continued from where you stopped, enter only the <b>new section</b> (e.g. start from Ch {fmtChainage(Math.max(...overlaps.map(o => Math.max(o.start_chainage || 0, o.end_chainage || 0))))}).
-                      If this is a genuine repeat (second pass, rework, other layer), proceed — it will be flagged for the RE's review.
-                    </div>
-                  </div>
-                )}
-                {!isLinear && w.quantity > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
-                    ✅ {w.quantity} {unit} of {w.layer_name}{linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
+                    <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>⚠ OVERLAP:</div>
+                    {overlaps.slice(0, 3).map((o, oi) => (<div key={oi} style={{ color: 'var(--text-muted)' }}>• Ch {fmtChainage(o.start_chainage)} → {fmtChainage(o.end_chainage)} ({o.side}) on {o.work_date}</div>))}
+                    <div style={{ color: 'var(--text)', marginTop: 4 }}>Continue from Ch {fmtChainage(Math.max(...overlaps.map(o => Math.max(o.start_chainage || 0, o.end_chainage || 0))))} or proceed if legitimate repeat.</div>
                   </div>
                 )}
               </EntryRow>
@@ -1155,9 +1153,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           <AddButton label="＋ Add Works Progress" onClick={addWork} />
           <PhotoUploader projectId={selectedProject} category="works_progress" photos={worksPhotos} setPhotos={setWorksPhotos} maxPhotos={10} label="Works Photos" />
         </SectionCard>
-      )}
+        );
+      })()}
 
-      {/* ══════ STEP 5: EQUIPMENT ══════ */}
+            {/* ══════ STEP 5: EQUIPMENT ══════ */}
       {step === 5 && (
         <SectionCard title="Equipment Status" icon="🚜" count={equipEntries.length}>
           {equipEntries.map((eq, i) => (
