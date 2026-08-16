@@ -35,30 +35,19 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
     e.preventDefault();
     setSaving(true);
     try {
+      // Convert ALL empty strings to null (PostgreSQL rejects '' for DATE, NUMERIC etc.)
+      const raw = { ...form };
+      Object.keys(raw).forEach(k => { if (raw[k] === '') raw[k] = null; });
       const payload = {
-        ...form,
-        contract_sum: form.contract_sum ? parseFloat(form.contract_sum) : null,
-        original_contract_sum: form.original_contract_sum ? parseFloat(form.original_contract_sum) : null,
-        revised_contract_sum: form.revised_contract_sum ? parseFloat(form.revised_contract_sum) : null,
-        start_chainage: form.start_chainage ? parseFloat(form.start_chainage) : null,
-        end_chainage: form.end_chainage ? parseFloat(form.end_chainage) : null,
-        defects_liability_months: form.defects_liability_months ? parseInt(form.defects_liability_months) : 12,
-        latitude: form.latitude ? parseFloat(form.latitude) : null,
-        longitude: form.longitude ? parseFloat(form.longitude) : null,
-        // Dates: empty string → null (PostgreSQL rejects '' for DATE)
-        commencement_date: form.commencement_date || null,
-        original_completion_date: form.original_completion_date || null,
-        contract_award_date: form.contract_award_date || null,
-        contract_signing_date: form.contract_signing_date || null,
-        order_to_commence_date: form.order_to_commence_date || null,
-        performance_guarantee_expiry: form.performance_guarantee_expiry || null,
-        // Text: empty string → null
-        sub_county: form.sub_county || null,
-        constituency: form.constituency || null,
-        financier: form.financier || null,
-        engineer_name: form.engineer_name || null,
-        engineer_rep: form.engineer_rep || null,
-        addendums: form.addendums || null,
+        ...raw,
+        contract_sum: raw.contract_sum ? parseFloat(raw.contract_sum) : null,
+        original_contract_sum: raw.original_contract_sum ? parseFloat(raw.original_contract_sum) : null,
+        revised_contract_sum: raw.revised_contract_sum ? parseFloat(raw.revised_contract_sum) : null,
+        start_chainage: raw.start_chainage ? parseFloat(raw.start_chainage) : null,
+        end_chainage: raw.end_chainage ? parseFloat(raw.end_chainage) : null,
+        defects_liability_months: raw.defects_liability_months ? parseInt(raw.defects_liability_months) : 12,
+        latitude: raw.latitude ? parseFloat(raw.latitude) : null,
+        longitude: raw.longitude ? parseFloat(raw.longitude) : null,
       };
       if (editId) {
         const { error } = await supabase.from('projects').update(payload).eq('id', editId);
