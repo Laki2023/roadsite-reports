@@ -55,6 +55,30 @@ export function fmtChainage(km) {
   return `${k}+${String(m).padStart(3, '0')}`;
 }
 
+// ── Side factor: full-width vs side-specific activities ──
+// Full-width (carriageway) activities: one side = half the section quantity.
+// Side-specific items (drains, kerbs, guardrails): each side counts in full.
+const FULL_WIDTH_KEYWORDS = ['clearance', 'stripping', 'topsoil', 'earthwork', 'formation', 'ogl',
+  'subgrade', 'subbase', 'sub-base', 'base', 'gravel', 'stabilis', 'pavement', 'prime', 'tack',
+  'binder', 'wearing', 'asphalt', 'surface dressing', 'slurry', 'concrete pavement', 'cut to', 'fill', 'excavation'];
+const SIDE_SPECIFIC_KEYWORDS = ['drain', 'ditch', 'kerb', 'guard', 'rail', 'sign', 'footpath', 'walkway',
+  'sidewalk', 'delineator', 'marker post', 'shoulder', 'mitre', 'scour'];
+
+export function isFullWidthActivity(name) {
+  const n = (name || '').toLowerCase();
+  if (SIDE_SPECIFIC_KEYWORDS.some(k => n.includes(k))) return false;
+  return FULL_WIDTH_KEYWORDS.some(k => n.includes(k));
+}
+
+// Returns { factor, label } for a given activity name and side
+export function sideFactor(activityName, side) {
+  if (side === 'Both' || !side) return { factor: 1, label: null };
+  if (isFullWidthActivity(activityName)) {
+    return { factor: 0.5, label: `${side} = half carriageway width` };
+  }
+  return { factor: 1, label: `${side} — side item, full credit` };
+}
+
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
   { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
@@ -581,9 +605,17 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         const isLinear = unit === 'Km' || unit === 'km';
         const chFrom = parseChainage(w.start_chainage);
         const chTo = parseChainage(w.end_chainage);
-        const autoQty = isLinear && chFrom != null && chTo != null
-          ? Math.abs(chTo - chFrom)
+        const rawLength = isLinear && chFrom != null && chTo != null
+          ? Math.abs(chTo - chFrom) : null;
+        // Side factor: half-width for carriageway activities worked one side only.
+        // Raw chainage is stored untouched — only the synced quantity carries the factor.
+        const sf = isLinear ? sideFactor(w.layer_name, w.side || 'Both') : { factor: 1, label: null };
+        const autoQty = rawLength != null
+          ? rawLength * sf.factor
           : parseFloat(w.quantity) || 0;
+        const sideTag = sf.label && sf.factor !== 1
+          ? ` (${sf.label}: ${rawLength?.toFixed(3)} Km × 0.5 = ${autoQty.toFixed(3)} Km eq.)`
+          : '';
         // Flag overlaps in the record so the RE sees them during review/measurement
         const subOverlaps = actId ? findOverlaps(recentProgress, actId, chFrom, chTo, w.side || 'Both') : [];
         const overlapTag = subOverlaps.length > 0
@@ -593,7 +625,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           project_id: selectedProject, activity_id: actId,
           work_date: form.report_date, start_chainage: chFrom || 0,
           end_chainage: chTo || 0, side: w.side || 'Both',
-          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + overlapTag,
+          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + sideTag + overlapTag,
           reported_by: profile.id,
         });
         if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
@@ -969,11 +1001,18 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                   )}
                 </div>
                 <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
-                {isLinear && autoKm && overlaps.length === 0 && (
-                  <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
-                    ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides{linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
-                  </div>
-                )}
+                {isLinear && autoKm && overlaps.length === 0 && (() => {
+                  const uiSf = sideFactor(w.layer_name, w.side || 'Both');
+                  const eqKm = (parseFloat(autoKm) * uiSf.factor).toFixed(3);
+                  return (
+                    <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
+                      ✅ {uiSf.factor !== 1
+                        ? `${autoKm} Km measured on ${w.side} → ${eqKm} Km equivalent (${uiSf.label})`
+                        : `${autoKm} Km of ${w.layer_name} — ${w.side || 'Both'} sides${uiSf.label ? ` (${uiSf.label})` : ''}`}
+                      {linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
+                    </div>
+                  );
+                })()}
                 {overlaps.length > 0 && (
                   <div style={{ marginTop: 6, padding: '8px 10px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 10 }}>
                     <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>
