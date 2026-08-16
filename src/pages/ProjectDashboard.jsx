@@ -543,141 +543,31 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         </div>
       </details>
 
-      {/* ══════ STATUTORY OBLIGATIONS ══════ */}
+      {/* ══════ STATUTORY OBLIGATIONS — Summary Strip ══════ */}
       {(() => {
         const obs = d.obligations || [];
+        if (obs.length === 0) return null;
         const today = new Date();
-        const daysUntil = (dateStr) => {
-          if (!dateStr) return null;
-          return Math.ceil((new Date(dateStr) - today) / 86400000);
-        };
-        const statusBadge = (expiry) => {
-          const days = daysUntil(expiry);
-          if (days === null) return <span className="badge badge-muted">N/A</span>;
-          if (days < 0) return <span className="badge badge-danger">Expired ({Math.abs(days)}d ago)</span>;
-          if (days <= 90) return <span className="badge badge-warning">⚠ {days}d left</span>;
-          return <span className="badge badge-success">✅ Valid</span>;
-        };
-        const expiredCount = obs.filter(o => daysUntil(o.expiry_date) !== null && daysUntil(o.expiry_date) < 0).length;
-        const warningCount = obs.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d >= 0 && d <= 90; }).length;
-
+        const daysUntil = (d) => d ? Math.ceil((new Date(d) - today) / 86400000) : null;
+        const expired = obs.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d < 0; });
+        const expiring = obs.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d >= 0 && d <= 90; });
+        if (expired.length === 0 && expiring.length === 0) return (
+          <div style={{ padding: '8px 16px', background: '#05966910', borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#059669' }}>🔒 All {obs.length} statutory obligations valid</span>
+            <button className="btn btn-sm btn-secondary" style={{ fontSize: 10 }} onClick={() => navigateTo('obligations')}>View All</button>
+          </div>
+        );
         return (
-          <>
-            <details className="card" style={{ padding: 0, marginBottom: 16 }}
-              open={expiredCount > 0 || warningCount > 0}>
-              <summary style={{ padding: '12px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14, userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  🔒 Statutory Obligations
-                  {expiredCount > 0 && <span className="badge badge-danger" style={{ marginLeft: 8 }}>{expiredCount} expired</span>}
-                  {warningCount > 0 && <span className="badge badge-warning" style={{ marginLeft: 4 }}>{warningCount} expiring</span>}
-                </span>
-                <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {isPlatformAdmin && <button className="btn btn-sm btn-primary" onClick={e => { e.preventDefault(); e.stopPropagation(); setObEditId(null); setObForm({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' }); setShowObModal(true); }}>+ Add</button>}
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>▼</span>
-                </span>
-              </summary>
-              <div style={{ padding: '0 16px 16px' }}>
-                {obs.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-                    No obligations recorded — click "+ Add" to add guarantees, insurance, licences
-                  </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Obligation</th>
-                        <th style={{ textAlign: 'left', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Provider / Ref</th>
-                        <th style={{ textAlign: 'right', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Amount</th>
-                        <th style={{ textAlign: 'center', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Expiry</th>
-                        <th style={{ textAlign: 'center', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
-                        <th style={{ width: 60 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {obs.map(ob => (
-                        <tr key={ob.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '8px 6px', fontWeight: 600 }}>{ob.obligation_type}</td>
-                          <td style={{ padding: '8px 6px' }}>
-                            <div>{ob.provider || '—'}</div>
-                            {ob.reference_no && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ob.reference_no}</div>}
-                          </td>
-                          <td className="text-mono" style={{ padding: '8px 6px', textAlign: 'right' }}>
-                            {ob.amount ? `KES ${Number(ob.amount).toLocaleString()}` : '—'}
-                          </td>
-                          <td className="text-mono" style={{ padding: '8px 6px', textAlign: 'center' }}>
-                            {ob.expiry_date ? new Date(ob.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td style={{ padding: '8px 6px', textAlign: 'center' }}>{statusBadge(ob.expiry_date)}</td>
-                          <td style={{ padding: '8px 6px' }}>
-                            {isPlatformAdmin && (
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                <button className="btn btn-sm btn-secondary" style={{ fontSize: 9, padding: '2px 6px' }} onClick={() => editOb(ob)}>Edit</button>
-                                <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }} onClick={() => deleteOb(ob.id)}>×</button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {obs.some(o => o.notes) && (
-                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                    {obs.filter(o => o.notes).map(o => <div key={o.id}>📝 {o.obligation_type}: {o.notes}</div>)}
-                  </div>
-                )}
-              </div>
-            </details>
-
-            {/* Add/Edit Obligation Modal */}
-            {showObModal && (
-              <div className="modal-overlay" onClick={() => setShowObModal(false)}>
-                <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                  <h3>{obEditId ? 'Edit Obligation' : 'Add Statutory Obligation'}<button onClick={() => setShowObModal(false)}>×</button></h3>
-                  <div className="form-group mb-16">
-                    <label>Type *</label>
-                    <select value={obForm.obligation_type} onChange={e => setObForm({ ...obForm, obligation_type: e.target.value })}>
-                      {OB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group mb-16">
-                      <label>Provider / Bank / Insurer</label>
-                      <input value={obForm.provider} onChange={e => setObForm({ ...obForm, provider: e.target.value })}
-                        placeholder="e.g. KCB Bank, Jubilee Insurance" />
-                    </div>
-                    <div className="form-group mb-16">
-                      <label>Amount (KES)</label>
-                      <input type="number" step="0.01" value={obForm.amount} onChange={e => setObForm({ ...obForm, amount: e.target.value })}
-                        placeholder="e.g. 254000000" />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group mb-16">
-                      <label>Reference / Policy No.</label>
-                      <input value={obForm.reference_no} onChange={e => setObForm({ ...obForm, reference_no: e.target.value })}
-                        placeholder="e.g. BG/2024/001, POL-123456" />
-                    </div>
-                    <div className="form-group mb-16">
-                      <label>Expiry Date</label>
-                      <input type="date" value={obForm.expiry_date} onChange={e => setObForm({ ...obForm, expiry_date: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="form-group mb-16">
-                    <label>Notes</label>
-                    <input value={obForm.notes} onChange={e => setObForm({ ...obForm, notes: e.target.value })}
-                      placeholder="e.g. Renewal letter sent to Contractor 15 Aug" />
-                  </div>
-                  <div className="btn-group">
-                    <button className="btn btn-primary" onClick={saveOb} disabled={obSaving}>
-                      {obSaving ? 'Saving...' : obEditId ? 'Update' : 'Add Obligation'}
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setShowObModal(false)}>Cancel</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+          <div style={{ padding: '10px 16px', background: expired.length > 0 ? '#ef444415' : '#f59e0b10', border: `1px solid ${expired.length > 0 ? '#ef444440' : '#f59e0b30'}`, borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expired.length + expiring.length > 0 ? 6 : 0 }}>
+              <span style={{ fontWeight: 700, color: expired.length > 0 ? '#ef4444' : '#f59e0b' }}>
+                🔒 {expired.length > 0 ? `${expired.length} obligation(s) EXPIRED` : `${expiring.length} obligation(s) expiring within 90 days`}
+              </span>
+              <button className="btn btn-sm btn-secondary" style={{ fontSize: 10 }} onClick={() => navigateTo('obligations')}>Manage</button>
+            </div>
+            {expired.map(o => <div key={o.id} style={{ color: '#ef4444', fontSize: 11 }}>⛔ {o.obligation_type} — expired {Math.abs(daysUntil(o.expiry_date))} days ago{o.provider ? ` (${o.provider})` : ''}</div>)}
+            {expiring.map(o => <div key={o.id} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {o.obligation_type} — {daysUntil(o.expiry_date)} days remaining{o.provider ? ` (${o.provider})` : ''}</div>)}
+          </div>
         );
       })()}
 

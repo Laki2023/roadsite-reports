@@ -28,6 +28,7 @@ import ClaimsPage from './pages/ClaimsPage';
 import KeyPersonnelPage from './pages/KeyPersonnelPage';
 import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
 import TakingOffPage from './pages/TakingOffPage';
+import ObligationsPage from './pages/ObligationsPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
@@ -53,6 +54,7 @@ const NAV_ITEMS = [
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
   { key: 'claims', label: 'Claims Management', icon: '⚖️', minRole: 'resident_engineer' },
   { key: 'key-personnel', label: 'Key Personnel', icon: '👥', minRole: 'inspector' },
+  { key: 'obligations', label: 'Statutory Obligations', icon: '🔒', minRole: 'resident_engineer' },
   { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐', minRole: 'resident_engineer' },
   { section: 'Administration' },
   { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
@@ -198,6 +200,7 @@ export default function App() {
       case 'monthly-report': return <MonthlyReportPage {...ctx} />;
       case 'programme': return <ProgrammePage {...ctx} />;
       case 'claims': return <ClaimsPage {...ctx} />;
+      case 'obligations': return <ObligationsPage {...ctx} />;
       case 'key-personnel': return <KeyPersonnelPage {...ctx} />;
       case 'approvals-matrix': return <ApprovalsMatrixPage {...ctx} />;
       case 'org-mgmt': return <OrgManagement {...ctx} />;
