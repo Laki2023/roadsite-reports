@@ -39,7 +39,7 @@ CREATE POLICY "Managers can delete templates" ON position_templates
 
 -- Seed some common Kenya road sector position templates
 INSERT INTO position_templates (display_name, description, system_role, allowed_pages) VALUES
-  ('HQ Quantity Surveyor', 'Reviews BoQ, measurements and IPC submissions at HQ level', 'project_officer',
+  ('Measurement Engineer', 'Handles BoQ, measurements, taking-off and IPC submissions', 'project_officer',
    ARRAY['boq', 'taking-off', 'ipc', 'claims', 'monthly-report']),
   ('Contracts Officer', 'Handles claims, EOT assessments and contract amendments', 'project_officer',
    ARRAY['claims', 'approvals', 'monthly-report', 'key-personnel', 'approvals-matrix']),
