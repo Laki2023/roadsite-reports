@@ -134,17 +134,27 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
               <tr>
                 <th>Project Name</th>
                 <th>Contract No.</th>
-                <th>Category</th>
-                <th>Phase</th>
                 <th>Contractor</th>
-                <th>FIDIC</th>
-                <th>Chainage (km)</th>
+                <th>Contract Sum</th>
+                <th>Phase</th>
+                <th>Road (Km)</th>
                 <th>County</th>
+                <th>Progress</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {filtered.map(p => {
+                const roadLen = p.start_chainage != null && p.end_chainage != null ? (p.end_chainage - p.start_chainage) : (p.road_length || 0);
+                const contractSum = p.original_contract_sum || p.contract_sum || 0;
+                // Simple time-based progress estimate (will be replaced by real layer progress later)
+                const startDt = p.commencement_date || p.start_date;
+                const endDt = p.revised_completion_date || p.original_completion_date || p.end_date;
+                const elapsed = startDt ? Math.max(0, (Date.now() - new Date(startDt)) / 86400000) : 0;
+                const total = startDt && endDt ? Math.max(1, (new Date(endDt) - new Date(startDt)) / 86400000) : 1;
+                const timePct = Math.min(100, Math.round(elapsed / total * 100));
+
+                return (
                 <tr key={p.id} style={{ cursor: 'pointer' }}
                   onClick={() => {
                     if (profile?.role === 'contractor_qs') {
@@ -153,18 +163,25 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                       navigateTo('project-dashboard', p);
                     }
                   }}>
-                  <td style={{ fontWeight: 600 }}>{p.name}</td>
-                  <td className="text-mono text-sm">{p.contract_no || '—'}</td>
-                  <td><span className={`badge badge-${catColors[p.category] || 'muted'}`}>{p.category}</span></td>
-                  <td><span className={`badge badge-${phaseColors[p.current_phase] || 'muted'}`}>{p.current_phase}</span></td>
-                  <td className="text-sm">{p.contractor_name || '—'}</td>
-                  <td className="text-sm">{p.fidic_edition || '—'}</td>
-                  <td className="chainage">
-                    {p.start_chainage != null && p.end_chainage != null
-                      ? `${p.start_chainage.toFixed(3)} — ${p.end_chainage.toFixed(3)}`
-                      : '—'}
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--accent)' }}>{p.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{p.category} · {p.fidic_edition || '—'}</div>
                   </td>
+                  <td className="text-mono text-sm">{p.contract_no || '—'}</td>
+                  <td className="text-sm">{p.contractor_name || '—'}</td>
+                  <td className="text-mono text-sm">{contractSum > 0 ? `KES ${(contractSum / 1e6).toFixed(1)}M` : '—'}</td>
+                  <td><span className={`badge badge-${phaseColors[p.current_phase] || 'muted'}`}>{p.current_phase}</span></td>
+                  <td className="text-mono text-sm">{roadLen > 0 ? `${roadLen.toFixed(1)}` : '—'}</td>
                   <td className="text-sm">{p.county || '—'}</td>
+                  <td style={{ width: 100 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${timePct}%`, borderRadius: 3,
+                          background: timePct >= 80 ? '#10b981' : timePct >= 40 ? '#e87b35' : '#3b82f6' }} />
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 600, minWidth: 28, color: 'var(--text-muted)' }}>{timePct}%</span>
+                    </div>
+                  </td>
                   <td>
                     {hasRole(profile.role, 'engineer') && (
                       <button className="btn btn-sm btn-secondary"
@@ -172,7 +189,8 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
