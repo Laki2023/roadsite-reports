@@ -76,7 +76,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
     const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions] = await Promise.all([
       supabase.from('projects').select('*').eq('id', projectId).single(),
       supabase.from('boq_items').select('*').eq('project_id', projectId),
-      supabase.from('works_activities').select('*').eq('project_id', projectId).order('sort_order'),
+      supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name)').eq('project_id', projectId).order('sort_order'),
       supabase.from('equipment_register').select('*').eq('project_id', projectId),
       supabase.from('structures').select('*').eq('project_id', projectId),
       supabase.from('site_issues').select('*').eq('project_id', projectId),
@@ -584,27 +584,56 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             </>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
 
-          {/* Category Progress with Live Indicators */}
-          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>Major Activities by Category</h3>
-          <div style={{ maxHeight:220, overflowY:'auto' }}>
-            {actProgress.length > 0 ? actProgress.map((a,i) => (
-              <div key={i} style={{ marginBottom:10 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, marginBottom:3 }}>
-                  <span style={{ fontWeight:500, display:'flex', alignItems:'center', gap:5 }}>
-                    {a.hasLive && <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block',
-                      boxShadow:'0 0 6px #10b981', animation:'pulse 1.5s infinite' }} title="Active today" />}
-                    {a.name}
-                  </span>
-                  <span style={{ fontWeight:700, color: a.pct>=80?'#10b981':a.pct>=40?'#e87b35':'#ef4444' }}>{a.pct}%</span>
+          {/* Key Activities — Km Progress */}
+          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>Key Activities — Progress</h3>
+          <div style={{ maxHeight:320, overflowY:'auto' }}>
+            {(() => {
+              // Show parent activities with aggregated child progress
+              const parents = works.filter(w => !w.is_component && !w.parent_activity_id && w.category !== 'Other');
+              const childrenOf = (pid) => works.filter(w => w.parent_activity_id === pid);
+              if (parents.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
+              // Group by category
+              const catGroups = {};
+              parents.forEach(p => { const c = p.category || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(p); });
+              return Object.entries(catGroups).sort((a,b) => a[0].localeCompare(b[0])).map(([cat, items]) => (
+                <div key={cat} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{cat}</div>
+                  {items.map(a => {
+                    const planned = a.planned_quantity || 0;
+                    const done = Math.min(a.completed_quantity || 0, planned || Infinity);
+                    const unit = a.unit || 'Km';
+                    const rawPct = planned > 0 ? Math.round(done / planned * 100) : 0;
+                    const displayPct = Math.min(100, rawPct);
+                    const remaining = Math.max(0, planned - done);
+                    const isLive = a.last_progress_date === today;
+                    const children = childrenOf(a.id);
+                    return (
+                      <div key={a.id} style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, marginBottom:3 }}>
+                          <span style={{ fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+                            {isLive && <span style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', display:'inline-block',
+                              boxShadow:'0 0 6px #10b981', animation:'pulse 1.5s infinite' }} />}
+                            {a.activity_code ? a.activity_code + ' ' : ''}{a.activity_name}
+                          </span>
+                          <span style={{ fontWeight:700, fontSize:13, color: displayPct>=80?'#10b981':displayPct>=40?'#e87b35':'#ef4444' }}>{displayPct}%</span>
+                        </div>
+                        <div style={{ height:6, background:'var(--border)', borderRadius:3, overflow:'hidden', marginBottom:4 }}>
+                          <div style={{ height:'100%', width:`${displayPct}%`, borderRadius:3, transition:'width 0.8s ease',
+                            background: isLive ? 'linear-gradient(90deg, #10b981, #34d399)' : displayPct>=80 ? '#10b981' : displayPct>=40 ? '#e87b35' : '#ef4444' }} />
+                        </div>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)' }}>
+                          <span>Done: <b style={{ color:'var(--text)' }}>{Number(done).toFixed(2)} {unit}</b></span>
+                          <span>of <b style={{ color:'var(--text)' }}>{Number(planned).toFixed(2)} {unit}</b></span>
+                          <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight:600 }}>
+                            {remaining > 0 ? `${Number(remaining).toFixed(2)} ${unit} remaining` : '✅ Complete'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ height:8, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${a.pct}%`, borderRadius:4, transition:'width 1s ease',
-                    background: a.hasLive
-                      ? 'linear-gradient(90deg, #10b981, #34d399)'
-                      : a.pct>=80 ? '#10b981' : a.pct>=40 ? '#e87b35' : '#ef4444' }} />
-                </div>
-              </div>
-            )) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>}
+              ));
+            })()}
           </div>
         </div>
       </div>

@@ -1074,7 +1074,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                   <SearchableDropdown
                     items={[
                       ...parentActivities.map(a => ({ name: `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}`, category: `Project — ${a.category || 'General'}` })),
-                      ...WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })),
+                      ...(parentActivities.length === 0 ? WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })) : []),
                     ]}
                     value={parentAct ? `${parentAct.activity_code ? parentAct.activity_code + ' — ' : ''}${parentAct.activity_name}` : w.layer_name}
                     onChange={val => {
