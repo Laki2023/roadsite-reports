@@ -1,20 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase, hasRole, ROLE_LABELS, INSTRUCTION_TYPES } from '../lib/supabase';
 import PhotoUploader, { uploadReportPhotos } from '../components/PhotoUploader';
+import {
+  WEATHER_OPTIONS,
+  EQUIPMENT_LIST, EQUIPMENT_STATUS_OPTIONS, EQUIPMENT_CATEGORIES,
+  STRUCTURES_LIST, STRUCTURE_STATUS_OPTIONS, STRUCTURE_CATEGORIES,
+  ACTIVITIES_LIST, ACTIVITY_CATEGORIES,
+  QUALITY_TESTS_LIST, QUALITY_TEST_CATEGORIES,
+  MATERIALS_LIST,
+  ISSUE_CATEGORIES as REF_ISSUE_CATEGORIES,
+} from '../data/referenceData';
 
-const WEATHER = [
-  { key: 'Sunny', icon: '☀️', color: '#f59e0b' },
-  { key: 'Partly Cloudy', icon: '⛅', color: '#6b7280' },
-  { key: 'Overcast', icon: '☁️', color: '#4b5563' },
-  { key: 'Light Rain', icon: '🌦️', color: '#3b82f6' },
-  { key: 'Heavy Rain', icon: '🌧️', color: '#1d4ed8' },
-  { key: 'Stormy', icon: '⛈️', color: '#7c3aed' },
-];
-
+// ── Constants ──
 const ISSUE_SEVERITY = ['Low', 'Medium', 'High', 'Critical'];
-const ISSUE_CATEGORIES = ['Safety', 'Quality', 'Environmental', 'Design', 'Access', 'Utility', 'Community', 'Other'];
-const TEST_TYPES = ['MDD/CBR', 'DCP', 'Gradation', 'Atterberg Limits', 'Marshall Stability', 'Concrete Cube', 'Slump Test', 'Compaction', 'Deflection', 'IRI', 'Sand Equivalent', 'Bitumen Content', 'Other'];
-const MATERIAL_TYPES = ['Cement', 'Bitumen', 'Aggregate', 'Sand', 'Steel', 'Fuel', 'Timber', 'Pipes', 'Geotextile', 'Paint', 'Other'];
 
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
@@ -81,6 +79,107 @@ const WORK_LAYERS = [
   { name: 'Remedial / Defects Works', unit: 'LS', group: 'other' },
 ];
 
+// ════════════════════════════════════════════════════════
+// SearchableDropdown — inline component with type-ahead,
+// category grouping, and "Add custom..." option
+// ════════════════════════════════════════════════════════
+function SearchableDropdown({ items, value, onChange, placeholder = 'Search...', allowCustom = true, style = {} }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) { if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); setSearch(''); } }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // items can be strings or { name, category }
+  const normalized = items.map(i => typeof i === 'string' ? { name: i, category: '' } : i);
+  const filtered = search.trim()
+    ? normalized.filter(i => i.name.toLowerCase().includes(search.toLowerCase().trim()))
+    : normalized;
+
+  // Group by category
+  const groups = {};
+  filtered.forEach(item => {
+    const cat = item.category || '';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  });
+
+  const handleSelect = (val) => { onChange(val); setOpen(false); setSearch(''); };
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', ...style }}>
+      <div onClick={() => setOpen(!open)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px',
+          border: `1.5px solid ${open ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)',
+          background: 'var(--bg-card)', cursor: 'pointer', fontSize: 12, minHeight: 32, transition: 'border-color 0.15s' }}>
+        <span style={{ color: value ? 'var(--text)' : 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {value || placeholder}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
+          {value && <span onClick={e => { e.stopPropagation(); onChange(''); }} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>×</span>}
+          <span style={{ color: 'var(--text-muted)', fontSize: 8 }}>{open ? '▲' : '▼'}</span>
+        </span>
+      </div>
+
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, marginTop: 3,
+          border: '1.5px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-card)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', maxHeight: 300, display: 'flex', flexDirection: 'column' }}>
+          {/* Search input */}
+          <div style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
+            <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Type to search..." style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--border)',
+              borderRadius: 4, fontSize: 12, outline: 'none', boxSizing: 'border-box', background: 'var(--bg-card)', color: 'var(--text)' }} />
+          </div>
+
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>No matches</div>
+            ) : (
+              Object.entries(groups).map(([cat, catItems]) => (
+                <div key={cat || 'default'}>
+                  {cat && (
+                    <div style={{ padding: '5px 10px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.05em', background: 'var(--bg-hover)',
+                      position: 'sticky', top: 0 }}>{cat}</div>
+                  )}
+                  {catItems.map(item => (
+                    <div key={item.name} onClick={() => handleSelect(item.name)}
+                      style={{ padding: '6px 10px', cursor: 'pointer', fontSize: 12,
+                        background: value === item.name ? 'var(--accent-light, #dbeafe)' : 'transparent',
+                        color: value === item.name ? 'var(--accent)' : 'var(--text)',
+                        fontWeight: value === item.name ? 600 : 400,
+                        borderLeft: value === item.name ? '3px solid var(--accent)' : '3px solid transparent' }}
+                      onMouseOver={e => { if (value !== item.name) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                      onMouseOut={e => { if (value !== item.name) e.currentTarget.style.background = 'transparent'; }}>
+                      {item.name}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+
+            {/* Add custom option */}
+            {allowCustom && search.trim() && !normalized.some(i => i.name.toLowerCase() === search.toLowerCase().trim()) && (
+              <div onClick={() => handleSelect(search.trim())}
+                style={{ padding: '8px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--accent)',
+                  fontWeight: 600, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 4 }}
+                onMouseOver={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                <span style={{ fontSize: 14 }}>+</span> Add "{search.trim()}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Reusable Workforce Step Component ──
 function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPresence, labourEntries, setLabourEntries, showTooltips }) {
   const keyPersonnel = personnel || [];
@@ -100,309 +199,210 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
     }
   }, [roles, party]);
 
-  function updateLabour(roleTitle, field, value) {
-    setLabourEntries(prev => prev.map(e =>
-      e.role_title === roleTitle ? { ...e, [field]: Math.max(0, parseInt(value) || 0) } : e
-    ));
+  const totalMale = labourEntries.reduce((s, e) => s + (e.male_count || 0), 0);
+  const totalFemale = labourEntries.reduce((s, e) => s + (e.female_count || 0), 0);
+  const total = totalMale + totalFemale;
+  const kpPresent = Object.values(presence).filter(Boolean).length;
+  const kpTotal = keyPersonnel.length;
+
+  function updateEntry(i, field, val) {
+    const copy = [...labourEntries];
+    copy[i][field] = field.includes('count') ? (parseInt(val) || 0) : val;
+    setLabourEntries(copy);
   }
 
-  function addCustomRole() {
-    if (!customRole.role_title.trim()) return;
-    setLabourEntries(prev => [...prev, {
-      role_title: customRole.role_title, category: customRole.category,
-      male_count: parseInt(customRole.male_count) || 0,
-      female_count: parseInt(customRole.female_count) || 0,
-      description: 'Custom role', ref_id: null,
-    }]);
+  function removeEntry(i) { setLabourEntries(labourEntries.filter((_, idx) => idx !== i)); }
+
+  function addCustom() {
+    if (!customRole.role_title) return;
+    setLabourEntries([...labourEntries, { ...customRole }]);
     setCustomRole({ role_title: '', category: 'skilled', male_count: 0, female_count: 0 });
     setShowCustom(false);
   }
 
-  // Compute totals
-  const entries = labourEntries.filter(e => e.category !== 'key_personnel');
-  const totalMale = entries.reduce((s, e) => s + (e.male_count || 0), 0);
-  const totalFemale = entries.reduce((s, e) => s + (e.female_count || 0), 0);
-  const totalWorkers = totalMale + totalFemale;
-  const skilledTotal = entries.filter(e => e.category === 'skilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
-  const unskilledTotal = entries.filter(e => e.category === 'unskilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
-  const kpPresent = Object.values(presence).filter(Boolean).length;
+  // ── Gender Bar ──
+  const mPct = total > 0 ? Math.round(totalMale / total * 100) : 0;
 
-  function RoleTable({ title, icon, category, roleList }) {
-    const catEntries = labourEntries.filter(e => e.category === category);
-    const catTotal = catEntries.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
-    const [collapsed, setCollapsed] = useState(false);
+  return (
+    <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? '🏗️' : '👷'}
+      count={`${total} workers + ${kpPresent}/${kpTotal} KP`} color={total > 0 ? '#10b981' : 'var(--accent)'}>
 
-    function clearCategory() {
-      setLabourEntries(prev => prev.map(e => e.category === category ? { ...e, male_count: 0, female_count: 0 } : e));
-    }
-    function removeRole(roleTitle) {
-      setLabourEntries(prev => prev.filter(e => !(e.role_title === roleTitle && e.category === category)));
-    }
-
-    return (
-      <div style={{ marginTop: 16 }}>
-        <div onClick={() => setCollapsed(!collapsed)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
-          <span style={{ fontSize: 16 }}>{icon}</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{title}</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 10 }}>
-            {catTotal} on site
-          </span>
-          {catTotal > 0 && (
-            <span onClick={e => { e.stopPropagation(); clearCategory(); }}
-              title="Clear all counts" style={{ fontSize: 10, color: '#ef4444', cursor: 'pointer', padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.08)' }}>
-              ✕ Clear
-            </span>
-          )}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{collapsed ? '▸' : '▾'}</span>
+      {/* Key Personnel Attendance */}
+      {keyPersonnel.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Key Personnel — Present Today ({kpPresent}/{kpTotal})
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {keyPersonnel.map(t => (
+              <label key={t.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 'var(--radius)',
+                  border: `1.5px solid ${presence[t.id] ? '#10b981' : 'var(--border)'}`,
+                  background: presence[t.id] ? '#f0fdf420' : 'transparent', cursor: 'pointer', fontSize: 11,
+                  transition: 'all 0.15s', fontWeight: presence[t.id] ? 600 : 400 }}>
+                <input type="checkbox" checked={!!presence[t.id]}
+                  onChange={e => setPresence({ ...presence, [t.id]: e.target.checked })}
+                  style={{ accentColor: '#10b981' }} />
+                <span style={{ color: presence[t.id] ? '#10b981' : 'var(--text-muted)' }}>
+                  {t.title_prefix ? `${t.title_prefix} ` : ''}{t.name}
+                </span>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({t.position_title})</span>
+              </label>
+            ))}
+          </div>
         </div>
-        {!collapsed && (
-          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 50px 30px', gap: 0, padding: '6px 10px',
-              background: 'var(--bg-hover)', borderBottom: '1px solid var(--border)', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>
-              <div>Role</div><div style={{ textAlign: 'center' }}>♂ M</div><div style={{ textAlign: 'center' }}>♀ F</div><div style={{ textAlign: 'center' }}>Tot</div><div></div>
+      )}
+
+      {/* Labour entries by category */}
+      {['skilled', 'unskilled'].map(cat => {
+        const catEntries = labourEntries.filter(e => e.category === cat);
+        if (catEntries.length === 0 && labourEntries.length > 0) return null;
+        return (
+          <div key={cat} style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{cat === 'skilled' ? '🔧 Skilled' : '👥 Unskilled'}</span>
+              <span>{catEntries.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0)} total</span>
             </div>
-            {/* Rows */}
-            {catEntries.map((entry, i) => {
-              const total = (entry.male_count || 0) + (entry.female_count || 0);
-              const isActive = total > 0;
-              const isCustom = !entry.ref_id;
+            {catEntries.map((entry, idx) => {
+              const globalIdx = labourEntries.indexOf(entry);
               return (
-                <div key={entry.role_title} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px 50px 30px', gap: 0,
-                  padding: '5px 10px', borderBottom: i < catEntries.length - 1 ? '1px solid var(--border)' : 'none',
-                  background: isActive ? 'rgba(16,185,129,0.04)' : 'transparent', alignItems: 'center' }}>
-                  <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ color: isActive ? 'var(--text)' : 'var(--text-muted)' }}>{entry.role_title}</span>
+                <div key={globalIdx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 28px', gap: 6, marginBottom: 4, alignItems: 'center' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text)' }}>
+                    {entry.role_title}
                     {entry.description && showTooltips && (
-                      <span title={entry.description} style={{ cursor: 'help', fontSize: 10, color: 'var(--accent)' }}>ⓘ</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 4 }}>({entry.description})</span>
                     )}
                   </div>
-                  <input type="number" min="0" value={entry.male_count || ''} placeholder="0"
-                    onChange={e => updateLabour(entry.role_title, 'male_count', e.target.value)}
-                    style={{ width: 46, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
-                      border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
-                  <input type="number" min="0" value={entry.female_count || ''} placeholder="0"
-                    onChange={e => updateLabour(entry.role_title, 'female_count', e.target.value)}
-                    style={{ width: 46, textAlign: 'center', fontSize: 13, fontWeight: 700, padding: '3px 4px', margin: '0 auto',
-                      border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-card)' }} />
-                  <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, color: isActive ? '#059669' : 'var(--text-muted)' }}>{total}</div>
-                  <div style={{ textAlign: 'center' }}>
-                    {isCustom && (
-                      <span onClick={() => removeRole(entry.role_title)} title="Remove custom role"
-                        style={{ cursor: 'pointer', fontSize: 12, color: '#ef4444' }}>✕</span>
-                    )}
-                  </div>
+                  <input type="number" min="0" placeholder="M" value={entry.male_count || ''}
+                    onChange={e => updateEntry(globalIdx, 'male_count', e.target.value)}
+                    style={{ fontSize: 12, textAlign: 'center', padding: '4px 6px' }} />
+                  <input type="number" min="0" placeholder="F" value={entry.female_count || ''}
+                    onChange={e => updateEntry(globalIdx, 'female_count', e.target.value)}
+                    style={{ fontSize: 12, textAlign: 'center', padding: '4px 6px' }} />
+                  <button onClick={() => removeEntry(globalIdx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
                 </div>
               );
             })}
           </div>
-        )}
-      </div>
-    );
-  }
+        );
+      })}
 
-  return (
-    <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? '🏗️' : '👷'}
-      count={totalWorkers + kpPresent} color={totalWorkers + kpPresent > 0 ? '#10b981' : '#6b7280'}>
-
-      {/* Key Personnel Attendance — grouped by party */}
-      {keyPersonnel.length > 0 && (() => {
-        const PARTY_CONFIG = {
-          client: { icon: '🏛️', label: 'Client', color: '#2563eb' },
-          engineer: { icon: '📐', label: 'Engineer', color: '#6366f1' },
-          project_manager: { icon: '👔', label: 'Project Manager', color: '#0891b2' },
-          engineer_rep: { icon: '👷', label: "Engineer's Representative", color: '#059669' },
-          contractor: { icon: '🏗️', label: 'Contractor', color: '#e87b35' },
-          subcontractor: { icon: '🔧', label: 'Subcontractor', color: '#8b5cf6' },
-          employer: { icon: '🏛️', label: 'Employer', color: '#2563eb' },
-        };
-        const partyGroups = {};
-        keyPersonnel.forEach(t => {
-          const p = t.party || 'contractor';
-          if (!partyGroups[p]) partyGroups[p] = [];
-          partyGroups[p].push(t);
-        });
-        return Object.entries(partyGroups).map(([partyKey, members]) => {
-          const cfg = PARTY_CONFIG[partyKey] || { icon: '👤', label: partyKey, color: '#64748b' };
-          const presentCount = members.filter(t => presence[t.id]).length;
-          return (
-            <div key={partyKey} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: cfg.color, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                {cfg.icon} {cfg.label}
-                <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>
-                  ({presentCount}/{members.length} present)
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-                {members.map(t => (
-                  <div key={t.id}
-                    onClick={() => setPresence({ ...presence, [t.id]: !presence[t.id] })}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                      background: presence[t.id] ? `${cfg.color}14` : 'var(--bg-hover)',
-                      border: `1px solid ${presence[t.id] ? cfg.color : 'var(--border)'}`,
-                      borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'all 0.2s',
-                    }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: presence[t.id] ? cfg.color : 'var(--bg-card)',
-                      border: `2px solid ${presence[t.id] ? cfg.color : 'var(--border)'}`,
-                      color: '#fff', fontSize: 12, fontWeight: 800,
-                    }}>{presence[t.id] ? '✓' : ''}</div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600 }}>{t.title_prefix ? `${t.title_prefix} ` : ''}{t.name}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t.position_title}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        });
-      })()}
-
-      {/* Skilled Labour Table */}
-      <RoleTable title="Skilled Labour" icon="🔧" category="skilled" roleList={skilledRoles} />
-
-      {/* Unskilled Labour Table */}
-      <RoleTable title="Unskilled Labour" icon="🦺" category="unskilled" roleList={unskilledRoles} />
-
-      {/* Add Custom Role */}
-      <div style={{ marginTop: 12 }}>
-        {!showCustom ? (
-          <button onClick={() => setShowCustom(true)} className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 12px' }}>
-            ＋ Add Custom Role
-          </button>
-        ) : (
-          <div style={{ padding: 12, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ flex: 1, minWidth: 140, marginBottom: 0 }}>
-              <label style={{ fontSize: 10 }}>Role Title</label>
-              <input type="text" value={customRole.role_title} onChange={e => setCustomRole({ ...customRole, role_title: e.target.value })}
-                placeholder="e.g. Crane Operator" style={{ fontSize: 12 }} />
-            </div>
-            <div className="form-group" style={{ width: 110, marginBottom: 0 }}>
-              <label style={{ fontSize: 10 }}>Category</label>
-              <select value={customRole.category} onChange={e => setCustomRole({ ...customRole, category: e.target.value })} style={{ fontSize: 12 }}>
-                <option value="skilled">Skilled</option>
-                <option value="unskilled">Unskilled</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ width: 60, marginBottom: 0 }}>
-              <label style={{ fontSize: 10 }}>♂</label>
-              <input type="number" min="0" value={customRole.male_count} onChange={e => setCustomRole({ ...customRole, male_count: e.target.value })} style={{ fontSize: 12, textAlign: 'center' }} />
-            </div>
-            <div className="form-group" style={{ width: 60, marginBottom: 0 }}>
-              <label style={{ fontSize: 10 }}>♀</label>
-              <input type="number" min="0" value={customRole.female_count} onChange={e => setCustomRole({ ...customRole, female_count: e.target.value })} style={{ fontSize: 12, textAlign: 'center' }} />
-            </div>
-            <button onClick={addCustomRole} className="btn btn-primary" style={{ fontSize: 11, padding: '6px 12px' }}>Add</button>
-            <button onClick={() => setShowCustom(false)} className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 12px' }}>Cancel</button>
-          </div>
-        )}
-      </div>
-
-      {/* Summary Footer */}
-      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10, textAlign: 'center', marginBottom: 10 }}>
+      {/* Add custom role */}
+      {showCustom ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: 6, marginTop: 8, alignItems: 'end' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#6366f1' }}>{kpPresent}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Key Personnel</div>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Role Title</label>
+            <input type="text" placeholder="e.g. Mason" value={customRole.role_title} onChange={e => setCustomRole({ ...customRole, role_title: e.target.value })} style={{ fontSize: 12 }} />
           </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#059669' }}>{skilledTotal}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Skilled</div>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Category</label>
+            <select value={customRole.category} onChange={e => setCustomRole({ ...customRole, category: e.target.value })} style={{ fontSize: 12 }}>
+              <option value="skilled">Skilled</option>
+              <option value="unskilled">Unskilled</option>
+            </select>
           </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#f59e0b' }}>{unskilledTotal}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Unskilled</div>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Male</label>
+            <input type="number" min="0" value={customRole.male_count} onChange={e => setCustomRole({ ...customRole, male_count: parseInt(e.target.value) || 0 })} style={{ fontSize: 12 }} />
           </div>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{totalWorkers + kpPresent}</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Total</div>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>Female</label>
+            <input type="number" min="0" value={customRole.female_count} onChange={e => setCustomRole({ ...customRole, female_count: parseInt(e.target.value) || 0 })} style={{ fontSize: 12 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 4, paddingBottom: 2 }}>
+            <button onClick={addCustom} className="btn btn-primary" style={{ fontSize: 11, padding: '5px 10px' }}>Add</button>
+            <button onClick={() => setShowCustom(false)} style={{ fontSize: 11, padding: '5px 8px', background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
           </div>
         </div>
-        {/* Gender Ratio Bar */}
-        {totalWorkers > 0 && (
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-              <span>♂ Male: {totalMale} ({Math.round(totalMale / totalWorkers * 100)}%)</span>
-              <span>♀ Female: {totalFemale} ({Math.round(totalFemale / totalWorkers * 100)}%)</span>
-            </div>
-            <div style={{ height: 8, borderRadius: 4, background: '#fecaca', overflow: 'hidden' }}>
-              <div style={{ width: `${totalMale / totalWorkers * 100}%`, height: '100%', background: '#3b82f6', borderRadius: 4 }} />
-            </div>
+      ) : (
+        <AddButton label={`+ Add ${partyLabel} Role`} onClick={() => setShowCustom(true)} />
+      )}
+
+      {/* Gender ratio bar */}
+      {total > 0 && (
+        <div style={{ marginTop: 12, padding: '8px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ color: '#3b82f6', fontWeight: 600 }}>♂ {totalMale} Male ({mPct}%)</span>
+            <span style={{ fontWeight: 700 }}>{total} Total</span>
+            <span style={{ color: '#ec4899', fontWeight: 600 }}>♀ {totalFemale} Female ({100 - mPct}%)</span>
           </div>
-        )}
-      </div>
+          <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${mPct}%`, background: '#3b82f6', transition: 'width 0.3s' }} />
+            <div style={{ flex: 1, background: '#ec4899' }} />
+          </div>
+        </div>
+      )}
     </SectionCard>
   );
 }
 
+// ── Helper Components ──
 function SectionCard({ title, icon, children, count, color = 'var(--accent)' }) {
   return (
-    <div className="card" style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        borderBottom: '1px solid var(--border)', background: 'var(--bg-hover)' }}>
-        <span style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 18 }}>{icon}</span> {title}
-        </span>
-        {count != null && (
-          <span style={{ background: color, color: '#fff', fontSize: 10, fontWeight: 800,
-            padding: '2px 8px', borderRadius: 9999, minWidth: 20, textAlign: 'center' }}>{count}</span>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 16, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>{title}</span>
+        {count !== undefined && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: color + '20', color }}>{count}</span>
         )}
       </div>
-      <div style={{ padding: 16 }}>{children}</div>
+      {children}
     </div>
   );
 }
 
 function EntryRow({ children, onRemove }) {
   return (
-    <div style={{ padding: '10px 12px', marginBottom: 8, background: 'var(--bg-hover)', borderRadius: 'var(--radius)',
-      border: '1px solid var(--border)', position: 'relative' }}>
-      {onRemove && (
-        <button onClick={onRemove} style={{ position: 'absolute', top: 6, right: 8, background: 'none',
-          border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, fontWeight: 700 }}>×</button>
-      )}
+    <div style={{ position: 'relative', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', padding: 10, marginBottom: 8, border: '1px solid var(--border)' }}>
       {children}
+      <button onClick={onRemove}
+        style={{ position: 'absolute', top: 6, right: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}
+        title="Remove">×</button>
     </div>
   );
 }
 
 function AddButton({ label, onClick }) {
   return (
-    <button onClick={onClick} style={{ width: '100%', padding: '10px', border: '2px dashed var(--border)',
-      borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer',
-      fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      transition: 'all 0.2s' }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'transparent'; }}>
-      <span style={{ fontSize: 18 }}>+</span> {label}
+    <button onClick={onClick}
+      style={{ width: '100%', padding: '10px', border: '2px dashed var(--border)', borderRadius: 'var(--radius)',
+        background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--accent)',
+        transition: 'all 0.15s', marginTop: 4 }}
+      onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+      onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'transparent'; }}>
+      {label}
     </button>
   );
 }
 
+
+// ════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════
 export default function SubmitReport({ profile, showToast, navigateTo, selectedProject: propProject }) {
+  const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(propProject?.id || null);
+  const [selectedProject, setSelectedProject] = useState(propProject || '');
+
+  // Project-specific data
   const [activities, setActivities] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [structures, setStructures] = useState([]);
   const [layers, setLayers] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState(1);
-  const [submitted, setSubmitted] = useState(false);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const isRE = hasRole(profile.role, 'resident_engineer') || isPlatformAdmin;
 
-  // ── Form State ──
+  // ── Form State (CANONICAL column names only) ──
   const [form, setForm] = useState({
     report_date: new Date().toISOString().split('T')[0],
-    weather_conditions: 'Sunny', max_temp_c: '', min_temp_c: '', rainfall_mm: '',
+    weather: '', max_temp_c: '', min_temp_c: '', rainfall_mm: '',
     working_hours: 8, non_working_reason: '', is_working_day: true,
     contractor_labour_skilled: 0, contractor_labour_unskilled: 0, subcontractor_labour: 0,
-    supervisor_count: 0, work_description: '', quality_observations: '', challenges: '',
+    supervisor_count: 0, work_done: '', quality_observations: '', challenges: '',
     instructions_issued: '', visitors: '', urgent_flag: false, safety_incidents: '',
   });
 
@@ -430,10 +430,6 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [supervisionPresence, setSupervisionPresence] = useState({});
   const [contractorLabour, setContractorLabour] = useState([]);
   const [supervisionLabour, setSupervisionLabour] = useState([]);
-  // Keep legacy aliases for engineer team
-  const engineerTeam = supervisionPersonnel;
-  const teamPresence = supervisionPresence;
-  const setTeamPresence = setSupervisionPresence;
 
   // ── Data Loading ──
   useEffect(() => {
@@ -455,63 +451,51 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       setEquipment(eqRes.data || []);
       setStructures(strRes.data || []);
       setLayers(layRes.data || []);
-      // Contractor key personnel
       setContractorPersonnel(contKpRes.data || []);
       const contPresence = {};
       (contKpRes.data || []).forEach(t => { contPresence[t.id] = true; });
       setContractorPresence(contPresence);
-      // Supervision key personnel
       setSupervisionPersonnel(supKpRes.data || []);
       const supPresence = {};
       (supKpRes.data || []).forEach(t => { supPresence[t.id] = true; });
       setSupervisionPresence(supPresence);
     });
-    // Reset labour entries when project changes
     setContractorLabour([]);
     setSupervisionLabour([]);
   }, [selectedProject]);
 
   // ── Entry Helpers ──
-  function addWork() { setWorksEntries([...worksEntries, { activity_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', notes: '' }]); }
-  function addEquip() { setEquipEntries([...equipEntries, { equipment_id: '', status: 'Operational', hours_worked: 0, notes: '' }]); }
-  function addStruct() { setStructEntries([...structEntries, { structure_id: '', stage: '', status: 'In Progress', concrete_volume_m3: '', rebar_kg: '', notes: '' }]); }
-  function addTest() { setTestEntries([...testEntries, { test_type: 'Compaction', location: '', chainage: '', sample_id: '', result_value: '', spec_limit: '', result_status: 'Pending', notes: '' }]); }
-  function addIssue() { setIssueEntries([...issueEntries, { title: '', category: 'Quality', severity: 'Medium', description: '', action_required: '' }]); }
+  function addWork() { setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }]); }
+  function addEquip() { setEquipEntries([...equipEntries, { equipment_id: '', equipment_name: '', status: 'Operational', hours_worked: 0, notes: '' }]); }
+  function addStruct() { setStructEntries([...structEntries, { structure_id: '', structure_name: '', stage: '', status: 'In Progress', concrete_volume_m3: '', rebar_kg: '', notes: '' }]); }
+  function addTest() { setTestEntries([...testEntries, { test_type: '', location: '', chainage: '', sample_id: '', result_value: '', spec_limit: '', result_status: 'Pending', notes: '' }]); }
+  function addIssue() { setIssueEntries([...issueEntries, { title: '', category: '', severity: 'Medium', description: '', action_required: '' }]); }
   function addInstruction() { setInstructionEntries([...instructionEntries, { instruction_type: 'site_instruction', subject: '', description: '', chainage: '', response_required: false }]); }
-  function addMaterial() { setMaterialEntries([...materialEntries, { material_type: 'Cement', description: '', quantity: '', unit: 'Tonnes', source: '', delivery_note: '' }]); }
+  function addMaterial() { setMaterialEntries([...materialEntries, { material_type: '', description: '', quantity: '', unit: 'Tonnes', source: '', delivery_note: '' }]); }
 
   function updateEntry(setter, list, i, field, val) { const copy = [...list]; copy[i][field] = val; setter(copy); }
   function removeEntry(setter, list, i) { setter(list.filter((_, idx) => idx !== i)); }
 
   // ── Completeness ──
   const stepComplete = [
-    selectedProject && form.report_date && form.weather_conditions, // Step 1
-    true, // Step 2 Contractor Workforce
-    true, // Step 3 Supervision Workforce
-    true, // Step 4 Works
-    true, // Step 5 Equipment
-    true, // Step 6 Quality
-    true, // Step 7 Structures
-    true, // Step 8 Issues
-    true, // Step 9 Review
+    selectedProject && form.report_date && form.weather,
+    true, true, true, true, true, true, true, true,
   ];
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
 
-  // ── Submit ──
+  // ── Submit — CANONICAL column names only ──
   async function handleSubmit() {
     if (!selectedProject) { showToast('Select a project first', 'error'); return; }
     setSaving(true);
 
     try {
-      // 1. Daily Report — explicitly map fields to avoid sending non-existent columns
+      // 1. Daily Report — CANONICAL columns (no dual-write)
       const reportData = {
         project_id: selectedProject,
-        user_id: profile.id,
         submitted_by: profile.id,
         report_date: form.report_date,
-        weather_conditions: form.weather_conditions,
-        weather: form.weather_conditions,
+        weather: form.weather,
         max_temp_c: form.max_temp_c ? parseFloat(form.max_temp_c) : null,
         min_temp_c: form.min_temp_c ? parseFloat(form.min_temp_c) : null,
         rainfall_mm: form.rainfall_mm ? parseFloat(form.rainfall_mm) : null,
@@ -519,13 +503,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         contractor_labour_skilled: parseInt(form.contractor_labour_skilled) || 0,
         contractor_labour_unskilled: parseInt(form.contractor_labour_unskilled) || 0,
         subcontractor_labour: parseInt(form.subcontractor_labour) || 0,
-        work_description: form.work_description || null,
-        work_done: form.work_description || null,
+        work_done: form.work_done || null,
         quality_observations: form.quality_observations || null,
         challenges: form.challenges || null,
         visitors: form.visitors || null,
         safety_incidents: form.safety_incidents || null,
-        progress_percentage: 0,
         progress_pct: 0,
       };
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
@@ -550,24 +532,26 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
       // 3. Equipment Status
       for (const eq of equipEntries) {
-        if (!eq.equipment_id) continue;
+        if (!eq.equipment_id && !eq.equipment_name) continue;
         await supabase.from('equipment_daily_status').upsert({
-          equipment_id: eq.equipment_id, project_id: selectedProject,
+          equipment_id: eq.equipment_id || null, project_id: selectedProject,
           status_date: form.report_date, status: eq.status,
           hours_worked: parseFloat(eq.hours_worked) || 0,
-          notes: eq.notes, reported_by: profile.id,
-        }, { onConflict: 'equipment_id,status_date' });
+          notes: eq.equipment_name ? `[${eq.equipment_name}] ${eq.notes || ''}`.trim() : eq.notes,
+          reported_by: profile.id,
+        }, { onConflict: eq.equipment_id ? 'equipment_id,status_date' : undefined });
       }
 
       // 4. Structures
       for (const s of structEntries) {
-        if (!s.structure_id || !s.stage) continue;
+        if ((!s.structure_id && !s.structure_name) || !s.stage) continue;
         await supabase.from('structure_progress').insert({
-          structure_id: s.structure_id, project_id: selectedProject,
+          structure_id: s.structure_id || null, project_id: selectedProject,
           stage: s.stage, status: s.status, work_date: form.report_date,
           concrete_volume_m3: s.concrete_volume_m3 ? parseFloat(s.concrete_volume_m3) : null,
           rebar_kg: s.rebar_kg ? parseFloat(s.rebar_kg) : null,
-          notes: s.notes, reported_by: profile.id,
+          notes: s.structure_name ? `[${s.structure_name}] ${s.notes || ''}`.trim() : s.notes,
+          reported_by: profile.id,
         });
       }
 
@@ -595,7 +579,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         });
       }
 
-      // 7. Site Instructions (RE and above only)
+      // 7. Site Instructions
       for (const instr of instructionEntries) {
         if (!instr.subject) continue;
         const { count } = await supabase.from('site_instructions')
@@ -620,60 +604,48 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         });
       }
 
-      // 9. Upload Photos to Supabase Storage
-      const allPhotos = [
-        ...worksPhotos, ...equipPhotos, ...qualityPhotos,
-        ...structPhotos, ...issuePhotos, ...generalPhotos,
-      ];
+      // 9. Upload Photos
+      const allPhotos = [...worksPhotos, ...equipPhotos, ...qualityPhotos, ...structPhotos, ...issuePhotos, ...generalPhotos];
       let photoCount = 0;
       if (allPhotos.length > 0) {
         photoCount = await uploadReportPhotos(allPhotos, selectedProject, report.id, profile, form.report_date);
       }
 
-      // 10. Save Key Personnel Attendance (both parties)
+      // 10. Key Personnel Attendance
       const allPersonnel = [
         ...contractorPersonnel.map(t => ({ ...t, presenceMap: contractorPresence })),
         ...supervisionPersonnel.map(t => ({ ...t, presenceMap: supervisionPresence })),
       ];
       if (allPersonnel.length > 0) {
         const attendanceRecords = allPersonnel.map(t => ({
-          project_id: selectedProject,
-          personnel_id: t.id,
-          attendance_date: form.report_date,
-          is_present: !!t.presenceMap[t.id],
+          project_id: selectedProject, personnel_id: t.id,
+          attendance_date: form.report_date, is_present: !!t.presenceMap[t.id],
           recorded_by: profile.id,
         }));
         await supabase.from('personnel_attendance').upsert(attendanceRecords, { onConflict: 'personnel_id,attendance_date' });
       }
 
-      // 11. Save Daily Labour (Contractor + Supervision)
+      // 11. Daily Labour
       const allLabour = [
         ...contractorLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'contractor' })),
         ...supervisionLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'supervision' })),
       ];
       if (allLabour.length > 0) {
         const labourRecords = allLabour.map(e => ({
-          daily_report_id: report.id,
-          project_id: selectedProject,
-          report_date: form.report_date,
-          party: e.party,
-          category: e.category,
-          role_title: e.role_title,
-          male_count: e.male_count || 0,
-          female_count: e.female_count || 0,
-          key_personnel_id: null,
-          is_present: true,
+          daily_report_id: report.id, project_id: selectedProject,
+          report_date: form.report_date, party: e.party, category: e.category,
+          role_title: e.role_title, male_count: e.male_count || 0,
+          female_count: e.female_count || 0, key_personnel_id: null, is_present: true,
         }));
         await supabase.from('daily_labour').insert(labourRecords);
       }
 
-      // Also update legacy labour columns on daily_reports for backward compatibility
+      // Update legacy labour columns
       const contSkilled = contractorLabour.filter(e => e.category === 'skilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
       const contUnskilled = contractorLabour.filter(e => e.category === 'unskilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
       if (contSkilled > 0 || contUnskilled > 0) {
         await supabase.from('daily_reports').update({
-          contractor_labour_skilled: contSkilled,
-          contractor_labour_unskilled: contUnskilled,
+          contractor_labour_skilled: contSkilled, contractor_labour_unskilled: contUnskilled,
         }).eq('id', report.id);
       }
 
@@ -686,34 +658,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     }
   }
 
-  // ── Success Screen ──
-  if (submitted) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: 64, marginBottom: 16 }}>🎉</div>
-        <h2 style={{ marginBottom: 8 }}>Report Submitted Successfully!</h2>
-        <p className="text-muted" style={{ marginBottom: 8 }}>All data has been auto-synced to the respective modules.</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 24, fontSize: 13 }}>
-          {worksEntries.length > 0 && <span className="badge badge-accent">⛏️ {worksEntries.length} activities logged</span>}
-          {equipEntries.length > 0 && <span className="badge badge-accent">🚜 {equipEntries.length} equipment updated</span>}
-          {testEntries.length > 0 && <span className="badge badge-accent">🧪 {testEntries.length} tests recorded</span>}
-          {structEntries.length > 0 && <span className="badge badge-accent">🌉 {structEntries.length} structures updated</span>}
-          {issueEntries.length > 0 && <span className="badge badge-accent">⚠️ {issueEntries.length} issues raised</span>}
-          {instructionEntries.length > 0 && <span className="badge badge-accent">📋 {instructionEntries.length} instructions issued</span>}
-          {materialEntries.length > 0 && <span className="badge badge-accent">📦 {materialEntries.length} materials received</span>}
-          {totalPhotos > 0 && <span className="badge badge-accent">📷 {totalPhotos} photos uploaded</span>}
-        </div>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]); setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]); setContractorLabour([]); setSupervisionLabour([]); }}>
-            📝 Submit Another Report
-          </button>
-          <button className="btn btn-secondary" onClick={() => navigateTo('dashboard')}>📊 Go to Dashboard</button>
-        </div>
-      </div>
-    );
-  }
-
-  const projName = projects.find(p => p.id === selectedProject)?.name;
+  // ── Summary stats ──
   const contLabourTotal = contractorLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
   const supLabourTotal = supervisionLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
   const contKpPresent = Object.values(contractorPresence).filter(Boolean).length;
@@ -721,217 +666,137 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const totalLabour = contLabourTotal + supLabourTotal;
   const totalWorkforce = totalLabour + contKpPresent + supKpPresent;
 
+  // ── Submitted ──
+  if (submitted) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+        <h2 style={{ fontSize: 22, fontWeight: 800 }}>Report Submitted</h2>
+        <p style={{ color: 'var(--text-muted)', margin: '8px 0 24px' }}>
+          {form.report_date} — {totalEntries} entries, {totalPhotos} photos, {totalWorkforce} workforce
+        </p>
+        <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setForm({
+          report_date: new Date().toISOString().split('T')[0], weather: '', max_temp_c: '', min_temp_c: '', rainfall_mm: '',
+          working_hours: 8, non_working_reason: '', is_working_day: true, contractor_labour_skilled: 0,
+          contractor_labour_unskilled: 0, subcontractor_labour: 0, supervisor_count: 0, work_done: '',
+          quality_observations: '', challenges: '', instructions_issued: '', visitors: '', urgent_flag: false, safety_incidents: '',
+        }); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]);
+          setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]);
+          setContractorLabour([]); setSupervisionLabour([]); }}>
+          Submit Another Report
+        </button>
+      </div>
+    );
+  }
+
+  // ── RENDER ──
   return (
     <div>
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h2>📝 Daily Site Report</h2>
-          <div className="subtitle">
-            {projName ? `${projName} — ` : ''}{form.report_date} · Step {step} of {STEPS.length}
-            {totalEntries > 0 && <span style={{ marginLeft: 8, color: 'var(--accent)' }}>({totalEntries} entries)</span>}
-          </div>
-        </div>
-        {form.urgent_flag && (
-          <span style={{ background: '#ef4444', color: '#fff', padding: '6px 14px', borderRadius: 9999, fontWeight: 700, fontSize: 12, animation: 'pulse 1.5s infinite' }}>
-            🚨 URGENT
-          </span>
-        )}
+      {/* Step Progress */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
+        {STEPS.map(s => (
+          <div key={s.num} onClick={() => { if (stepComplete[0] || s.num === 1) setStep(s.num); }}
+            style={{ flex: 1, height: 4, borderRadius: 2, cursor: stepComplete[0] || s.num === 1 ? 'pointer' : 'default',
+              background: s.num < step ? 'var(--accent)' : s.num === step ? '#93c5fd' : 'var(--border)', transition: 'background 0.2s' }} />
+        ))}
       </div>
-
-      {/* Step Navigator */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-        {STEPS.map((s, i) => {
-          const isActive = step === s.num;
-          const isDone = step > s.num;
-          const hasData = [null, null, null, worksEntries.length, equipEntries.length, testEntries.length + materialEntries.length, structEntries.length, issueEntries.length + instructionEntries.length][i];
-          return (
-            <div key={s.num} onClick={() => { if (selectedProject || s.num === 1) setStep(s.num); }}
-              style={{ flex: 1, minWidth: 80, textAlign: 'center', cursor: selectedProject || s.num === 1 ? 'pointer' : 'not-allowed', padding: '8px 4px',
-                background: isActive ? 'var(--accent)' : isDone ? 'rgba(232,123,53,0.15)' : 'var(--bg-card)',
-                borderRadius: 'var(--radius)', transition: 'all 0.2s', border: isActive ? '2px solid var(--accent)' : '2px solid var(--border)',
-                opacity: (!selectedProject && s.num > 1) ? 0.4 : 1 }}>
-              <div style={{ fontSize: 18, marginBottom: 2 }}>{isDone ? '✓' : s.icon}</div>
-              <div style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, color: isActive ? '#fff' : isDone ? 'var(--accent)' : 'var(--text-muted)' }}>
-                {s.short}
-              </div>
-              {hasData > 0 && (
-                <div style={{ fontSize: 9, fontWeight: 800, color: isActive ? '#fff' : 'var(--accent)', marginTop: 2 }}>{hasData}</div>
-              )}
-            </div>
-          );
-        })}
+      <div style={{ textAlign: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          Step {step}/{STEPS.length} — {STEPS[step - 1].icon} {STEPS[step - 1].label}
+        </span>
       </div>
 
       {/* ══════ STEP 1: PROJECT & WEATHER ══════ */}
       {step === 1 && (
         <SectionCard title="Project & Weather" icon="🌤️">
+          <div className="form-group mb-16">
+            <label>Project *</label>
+            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
+              <option value="">— Select project —</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>Project *</label>
-              <select value={selectedProject || ''} onChange={e => setSelectedProject(e.target.value)} required
-                style={{ fontSize: 14, fontWeight: 600 }}>
-                <option value="">Select project...</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <label>Report Date *</label>
+              <input type="date" value={form.report_date} onChange={e => setForm({ ...form, report_date: e.target.value })} />
             </div>
             <div className="form-group mb-16">
-              <label>Report Date *</label>
-              <input type="date" value={form.report_date} onChange={e => setForm({ ...form, report_date: e.target.value })}
-                style={{ fontSize: 14, fontWeight: 600 }} />
+              <label>Working Hours</label>
+              <input type="number" value={form.working_hours} onChange={e => setForm({ ...form, working_hours: e.target.value })} min="0" max="24" step="0.5" />
             </div>
           </div>
 
           <div className="form-group mb-16">
-            <label>Weather Conditions</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {WEATHER.map(w => (
-                <button key={w.key} type="button" onClick={() => setForm({ ...form, weather_conditions: w.key })}
-                  style={{ padding: '10px 14px', borderRadius: 'var(--radius)', border: form.weather_conditions === w.key ? `2px solid ${w.color}` : '2px solid var(--border)',
-                    background: form.weather_conditions === w.key ? w.color + '20' : 'var(--bg-card)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: form.weather_conditions === w.key ? 700 : 400, transition: 'all 0.15s' }}>
-                  <span style={{ fontSize: 20 }}>{w.icon}</span> {w.key}
-                </button>
-              ))}
-            </div>
+            <label>Weather Conditions *</label>
+            <SearchableDropdown
+              items={WEATHER_OPTIONS.map(w => ({ name: w, category: '' }))}
+              value={form.weather}
+              onChange={val => setForm({ ...form, weather: val })}
+              placeholder="Select or search weather..."
+              allowCustom={true}
+            />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>🌡️ Max Temp (°C)</label>
+              <label>Max Temp (°C)</label>
               <input type="number" value={form.max_temp_c} onChange={e => setForm({ ...form, max_temp_c: e.target.value })} placeholder="e.g. 28" />
             </div>
             <div className="form-group mb-16">
-              <label>🌡️ Min Temp (°C)</label>
-              <input type="number" value={form.min_temp_c} onChange={e => setForm({ ...form, min_temp_c: e.target.value })} placeholder="e.g. 15" />
+              <label>Min Temp (°C)</label>
+              <input type="number" value={form.min_temp_c} onChange={e => setForm({ ...form, min_temp_c: e.target.value })} placeholder="e.g. 16" />
             </div>
             <div className="form-group mb-16">
-              <label>🌧️ Rainfall (mm)</label>
-              <input type="number" value={form.rainfall_mm} onChange={e => setForm({ ...form, rainfall_mm: e.target.value })} placeholder="0" />
-            </div>
-            <div className="form-group mb-16">
-              <label>⏱️ Working Hours</label>
-              <input type="number" value={form.working_hours} onChange={e => setForm({ ...form, working_hours: e.target.value })} />
+              <label>Rainfall (mm)</label>
+              <input type="number" value={form.rainfall_mm} onChange={e => setForm({ ...form, rainfall_mm: e.target.value })} placeholder="0" min="0" />
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={!form.is_working_day} onChange={e => setForm({ ...form, is_working_day: !e.target.checked })} />
-              <span>Non-Working Day</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: '#ef4444' }}>
-              <input type="checkbox" checked={form.urgent_flag} onChange={e => setForm({ ...form, urgent_flag: e.target.checked })} />
-              <span style={{ fontWeight: 600 }}>🚨 Mark as Urgent</span>
-            </label>
-          </div>
-          {!form.is_working_day && (
-            <div className="form-group mb-16" style={{ marginTop: 12 }}>
-              <label>Reason for Non-Working Day</label>
-              <input type="text" value={form.non_working_reason} onChange={e => setForm({ ...form, non_working_reason: e.target.value })}
-                placeholder="e.g. Heavy rain, Public holiday, Sunday" />
-            </div>
-          )}
         </SectionCard>
       )}
 
       {/* ══════ STEP 2: CONTRACTOR WORKFORCE ══════ */}
       {step === 2 && (
-        <WorkforceStep
-          party="contractor" partyLabel="Contractor"
-          roles={labourRoles} personnel={contractorPersonnel}
-          presence={contractorPresence} setPresence={setContractorPresence}
+        <WorkforceStep party="contractor" partyLabel="Contractor" roles={labourRoles}
+          personnel={contractorPersonnel} presence={contractorPresence} setPresence={setContractorPresence}
           labourEntries={contractorLabour} setLabourEntries={setContractorLabour}
-          showTooltips={true}
-        />
+          showTooltips={true} />
       )}
 
-      {/* ══════ STEP 3: ENGINEER'S TEAM ══════ */}
+      {/* ══════ STEP 3: SUPERVISION WORKFORCE ══════ */}
       {step === 3 && (
-        <WorkforceStep
-          party="supervision" partyLabel="Engineer's Team"
-          roles={labourRoles} personnel={supervisionPersonnel}
-          presence={supervisionPresence} setPresence={setSupervisionPresence}
+        <WorkforceStep party="supervision" partyLabel="Engineer's Team" roles={labourRoles}
+          personnel={supervisionPersonnel} presence={supervisionPresence} setPresence={setSupervisionPresence}
           labourEntries={supervisionLabour} setLabourEntries={setSupervisionLabour}
-          showTooltips={true}
-        />
+          showTooltips={true} />
       )}
 
       {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
       {step === 4 && (
         <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-            Select the layer/activity, enter chainage range worked today. Km is auto-calculated.
-          </p>
-
           {worksEntries.map((w, i) => {
             const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
-            const isLinear = layerDef ? layerDef.unit === 'Km' : true;
+            const isLinear = layerDef ? layerDef.unit === 'Km' : false;
             const autoKm = isLinear && w.start_chainage && w.end_chainage
-              ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage)).toFixed(3)
-              : '';
+              ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage)).toFixed(3) : null;
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
-                {/* Layer selector grouped by category */}
-                <select value={w.layer_name || ''} onChange={e => {
-                  const layer = WORK_LAYERS.find(l => l.name === e.target.value);
-                  updateEntry(setWorksEntries, worksEntries, i, 'layer_name', e.target.value);
-                  if (layer) {
-                    updateEntry(setWorksEntries, worksEntries, i, 'unit', layer.unit);
-                    // Also link to activity_id if activities are loaded
-                    const matchAct = activities.find(a => a.activity_name?.toLowerCase().includes(e.target.value.toLowerCase().split(' ')[0]));
-                    if (matchAct) updateEntry(setWorksEntries, worksEntries, i, 'activity_id', matchAct.id);
-                  }
-                }} style={{ fontSize: 12, marginBottom: 8, width: '100%' }}>
-                  <option value="">— Select Layer / Activity —</option>
-                  <optgroup label="🌍 Earthworks & Formation">
-                    {WORK_LAYERS.filter(l => l.group === 'earthworks').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                  <optgroup label="🛣️ Pavement Layers">
-                    {WORK_LAYERS.filter(l => l.group === 'pavement').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                  <optgroup label="🎨 Surfacing">
-                    {WORK_LAYERS.filter(l => l.group === 'surfacing').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                  <optgroup label="🌊 Drainage & Structures">
-                    {WORK_LAYERS.filter(l => l.group === 'drainage').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                  <optgroup label="🚧 Road Furniture & Finishes">
-                    {WORK_LAYERS.filter(l => l.group === 'furniture').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                  <optgroup label="📦 Other">
-                    {WORK_LAYERS.filter(l => l.group === 'other').map(l => <option key={l.name} value={l.name}>{l.name} ({l.unit})</option>)}
-                  </optgroup>
-                </select>
-
-                <div style={{ display: 'grid', gridTemplateColumns: isLinear ? '1fr 1fr 80px 80px' : '1fr 80px 80px', gap: 8, marginBottom: 8 }}>
-                  {isLinear && (
-                    <>
-                      <input type="text" placeholder="Ch. From (e.g. 12+000)" value={w.start_chainage || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
-                      <input type="text" placeholder="Ch. To (e.g. 12+800)" value={w.end_chainage || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
-                    </>
-                  )}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>{isLinear ? 'Km' : `Qty (${w.unit || 'No.'})`}</div>
-                    {isLinear ? (
-                      <div style={{ fontSize: 16, fontWeight: 800, color: autoKm ? '#059669' : 'var(--text-muted)', padding: '4px 0' }}>{autoKm || '—'}</div>
-                    ) : (
-                      <input type="number" placeholder="Qty" value={w.quantity || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12, textAlign: 'center', width: '100%' }} />
-                    )}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>Side</div>
-                    <select value={w.side || 'Both'} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'side', e.target.value)} style={{ fontSize: 10, padding: 2, width: '100%' }}>
-                      <option value="Both">Both</option>
-                      <option value="LHS">LHS</option>
-                      <option value="RHS">RHS</option>
-                    </select>
-                  </div>
+                <div style={{ marginBottom: 8 }}>
+                  <SearchableDropdown
+                    items={WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Earthworks', pavement: 'Pavement Layers', surfacing: 'Surfacing', drainage: 'Drainage & Structures', furniture: 'Road Furniture', other: 'Other' })[l.group] || l.group }))}
+                    value={w.layer_name}
+                    onChange={val => { const def = WORK_LAYERS.find(l => l.name === val); updateEntry(setWorksEntries, worksEntries, i, 'layer_name', val); if (def) updateEntry(setWorksEntries, worksEntries, i, 'unit', def.unit); }}
+                    placeholder="Search activity / layer..."
+                  />
                 </div>
-
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
+                  <input type="text" placeholder="Start Chainage" value={w.start_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="text" placeholder="End Chainage" value={w.end_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                  <select value={w.side} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'side', e.target.value)} style={{ fontSize: 12 }}>
+                    {['Both', 'LHS', 'RHS', 'Centre'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
                 <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
-
-                {/* Auto-calculated Km highlight */}
                 {isLinear && autoKm && (
                   <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
                     ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides
@@ -940,15 +805,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               </EntryRow>
             );
           })}
-          <AddButton label="＋ Add Layer Progress" onClick={() => setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }])} />
-          <PhotoUploader
-            projectId={selectedProject}
-            category="works_progress"
-            photos={worksPhotos}
-            setPhotos={setWorksPhotos}
-            maxPhotos={10}
-            label="Works Photos"
-          />
+          <AddButton label="＋ Add Layer Progress" onClick={addWork} />
+          <PhotoUploader projectId={selectedProject} category="works_progress" photos={worksPhotos} setPhotos={setWorksPhotos} maxPhotos={10} label="Works Photos" />
         </SectionCard>
       )}
 
@@ -957,28 +815,57 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         <SectionCard title="Equipment Status" icon="🚜" count={equipEntries.length}>
           {equipEntries.map((eq, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setEquipEntries, equipEntries, i)}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8 }}>
-                <select value={eq.equipment_id} onChange={e => updateEntry(setEquipEntries, equipEntries, i, 'equipment_id', e.target.value)} style={{ fontSize: 12 }}>
-                  <option value="">Select equipment...</option>
-                  {equipment.map(e => <option key={e.id} value={e.id}>{e.equipment_name} ({e.equipment_type})</option>)}
-                </select>
+              <div style={{ marginBottom: 8 }}>
+                {/* If project has equipment_register, show project items first; otherwise show reference list */}
+                {equipment.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
+                    <SearchableDropdown
+                      items={[
+                        ...equipment.map(e => ({ name: `${e.equipment_name} (${e.equipment_type})`, category: 'Project Equipment', _id: e.id })),
+                        ...EQUIPMENT_LIST.map(e => ({ name: e.name, category: e.category })),
+                      ]}
+                      value={eq.equipment_name || (eq.equipment_id ? equipment.find(e => e.id === eq.equipment_id)?.equipment_name : '')}
+                      onChange={val => {
+                        const projItem = equipment.find(e => `${e.equipment_name} (${e.equipment_type})` === val);
+                        if (projItem) {
+                          updateEntry(setEquipEntries, equipEntries, i, 'equipment_id', projItem.id);
+                          updateEntry(setEquipEntries, equipEntries, i, 'equipment_name', projItem.equipment_name);
+                        } else {
+                          updateEntry(setEquipEntries, equipEntries, i, 'equipment_id', '');
+                          updateEntry(setEquipEntries, equipEntries, i, 'equipment_name', val);
+                        }
+                      }}
+                      placeholder="Search project equipment or reference list..."
+                    />
+                  </div>
+                ) : (
+                  <SearchableDropdown
+                    items={EQUIPMENT_LIST}
+                    value={eq.equipment_name}
+                    onChange={val => updateEntry(setEquipEntries, equipEntries, i, 'equipment_name', val)}
+                    placeholder="Search equipment (85+ types)..."
+                  />
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 8 }}>
                 <select value={eq.status} onChange={e => updateEntry(setEquipEntries, equipEntries, i, 'status', e.target.value)} style={{ fontSize: 12 }}>
-                  {['Operational', 'Idle', 'Breakdown', 'Maintenance', 'Off Site'].map(s => <option key={s} value={s}>{s}</option>)}
+                  {EQUIPMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <input type="number" placeholder="Hours worked" value={eq.hours_worked} onChange={e => updateEntry(setEquipEntries, equipEntries, i, 'hours_worked', e.target.value)} style={{ fontSize: 12 }} />
+                <input type="text" placeholder="Notes" value={eq.notes || ''} onChange={e => updateEntry(setEquipEntries, equipEntries, i, 'notes', e.target.value)} style={{ fontSize: 12 }} />
               </div>
             </EntryRow>
           ))}
           <AddButton label="Add Equipment Entry" onClick={addEquip} />
-          <PhotoUploader
-            projectId={selectedProject}
-            category="equipment"
-            photos={equipPhotos}
-            setPhotos={setEquipPhotos}
-            maxPhotos={5}
-            label="Equipment Photos"
-            compact
-          />
+          <PhotoUploader projectId={selectedProject} category="equipment" photos={equipPhotos} setPhotos={setEquipPhotos} maxPhotos={5} label="Equipment Photos" compact />
+
+          {equipEntries.length > 0 && (
+            <div style={{ marginTop: 10, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 11, color: '#059669' }}>
+              {equipEntries.length} items — {equipEntries.filter(e => e.status === 'Operational' || e.status === 'Working').length} working,
+              {' '}{equipEntries.filter(e => e.status === 'Idle' || e.status === 'Standby').length} idle,
+              {' '}{equipEntries.filter(e => e.status === 'Breakdown').length} breakdown
+            </div>
+          )}
         </SectionCard>
       )}
 
@@ -988,41 +875,44 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           <SectionCard title="Quality Tests" icon="🧪" count={testEntries.length}>
             {testEntries.map((t, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setTestEntries, testEntries, i)}>
+                <div style={{ marginBottom: 8 }}>
+                  <SearchableDropdown
+                    items={QUALITY_TESTS_LIST}
+                    value={t.test_type}
+                    onChange={val => updateEntry(setTestEntries, testEntries, i, 'test_type', val)}
+                    placeholder="Search quality tests (43 types)..."
+                  />
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <select value={t.test_type} onChange={e => updateEntry(setTestEntries, testEntries, i, 'test_type', e.target.value)} style={{ fontSize: 12 }}>
-                    {TEST_TYPES.map(tt => <option key={tt} value={tt}>{tt}</option>)}
-                  </select>
                   <input type="text" placeholder="Location / Layer" value={t.location} onChange={e => updateEntry(setTestEntries, testEntries, i, 'location', e.target.value)} style={{ fontSize: 12 }} />
                   <input type="text" placeholder="Chainage" value={t.chainage} onChange={e => updateEntry(setTestEntries, testEntries, i, 'chainage', e.target.value)} style={{ fontSize: 12 }} />
                   <input type="text" placeholder="Sample ID" value={t.sample_id} onChange={e => updateEntry(setTestEntries, testEntries, i, 'sample_id', e.target.value)} style={{ fontSize: 12 }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                  <input type="text" placeholder="Result Value" value={t.result_value} onChange={e => updateEntry(setTestEntries, testEntries, i, 'result_value', e.target.value)} style={{ fontSize: 12 }} />
-                  <input type="text" placeholder="Spec Limit" value={t.spec_limit} onChange={e => updateEntry(setTestEntries, testEntries, i, 'spec_limit', e.target.value)} style={{ fontSize: 12 }} />
                   <select value={t.result_status} onChange={e => updateEntry(setTestEntries, testEntries, i, 'result_status', e.target.value)} style={{ fontSize: 12 }}>
                     {['Pending', 'Pass', 'Fail', 'Marginal'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <input type="text" placeholder="Result Value (e.g. 97% MDD)" value={t.result_value} onChange={e => updateEntry(setTestEntries, testEntries, i, 'result_value', e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="text" placeholder="Spec Limit (e.g. ≥95% MDD)" value={t.spec_limit} onChange={e => updateEntry(setTestEntries, testEntries, i, 'spec_limit', e.target.value)} style={{ fontSize: 12 }} />
+                </div>
               </EntryRow>
             ))}
             <AddButton label="Add Quality Test" onClick={addTest} />
-            <PhotoUploader
-              projectId={selectedProject}
-              category="quality_test"
-              photos={qualityPhotos}
-              setPhotos={setQualityPhotos}
-              maxPhotos={10}
-              label="Test / Material Photos"
-            />
+            <PhotoUploader projectId={selectedProject} category="quality_test" photos={qualityPhotos} setPhotos={setQualityPhotos} maxPhotos={10} label="Test / Material Photos" />
           </SectionCard>
 
           <SectionCard title="Materials Received" icon="📦" count={materialEntries.length}>
             {materialEntries.map((m, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setMaterialEntries, materialEntries, i)}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
-                  <select value={m.material_type} onChange={e => updateEntry(setMaterialEntries, materialEntries, i, 'material_type', e.target.value)} style={{ fontSize: 12 }}>
-                    {MATERIAL_TYPES.map(mt => <option key={mt} value={mt}>{mt}</option>)}
-                  </select>
+                <div style={{ marginBottom: 8 }}>
+                  <SearchableDropdown
+                    items={MATERIALS_LIST.map(m => ({ name: m, category: '' }))}
+                    value={m.material_type}
+                    onChange={val => updateEntry(setMaterialEntries, materialEntries, i, 'material_type', val)}
+                    placeholder="Search materials (35+ types)..."
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   <input type="number" placeholder="Quantity" value={m.quantity} onChange={e => updateEntry(setMaterialEntries, materialEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12 }} />
                   <input type="text" placeholder="Unit" value={m.unit} onChange={e => updateEntry(setMaterialEntries, materialEntries, i, 'unit', e.target.value)} style={{ fontSize: 12 }} />
                   <input type="text" placeholder="Source / Supplier" value={m.source} onChange={e => updateEntry(setMaterialEntries, materialEntries, i, 'source', e.target.value)} style={{ fontSize: 12 }} />
@@ -1037,34 +927,56 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       {/* ══════ STEP 7: STRUCTURES ══════ */}
       {step === 7 && (
         <SectionCard title="Structures Progress" icon="🌉" count={structEntries.length}>
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+            Culverts, bridges, drainage structures, retaining walls, road furniture — anything under construction or inspected today.
+          </p>
           {structEntries.map((s, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setStructEntries, structEntries, i)}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <select value={s.structure_id} onChange={e => updateEntry(setStructEntries, structEntries, i, 'structure_id', e.target.value)} style={{ fontSize: 12 }}>
-                  <option value="">Select structure...</option>
-                  {structures.map(st => <option key={st.id} value={st.id}>{st.structure_ref} — {st.structure_type} (Ch. {st.chainage})</option>)}
-                </select>
+              <div style={{ marginBottom: 8 }}>
+                {/* If project has structures registered, show those first; otherwise show reference list */}
+                {structures.length > 0 ? (
+                  <SearchableDropdown
+                    items={[
+                      ...structures.map(st => ({ name: `${st.structure_ref} — ${st.structure_type} (Ch. ${st.chainage})`, category: 'Project Structures', _id: st.id })),
+                      ...STRUCTURES_LIST.map(st => ({ name: st.name, category: st.category })),
+                    ]}
+                    value={s.structure_name || (s.structure_id ? structures.find(st => st.id === s.structure_id)?.structure_ref : '')}
+                    onChange={val => {
+                      const projItem = structures.find(st => `${st.structure_ref} — ${st.structure_type} (Ch. ${st.chainage})` === val);
+                      if (projItem) {
+                        updateEntry(setStructEntries, structEntries, i, 'structure_id', projItem.id);
+                        updateEntry(setStructEntries, structEntries, i, 'structure_name', projItem.structure_ref);
+                      } else {
+                        updateEntry(setStructEntries, structEntries, i, 'structure_id', '');
+                        updateEntry(setStructEntries, structEntries, i, 'structure_name', val);
+                      }
+                    }}
+                    placeholder="Search project structures or reference list..."
+                  />
+                ) : (
+                  <SearchableDropdown
+                    items={STRUCTURES_LIST}
+                    value={s.structure_name}
+                    onChange={val => updateEntry(setStructEntries, structEntries, i, 'structure_name', val)}
+                    placeholder="Search structures (58 types)..."
+                  />
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                 <input type="text" placeholder="Stage (e.g. Foundation)" value={s.stage} onChange={e => updateEntry(setStructEntries, structEntries, i, 'stage', e.target.value)} style={{ fontSize: 12 }} />
                 <select value={s.status} onChange={e => updateEntry(setStructEntries, structEntries, i, 'status', e.target.value)} style={{ fontSize: 12 }}>
-                  {['Not Started', 'In Progress', 'Completed', 'On Hold'].map(st => <option key={st} value={st}>{st}</option>)}
+                  {STRUCTURE_STATUS_OPTIONS.map(st => <option key={st} value={st}>{st}</option>)}
                 </select>
+                <input type="text" placeholder="Notes" value={s.notes} onChange={e => updateEntry(setStructEntries, structEntries, i, 'notes', e.target.value)} style={{ fontSize: 12 }} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <input type="number" placeholder="Concrete (m³)" value={s.concrete_volume_m3} onChange={e => updateEntry(setStructEntries, structEntries, i, 'concrete_volume_m3', e.target.value)} style={{ fontSize: 12 }} />
                 <input type="number" placeholder="Rebar (kg)" value={s.rebar_kg} onChange={e => updateEntry(setStructEntries, structEntries, i, 'rebar_kg', e.target.value)} style={{ fontSize: 12 }} />
-                <input type="text" placeholder="Notes" value={s.notes} onChange={e => updateEntry(setStructEntries, structEntries, i, 'notes', e.target.value)} style={{ fontSize: 12 }} />
               </div>
             </EntryRow>
           ))}
           <AddButton label="Add Structure Progress" onClick={addStruct} />
-          <PhotoUploader
-            projectId={selectedProject}
-            category="structure"
-            photos={structPhotos}
-            setPhotos={setStructPhotos}
-            maxPhotos={10}
-            label="Structure Photos"
-          />
+          <PhotoUploader projectId={selectedProject} category="structure" photos={structPhotos} setPhotos={setStructPhotos} maxPhotos={10} label="Structure Photos" />
         </SectionCard>
       )}
 
@@ -1074,28 +986,26 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           <SectionCard title="Site Issues" icon="⚠️" count={issueEntries.length} color="#ef4444">
             {issueEntries.map((iss, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setIssueEntries, issueEntries, i)}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 8 }}>
                   <input type="text" placeholder="Issue title *" value={iss.title} onChange={e => updateEntry(setIssueEntries, issueEntries, i, 'title', e.target.value)} style={{ fontSize: 12, fontWeight: 600 }} />
-                  <select value={iss.category} onChange={e => updateEntry(setIssueEntries, issueEntries, i, 'category', e.target.value)} style={{ fontSize: 12 }}>
-                    {ISSUE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
                   <select value={iss.severity} onChange={e => updateEntry(setIssueEntries, issueEntries, i, 'severity', e.target.value)}
                     style={{ fontSize: 12, color: iss.severity === 'Critical' ? '#ef4444' : iss.severity === 'High' ? '#f59e0b' : 'inherit', fontWeight: 600 }}>
                     {ISSUE_SEVERITY.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                <div style={{ marginBottom: 8 }}>
+                  <SearchableDropdown
+                    items={REF_ISSUE_CATEGORIES.map(c => ({ name: c, category: '' }))}
+                    value={iss.category}
+                    onChange={val => updateEntry(setIssueEntries, issueEntries, i, 'category', val)}
+                    placeholder="Select issue category..."
+                  />
+                </div>
                 <textarea rows={2} placeholder="Description..." value={iss.description} onChange={e => updateEntry(setIssueEntries, issueEntries, i, 'description', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
               </EntryRow>
             ))}
             <AddButton label="Report Issue" onClick={addIssue} />
-            <PhotoUploader
-              projectId={selectedProject}
-              category="issue"
-              photos={issuePhotos}
-              setPhotos={setIssuePhotos}
-              maxPhotos={10}
-              label="Issue Evidence Photos"
-            />
+            <PhotoUploader projectId={selectedProject} category="issue" photos={issuePhotos} setPhotos={setIssuePhotos} maxPhotos={10} label="Issue Evidence Photos" />
           </SectionCard>
 
           {isRE && (
@@ -1125,7 +1035,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           <SectionCard title="General Observations" icon="📝">
             <div className="form-group mb-16">
               <label>Work Description / Summary</label>
-              <textarea rows={3} value={form.work_description} onChange={e => setForm({ ...form, work_description: e.target.value })}
+              <textarea rows={3} value={form.work_done} onChange={e => setForm({ ...form, work_done: e.target.value })}
                 placeholder="Summarise today's work activities..." style={{ fontSize: 13 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1154,16 +1064,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             </div>
           </SectionCard>
 
-          {/* General Site Photos */}
           <SectionCard title="Site Photos" icon="📸" count={totalPhotos} color="#8b5cf6">
-            <PhotoUploader
-              projectId={selectedProject}
-              category="general"
-              photos={generalPhotos}
-              setPhotos={setGeneralPhotos}
-              maxPhotos={10}
-              label="General Site Photos"
-            />
+            <PhotoUploader projectId={selectedProject} category="general" photos={generalPhotos} setPhotos={setGeneralPhotos} maxPhotos={10} label="General Site Photos" />
             {totalPhotos > 0 && (
               <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
                 <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>📷 Photos attached to this report:</div>
@@ -1179,11 +1081,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             )}
           </SectionCard>
 
-          {/* Summary */}
           <SectionCard title="Report Summary" icon="✅">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
               {[
-                { icon: '🌤️', label: 'Weather', value: form.weather_conditions },
+                { icon: '🌤️', label: 'Weather', value: form.weather },
                 { icon: '🏗️', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
                 { icon: '👷', label: "Engineer's Team", value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
                 { icon: '⛏️', label: 'Activities', value: worksEntries.length },

@@ -44,7 +44,7 @@ export async function fetchMonthlyReportData(projectId, month) {
     
     // Daily reports for the month
     supabase.from('daily_reports')
-      .select('*, user:user_id(full_name)')
+      .select('*, user:submitted_by(full_name)')
       .eq('project_id', projectId)
       .gte('report_date', startDate)
       .lte('report_date', endDate)
@@ -174,7 +174,7 @@ export async function fetchMonthlyReportData(projectId, month) {
   const workingDays = dailyReports.filter(r => r.is_working_day).length;
   const nonWorkingDays = dailyReports.filter(r => !r.is_working_day).length;
   const rainDays = dailyReports.filter(r => 
-    r.weather_conditions?.includes('Rain') || r.weather_conditions?.includes('Storm')
+    r.weather?.includes('Rain') || r.weather?.includes('Storm')
   ).length;
   const avgTemp = dailyReports.length > 0
     ? (dailyReports.reduce((s, r) => s + (r.max_temp_c || 0), 0) / dailyReports.length).toFixed(1)

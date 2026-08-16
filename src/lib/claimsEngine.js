@@ -17,14 +17,14 @@ const DETECTION_RULES = [
       const endDate = lastDayOfMonth(month);
 
       const { data } = await supabase.from('daily_reports')
-        .select('id, report_date, weather_conditions, rainfall_mm, is_working_day')
+        .select('id, report_date, weather, rainfall_mm, is_working_day')
         .eq('project_id', projectId)
         .gte('report_date', startDate).lte('report_date', endDate);
 
       if (!data) return null;
 
       const rainDays = data.filter(r =>
-        r.weather_conditions?.includes('Rain') || r.weather_conditions?.includes('Storm') || (r.rainfall_mm && r.rainfall_mm > 5)
+        r.weather?.includes('Rain') || r.weather?.includes('Storm') || (r.rainfall_mm && r.rainfall_mm > 5)
       );
 
       // Trigger: >8 rain days in a month (Kenya average ~5-6 for wet season)
@@ -39,7 +39,7 @@ const DETECTION_RULES = [
           events: rainDays.map(r => ({
             event_type: 'rain_day',
             event_date: r.report_date,
-            description: `Rain day: ${r.weather_conditions}, ${r.rainfall_mm || 0}mm`,
+            description: `Rain day: ${r.weather}, ${r.rainfall_mm || 0}mm`,
             report_id: r.id,
             days_lost: r.is_working_day === false ? 1 : 0.5,
           })),

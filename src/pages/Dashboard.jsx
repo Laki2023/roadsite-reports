@@ -135,7 +135,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   async function loadDashboard() {
     const [projRes, repRes, boqRes, worksRes, eqRes, strRes, issRes, layerRes, testRes, ipcRes, aqRes] = await Promise.all([
       supabase.from('projects').select('*').order('name'),
-      supabase.from('daily_reports').select('id, report_date, project_id, user_id, work_description, urgent_flag, projects(name)').order('report_date', { ascending: false }).limit(10),
+      supabase.from('daily_reports').select('id, report_date, project_id, submitted_by, work_done, urgent_flag, projects(name)').order('report_date', { ascending: false }).limit(10),
       supabase.from('boq_items').select('project_id, boq_amount, value_to_date, completed_quantity, boq_quantity'),
       supabase.from('works_activities').select('project_id, activity_name, status, completed_quantity, planned_quantity'),
       supabase.from('equipment_register').select('project_id, required_quantity, actual_on_site, is_key_equipment'),
@@ -661,7 +661,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                     <td style={{ fontSize: 12 }}>{r.projects?.name}</td>
                     <td style={{ fontSize: 12, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.urgent_flag && <span style={{ color: 'var(--danger)', marginRight: 4 }}>🚨</span>}
-                      {r.work_description}
+                      {r.work_done}
                     </td>
                   </tr>
                 ))}

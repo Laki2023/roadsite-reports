@@ -13,7 +13,7 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   async function load() {
     const [repRes, projRes] = await Promise.all([
       supabase.from('daily_reports')
-        .select('*, projects(name, category), profiles:submitted_by(full_name), submitter:user_id(full_name)')
+        .select('*, projects(name, category), profiles:submitted_by(full_name)')
         .order('report_date', { ascending: false }).limit(100),
       supabase.from('projects').select('id, name'),
     ]);
@@ -30,9 +30,9 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   function exportCSV() {
     const headers = ['Date', 'Project', 'Weather', 'Work Done', 'Progress %', 'Labour', 'Challenges', 'Urgent'];
     const rows = filtered.map(r => [
-      r.report_date, r.projects?.name, r.weather || r.weather_conditions,
-      `"${(r.work_done || r.work_description || '').replace(/"/g, '""')}"`,
-      r.progress_pct || r.progress_percentage || 0,
+      r.report_date, r.projects?.name, r.weather,
+      `"${(r.work_done || '').replace(/"/g, '""')}"`,
+      r.progress_pct || 0,
       (r.contractor_labour_skilled || 0) + (r.contractor_labour_unskilled || 0) + (r.subcontractor_labour || 0),
       `"${(r.challenges || '').replace(/"/g, '""')}"`,
       r.urgent_flag ? 'YES' : '',
@@ -81,16 +81,16 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
                   <tr style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
                     <td className="text-mono text-sm">{r.report_date}</td>
                     <td>{r.projects?.name || '—'}</td>
-                    <td className="text-sm">{r.profiles?.full_name || r.submitter?.full_name || '—'}</td>
-                    <td>{r.weather || r.weather_conditions || '—'}</td>
+                    <td className="text-sm">{r.profiles?.full_name || '—'}</td>
+                    <td>{r.weather || '—'}</td>
                     <td className="text-mono">{totalLabour}</td>
                     <td>
                       <div className="flex gap-8" style={{ alignItems: 'center' }}>
                         <div className="progress-bar" style={{ width: 50 }}>
-                          <div className={`fill ${(r.progress_pct || r.progress_percentage || 0) >= 80 ? 'green' : (r.progress_pct || r.progress_percentage || 0) >= 40 ? 'orange' : 'red'}`}
-                            style={{ width: `${r.progress_pct || r.progress_percentage || 0}%` }} />
+                          <div className={`fill ${(r.progress_pct || 0) >= 80 ? 'green' : (r.progress_pct || 0) >= 40 ? 'orange' : 'red'}`}
+                            style={{ width: `${r.progress_pct || 0}%` }} />
                         </div>
-                        <span className="text-mono text-sm">{r.progress_pct || r.progress_percentage || 0}%</span>
+                        <span className="text-mono text-sm">{r.progress_pct || 0}%</span>
                       </div>
                     </td>
                     <td>{r.urgent_flag && <span className="badge badge-danger">Urgent</span>}</td>
@@ -102,7 +102,7 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', fontSize: 13 }}>
                           <div>
                             <strong className="text-muted">Work Done:</strong>
-                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.work_done || r.work_description || '—'}</p>
+                            <p style={{ marginTop: 4, whiteSpace: 'pre-wrap' }}>{r.work_done || '—'}</p>
                           </div>
                           <div>
                             <strong className="text-muted">Challenges:</strong>
