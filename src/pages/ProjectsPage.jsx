@@ -45,6 +45,20 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
         defects_liability_months: form.defects_liability_months ? parseInt(form.defects_liability_months) : 12,
         latitude: form.latitude ? parseFloat(form.latitude) : null,
         longitude: form.longitude ? parseFloat(form.longitude) : null,
+        // Dates: empty string → null (PostgreSQL rejects '' for DATE)
+        commencement_date: form.commencement_date || null,
+        original_completion_date: form.original_completion_date || null,
+        contract_award_date: form.contract_award_date || null,
+        contract_signing_date: form.contract_signing_date || null,
+        order_to_commence_date: form.order_to_commence_date || null,
+        performance_guarantee_expiry: form.performance_guarantee_expiry || null,
+        // Text: empty string → null
+        sub_county: form.sub_county || null,
+        constituency: form.constituency || null,
+        financier: form.financier || null,
+        engineer_name: form.engineer_name || null,
+        engineer_rep: form.engineer_rep || null,
+        addendums: form.addendums || null,
       };
       if (editId) {
         const { error } = await supabase.from('projects').update(payload).eq('id', editId);
