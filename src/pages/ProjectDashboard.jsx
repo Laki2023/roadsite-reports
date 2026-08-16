@@ -587,11 +587,23 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           {/* ══════ PROGRESS SUMMARY TABLE ══════ */}
           <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>📋 Progress Summary</h3>
           {(() => {
+            // Build the display list: if a parent has components, show the components; if not, show the parent
             const parents = works.filter(w => !w.is_component && !w.parent_activity_id && w.category !== 'Other');
-            if (parents.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
-            // Group by category for section headers
+            const childrenOf = (pid) => works.filter(w => w.parent_activity_id === pid).sort((a,b) => (a.component_order||0) - (b.component_order||0));
+            const displayItems = [];
+            parents.forEach(p => {
+              const kids = childrenOf(p.id);
+              if (kids.length > 0) {
+                kids.forEach(k => displayItems.push({ ...k, parentName: p.activity_name, displayCategory: k.category || p.category }));
+              } else if (p.unit !== 'LS' && p.planned_quantity > 1) {
+                // Only show parents without components if they have real measurable quantities
+                displayItems.push({ ...p, parentName: null, displayCategory: p.category });
+              }
+            });
+            if (displayItems.length === 0) return <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>No activities data</div>;
+            // Group by category
             const catGroups = {};
-            parents.forEach(p => { const c = p.category || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(p); });
+            displayItems.forEach(d => { const c = d.displayCategory || 'Other'; if (!catGroups[c]) catGroups[c] = []; catGroups[c].push(d); });
             const catOrder = ['Earthworks','Pavement','Surfacing','Drainage','Structures','Road Furniture','Traffic Management','Environment','Preliminaries'];
             const sortedCats = Object.entries(catGroups).sort((a,b) => {
               const ai = catOrder.indexOf(a[0]), bi = catOrder.indexOf(b[0]);
