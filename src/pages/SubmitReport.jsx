@@ -459,6 +459,67 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [layers, setLayers] = useState([]);
   const [recentProgress, setRecentProgress] = useState([]);
 
+  // ── Weather Auto-Detect (Open-Meteo) ──
+  const [metWeather, setMetWeather] = useState(null); // { weather, temp, min_temp, rainfall, raw }
+  const [metLoading, setMetLoading] = useState(false);
+  const [weatherOverride, setWeatherOverride] = useState(false); // inspector changed from suggestion
+
+  // WMO Weather Code → human-readable weather string
+  function wmoToWeather(code) {
+    if (code <= 1) return 'Sunny / Clear';
+    if (code === 2) return 'Partly Cloudy';
+    if (code === 3) return 'Overcast';
+    if (code >= 45 && code <= 48) return 'Foggy / Misty';
+    if (code >= 51 && code <= 55) return 'Light Rain / Drizzle';
+    if (code >= 56 && code <= 57) return 'Light Rain / Drizzle';
+    if (code >= 61 && code <= 63) return 'Moderate Rain';
+    if (code >= 65 && code <= 67) return 'Heavy Rain';
+    if (code >= 71 && code <= 77) return 'Cold';
+    if (code >= 80 && code <= 82) return 'Heavy Rain';
+    if (code >= 85 && code <= 86) return 'Cold';
+    if (code >= 95 && code <= 99) return 'Thunderstorm';
+    return 'Partly Cloudy';
+  }
+
+  async function fetchWeather(lat, lng) {
+    if (!lat || !lng) return;
+    setMetLoading(true);
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+        + `&current=temperature_2m,rain,weather_code`
+        + `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum`
+        + `&timezone=Africa/Nairobi&forecast_days=1`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Weather API ${res.status}`);
+      const data = await res.json();
+      const current = data.current || {};
+      const daily = data.daily || {};
+      const met = {
+        weather: wmoToWeather(current.weather_code ?? 2),
+        temp: current.temperature_2m != null ? Math.round(current.temperature_2m) : null,
+        max_temp: daily.temperature_2m_max?.[0] != null ? Math.round(daily.temperature_2m_max[0]) : null,
+        min_temp: daily.temperature_2m_min?.[0] != null ? Math.round(daily.temperature_2m_min[0]) : null,
+        rainfall: daily.precipitation_sum?.[0] != null ? Math.round(daily.precipitation_sum[0] * 10) / 10 : null,
+        raw: data,
+      };
+      setMetWeather(met);
+      // Pre-fill only if inspector hasn't touched weather yet
+      if (!form.weather && !weatherOverride) {
+        setForm(prev => ({
+          ...prev,
+          weather: met.weather,
+          max_temp_c: met.max_temp ?? prev.max_temp_c,
+          min_temp_c: met.min_temp ?? prev.min_temp_c,
+          rainfall_mm: met.rainfall ?? prev.rainfall_mm,
+        }));
+      }
+    } catch (err) {
+      console.warn('Weather auto-detect failed (non-critical):', err.message);
+    } finally {
+      setMetLoading(false);
+    }
+  }
+
   const isPlatformAdmin = profile.is_platform_admin === true;
   const isRE = hasRole(profile.role, 'resident_engineer') || isPlatformAdmin;
 
@@ -499,12 +560,18 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
   // ── Data Loading ──
   useEffect(() => {
-    supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
+    supabase.from('projects').select('id, name, category, latitude, longitude').order('name').then(({ data }) => setProjects(data || []));
     supabase.from('labour_role_reference').select('*').eq('is_active', true).order('display_order').then(({ data }) => setLabourRoles(data || []));
   }, []);
 
   useEffect(() => {
     if (!selectedProject) return;
+    // Fetch weather for this project's location
+    const proj = projects.find(p => p.id === selectedProject);
+    if (proj?.latitude && proj?.longitude) {
+      fetchWeather(proj.latitude, proj.longitude);
+    }
+    setWeatherOverride(false);
     Promise.all([
       supabase.from('works_activities').select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity').eq('project_id', selectedProject).order('sort_order'),
       supabase.from('equipment_register').select('id, equipment_name, equipment_type').eq('project_id', selectedProject).order('equipment_type'),
@@ -587,6 +654,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         safety_incidents: form.safety_incidents || null,
         urgent_flag: form.urgent_flag || false,
         progress_pct: 0,
+        // Met station data stored for cross-reference (claims analysis, audit trail)
+        met_weather: metWeather?.weather || null,
+        met_temp_c: metWeather?.temp || null,
+        met_rainfall_mm: metWeather?.rainfall || null,
+        weather_source: weatherOverride ? 'inspector_override' : metWeather ? 'met_prefill_confirmed' : 'manual',
       };
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
       if (repErr) throw repErr;
@@ -876,10 +948,27 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
           <div className="form-group mb-16">
             <label>Weather Conditions *</label>
+            {/* Auto-detect badge */}
+            {metLoading && (
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>🌐 Fetching weather data...</span>
+            )}
+            {metWeather && !metLoading && !weatherOverride && form.weather === metWeather.weather && (
+              <span style={{ fontSize: 10, color: '#3b82f6', marginLeft: 8, fontWeight: 600 }}>
+                🌐 Auto-detected from met station — confirm or change based on your site observation
+              </span>
+            )}
+            {weatherOverride && metWeather && form.weather !== metWeather.weather && (
+              <span style={{ fontSize: 10, color: '#f59e0b', marginLeft: 8, fontWeight: 600 }}>
+                ✏️ Inspector override (met station reported: {metWeather.weather})
+              </span>
+            )}
             <SearchableDropdown
               items={WEATHER_OPTIONS.map(w => ({ name: w, category: '' }))}
               value={form.weather}
-              onChange={val => setForm({ ...form, weather: val })}
+              onChange={val => {
+                setForm({ ...form, weather: val });
+                if (metWeather && val !== metWeather.weather) setWeatherOverride(true);
+              }}
               placeholder="Select or search weather..."
               allowCustom={true}
             />
@@ -887,18 +976,44 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>Max Temp (°C)</label>
+              <label>Max Temp (°C) {metWeather?.max_temp != null && form.max_temp_c == metWeather.max_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
               <input type="number" value={form.max_temp_c} onChange={e => setForm({ ...form, max_temp_c: e.target.value })} placeholder="e.g. 28" />
             </div>
             <div className="form-group mb-16">
-              <label>Min Temp (°C)</label>
+              <label>Min Temp (°C) {metWeather?.min_temp != null && form.min_temp_c == metWeather.min_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
               <input type="number" value={form.min_temp_c} onChange={e => setForm({ ...form, min_temp_c: e.target.value })} placeholder="e.g. 16" />
             </div>
             <div className="form-group mb-16">
-              <label>Rainfall (mm)</label>
+              <label>Rainfall (mm) {metWeather?.rainfall != null && form.rainfall_mm == metWeather.rainfall && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
               <input type="number" value={form.rainfall_mm} onChange={e => setForm({ ...form, rainfall_mm: e.target.value })} placeholder="0" min="0" />
             </div>
           </div>
+
+          {/* Cross-check warning: inspector says sunny but met says rain */}
+          {metWeather && form.weather && (() => {
+            const inspectorDry = ['Sunny / Clear', 'Partly Cloudy', 'Overcast', 'Hot & Humid', 'Windy', 'Cold'].includes(form.weather);
+            const metRain = ['Light Rain / Drizzle', 'Moderate Rain', 'Heavy Rain', 'Thunderstorm'].includes(metWeather.weather);
+            const inspectorRain = ['Light Rain / Drizzle', 'Moderate Rain', 'Heavy Rain', 'Thunderstorm'].includes(form.weather);
+            const metDry = ['Sunny / Clear', 'Partly Cloudy', 'Overcast'].includes(metWeather.weather);
+            if (inspectorDry && metRain) return (
+              <div style={{ padding: '8px 12px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 11, marginBottom: 12 }}>
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>⚠ Cross-check:</span> Met station data indicates <b>{metWeather.weather}</b> in the project area ({metWeather.rainfall ?? 0} mm rainfall), but you selected <b>"{form.weather}"</b>. If it's genuinely dry at the active chainage, your on-site observation takes precedence — proceed as is.
+              </div>
+            );
+            if (inspectorRain && metDry) return (
+              <div style={{ padding: '8px 12px', background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: 'var(--radius)', fontSize: 11, marginBottom: 12 }}>
+                <span style={{ color: '#3b82f6', fontWeight: 700 }}>ℹ Note:</span> Met station reports <b>{metWeather.weather}</b> for the area, but you observed <b>"{form.weather}"</b> at site. Localised rainfall is common along road corridors — your field observation is the authoritative record.
+              </div>
+            );
+            return null;
+          })()}
+
+          {/* Attribution */}
+          {metWeather && (
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'right' }}>
+              Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Open-Meteo.com</a> (CC BY 4.0) · Met station forecast for project coordinates
+            </div>
+          )}
         </SectionCard>
       )}
 
