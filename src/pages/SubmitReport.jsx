@@ -508,8 +508,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       const reportData = {
         project_id: selectedProject,
         user_id: profile.id,
+        submitted_by: profile.id,
         report_date: form.report_date,
         weather_conditions: form.weather_conditions,
+        weather: form.weather_conditions,
         max_temp_c: form.max_temp_c ? parseFloat(form.max_temp_c) : null,
         min_temp_c: form.min_temp_c ? parseFloat(form.min_temp_c) : null,
         rainfall_mm: form.rainfall_mm ? parseFloat(form.rainfall_mm) : null,
@@ -518,11 +520,13 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         contractor_labour_unskilled: parseInt(form.contractor_labour_unskilled) || 0,
         subcontractor_labour: parseInt(form.subcontractor_labour) || 0,
         work_description: form.work_description || null,
+        work_done: form.work_description || null,
         quality_observations: form.quality_observations || null,
         challenges: form.challenges || null,
         visitors: form.visitors || null,
         safety_incidents: form.safety_incidents || null,
         progress_percentage: 0,
+        progress_pct: 0,
       };
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
       if (repErr) throw repErr;
