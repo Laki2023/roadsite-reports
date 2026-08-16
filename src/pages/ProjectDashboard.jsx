@@ -73,7 +73,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   useEffect(() => { load(); }, [projectId]);
 
   async function load() {
-    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions] = await Promise.all([
+    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions,obligations] = await Promise.all([
       supabase.from('projects').select('*').eq('id', projectId).single(),
       supabase.from('boq_items').select('*').eq('project_id', projectId),
       supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name)').eq('project_id', projectId).order('sort_order'),
@@ -88,11 +88,12 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       supabase.from('project_materials').select('*').eq('project_id', projectId),
       supabase.from('daily_reports').select('id, report_date').eq('project_id', projectId),
       supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
+      supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
     ]);
     setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
       issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
       risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
-      instructions:instructions.data||[] });
+      instructions:instructions.data||[], obligations:obligations.data||[] });
   }
 
   if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>Loading project dashboard...</div>;
@@ -499,6 +500,189 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           </table>
         </div>
       </details>
+
+      {/* ══════ STATUTORY OBLIGATIONS ══════ */}
+      {(() => {
+        const obs = d.obligations || [];
+        const today = new Date();
+        const daysUntil = (dateStr) => {
+          if (!dateStr) return null;
+          return Math.ceil((new Date(dateStr) - today) / 86400000);
+        };
+        const statusBadge = (expiry) => {
+          const days = daysUntil(expiry);
+          if (days === null) return <span className="badge badge-muted">N/A</span>;
+          if (days < 0) return <span className="badge badge-danger">Expired ({Math.abs(days)}d ago)</span>;
+          if (days <= 90) return <span className="badge badge-warning">⚠ {days}d left</span>;
+          return <span className="badge badge-success">✅ Valid</span>;
+        };
+        const [showObModal, setShowObModal] = React.useState(false);
+        const [obForm, setObForm] = React.useState({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
+        const [obEditId, setObEditId] = React.useState(null);
+        const [obSaving, setObSaving] = React.useState(false);
+
+        const OB_TYPES = [
+          'Performance Guarantee', 'Advance Payment Guarantee', 'Retention Guarantee',
+          "Contractor's All Risk Insurance", 'Third Party Liability Insurance',
+          "Workers' Compensation Insurance", 'Professional Indemnity Insurance',
+          'Motor Vehicle Insurance', 'NEMA Licence', 'NCA Registration',
+          'OSHA Registration', 'Tax Compliance Certificate', 'Other',
+        ];
+
+        const saveOb = async () => {
+          setObSaving(true);
+          try {
+            const payload = {
+              project_id: projectId, obligation_type: obForm.obligation_type,
+              provider: obForm.provider || null, amount: obForm.amount ? parseFloat(obForm.amount) : null,
+              reference_no: obForm.reference_no || null, expiry_date: obForm.expiry_date || null,
+              notes: obForm.notes || null, display_order: obs.length + 1,
+            };
+            if (obEditId) {
+              await supabase.from('project_obligations').update(payload).eq('id', obEditId);
+            } else {
+              await supabase.from('project_obligations').insert(payload);
+            }
+            setShowObModal(false); setObEditId(null);
+            setObForm({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
+            load();
+          } catch (err) { showToast(err.message, 'error'); }
+          finally { setObSaving(false); }
+        };
+
+        const deleteOb = async (id) => {
+          if (!window.confirm('Delete this obligation?')) return;
+          await supabase.from('project_obligations').delete().eq('id', id);
+          load();
+        };
+
+        const editOb = (ob) => {
+          setObForm({ obligation_type: ob.obligation_type, provider: ob.provider || '', amount: ob.amount || '', reference_no: ob.reference_no || '', expiry_date: ob.expiry_date || '', notes: ob.notes || '' });
+          setObEditId(ob.id); setShowObModal(true);
+        };
+
+        const expiredCount = obs.filter(o => daysUntil(o.expiry_date) !== null && daysUntil(o.expiry_date) < 0).length;
+        const warningCount = obs.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d >= 0 && d <= 90; }).length;
+
+        return (
+          <>
+            <details className="card" style={{ padding: 0, marginBottom: 16 }}
+              open={expiredCount > 0 || warningCount > 0}>
+              <summary style={{ padding: '12px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14, userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>
+                  🔒 Statutory Obligations
+                  {expiredCount > 0 && <span className="badge badge-danger" style={{ marginLeft: 8 }}>{expiredCount} expired</span>}
+                  {warningCount > 0 && <span className="badge badge-warning" style={{ marginLeft: 4 }}>{warningCount} expiring</span>}
+                </span>
+                <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {isPlatformAdmin && <button className="btn btn-sm btn-primary" onClick={e => { e.preventDefault(); e.stopPropagation(); setObEditId(null); setObForm({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' }); setShowObModal(true); }}>+ Add</button>}
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>▼</span>
+                </span>
+              </summary>
+              <div style={{ padding: '0 16px 16px' }}>
+                {obs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
+                    No obligations recorded — click "+ Add" to add guarantees, insurance, licences
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Obligation</th>
+                        <th style={{ textAlign: 'left', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Provider / Ref</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Amount</th>
+                        <th style={{ textAlign: 'center', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Expiry</th>
+                        <th style={{ textAlign: 'center', padding: '8px 6px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                        <th style={{ width: 60 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {obs.map(ob => (
+                        <tr key={ob.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '8px 6px', fontWeight: 600 }}>{ob.obligation_type}</td>
+                          <td style={{ padding: '8px 6px' }}>
+                            <div>{ob.provider || '—'}</div>
+                            {ob.reference_no && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ob.reference_no}</div>}
+                          </td>
+                          <td className="text-mono" style={{ padding: '8px 6px', textAlign: 'right' }}>
+                            {ob.amount ? `KES ${Number(ob.amount).toLocaleString()}` : '—'}
+                          </td>
+                          <td className="text-mono" style={{ padding: '8px 6px', textAlign: 'center' }}>
+                            {ob.expiry_date ? new Date(ob.expiry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center' }}>{statusBadge(ob.expiry_date)}</td>
+                          <td style={{ padding: '8px 6px' }}>
+                            {isPlatformAdmin && (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <button className="btn btn-sm btn-secondary" style={{ fontSize: 9, padding: '2px 6px' }} onClick={() => editOb(ob)}>Edit</button>
+                                <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14 }} onClick={() => deleteOb(ob.id)}>×</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {obs.some(o => o.notes) && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                    {obs.filter(o => o.notes).map(o => <div key={o.id}>📝 {o.obligation_type}: {o.notes}</div>)}
+                  </div>
+                )}
+              </div>
+            </details>
+
+            {/* Add/Edit Obligation Modal */}
+            {showObModal && (
+              <div className="modal-overlay" onClick={() => setShowObModal(false)}>
+                <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+                  <h3>{obEditId ? 'Edit Obligation' : 'Add Statutory Obligation'}<button onClick={() => setShowObModal(false)}>×</button></h3>
+                  <div className="form-group mb-16">
+                    <label>Type *</label>
+                    <select value={obForm.obligation_type} onChange={e => setObForm({ ...obForm, obligation_type: e.target.value })}>
+                      {OB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group mb-16">
+                      <label>Provider / Bank / Insurer</label>
+                      <input value={obForm.provider} onChange={e => setObForm({ ...obForm, provider: e.target.value })}
+                        placeholder="e.g. KCB Bank, Jubilee Insurance" />
+                    </div>
+                    <div className="form-group mb-16">
+                      <label>Amount (KES)</label>
+                      <input type="number" step="0.01" value={obForm.amount} onChange={e => setObForm({ ...obForm, amount: e.target.value })}
+                        placeholder="e.g. 254000000" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group mb-16">
+                      <label>Reference / Policy No.</label>
+                      <input value={obForm.reference_no} onChange={e => setObForm({ ...obForm, reference_no: e.target.value })}
+                        placeholder="e.g. BG/2024/001, POL-123456" />
+                    </div>
+                    <div className="form-group mb-16">
+                      <label>Expiry Date</label>
+                      <input type="date" value={obForm.expiry_date} onChange={e => setObForm({ ...obForm, expiry_date: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="form-group mb-16">
+                    <label>Notes</label>
+                    <input value={obForm.notes} onChange={e => setObForm({ ...obForm, notes: e.target.value })}
+                      placeholder="e.g. Renewal letter sent to Contractor 15 Aug" />
+                  </div>
+                  <div className="btn-group">
+                    <button className="btn btn-primary" onClick={saveOb} disabled={obSaving}>
+                      {obSaving ? 'Saving...' : obEditId ? 'Update' : 'Add Obligation'}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setShowObModal(false)}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ══════ TOP KPI ROW ══════ */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:16 }}>
