@@ -40,21 +40,21 @@ CREATE POLICY "Managers can delete templates" ON position_templates
 -- Seed some common Kenya road sector position templates
 INSERT INTO position_templates (display_name, description, system_role, allowed_pages) VALUES
   ('Measurement Engineer', 'Handles BoQ, measurements, taking-off and IPC submissions', 'project_officer',
-   ARRAY['boq', 'taking-off', 'ipc', 'claims', 'monthly-report']),
+   ARRAY['boq:edit', 'taking-off:edit', 'ipc:edit', 'claims:view', 'monthly-report:view']),
   ('Contracts Officer', 'Handles claims, EOT assessments and contract amendments', 'project_officer',
-   ARRAY['claims', 'approvals', 'monthly-report', 'key-personnel', 'approvals-matrix']),
+   ARRAY['claims:edit', 'approvals:edit', 'monthly-report:view', 'key-personnel:view', 'approvals-matrix:view']),
   ('Environmental Officer', 'Monitors environmental safeguards and compliance', 'project_officer',
-   ARRAY['quality', 'issues', 'reports', 'monthly-report']),
+   ARRAY['quality:edit', 'issues:edit', 'reports:view', 'monthly-report:view']),
   ('Safeguards Specialist', 'Oversees social and environmental safeguards', 'project_officer',
-   ARRAY['issues', 'reports', 'quality', 'key-personnel', 'monthly-report']),
+   ARRAY['issues:edit', 'reports:view', 'quality:view', 'key-personnel:view', 'monthly-report:view']),
   ('Assistant Resident Engineer', 'Supports RE with expanded site-level access', 'inspector',
-   ARRAY['submit-report', 'reports', 'works', 'issues', 'emergency', 'pavement', 'quality', 'equipment', 'structures', 'programme', 'boq', 'taking-off', 'key-personnel']),
+   ARRAY['submit-report:edit', 'reports:edit', 'works:edit', 'issues:edit', 'emergency:edit', 'pavement:view', 'quality:edit', 'equipment:edit', 'structures:edit', 'programme:view', 'boq:view', 'taking-off:edit', 'key-personnel:view']),
   ('Materials Technician', 'Quality testing and materials approval', 'inspector',
-   ARRAY['submit-report', 'quality', 'pavement', 'reports']),
+   ARRAY['submit-report:edit', 'quality:edit', 'pavement:view', 'reports:view']),
   ('Site Surveyor', 'Measurements, taking-off and works quantities', 'inspector',
-   ARRAY['submit-report', 'taking-off', 'works', 'structures', 'reports']),
+   ARRAY['submit-report:edit', 'taking-off:edit', 'works:edit', 'structures:edit', 'reports:view']),
   ('Office Engineer', 'Programme tracking, reporting and documentation', 'project_officer',
-   ARRAY['programme', 'monthly-report', 'reports', 'key-personnel', 'approvals'])
+   ARRAY['programme:edit', 'monthly-report:edit', 'reports:view', 'key-personnel:view', 'approvals:view'])
 ON CONFLICT DO NOTHING;
 
 -- Done!

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase, ROLE_LABELS, ROLE_LEVELS, ROLE_COLORS, ALL_ROLES, assignableRoles } from '../lib/supabase';
+import { supabase, ROLE_LABELS, ROLE_LEVELS, ROLE_COLORS, ALL_ROLES, assignableRoles, getModuleAccess } from '../lib/supabase';
 
 export default function UserManagement({ profile, showToast, navigateTo }) {
   const [tab, setTab] = useState('users');
@@ -451,11 +451,24 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
     showToast(`Template "${t.display_name}" applied`);
   }
 
-  function togglePage(key) {
-    setAllowedPages(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
+  function cycleAccess(key) {
+    setAllowedPages(prev => {
+      const without = prev.filter(p => p !== key && p !== `${key}:view` && p !== `${key}:edit`);
+      const current = getModuleAccess(prev, key);
+      if (!current) return [...without, `${key}:view`];
+      if (current === 'view') return [...without, `${key}:edit`];
+      return without;
+    });
   }
+
+  function setAllAccess(mode) {
+    if (mode === 'edit') setAllowedPages(PAGE_MODULES.map(m => `${m.key}:edit`));
+    else if (mode === 'view') setAllowedPages(PAGE_MODULES.map(m => `${m.key}:view`));
+    else setAllowedPages([]);
+  }
+
+  const viewCount = PAGE_MODULES.filter(m => getModuleAccess(allowedPages, m.key) === 'view').length;
+  const editCount = PAGE_MODULES.filter(m => getModuleAccess(allowedPages, m.key) === 'edit').length;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -543,41 +556,62 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
               placeholder="+254 7XX XXX XXX" />
           </div>
 
-          {/* Module Access Checkboxes */}
+          {/* Module Access — 3-state: Off / View Only / View & Edit */}
           <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: 16 }}>
             <button type="button" onClick={() => setShowModules(!showModules)}
               style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-              <span>Module Access ({allowedPages.length}/{PAGE_MODULES.length})</span>
+              <span>Module Access
+                {(viewCount > 0 || editCount > 0) && (
+                  <span style={{ fontWeight: 400, fontSize: 11, marginLeft: 8, color: 'var(--text-muted)' }}>
+                    {editCount} edit · {viewCount} view only
+                  </span>
+                )}
+              </span>
               <span style={{ fontSize: 16 }}>{showModules ? '▲' : '▼'}</span>
             </button>
             {showModules && (
               <div style={{ padding: '0 14px 14px' }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                  <button type="button" className="btn btn-sm btn-secondary"
-                    onClick={() => setAllowedPages(PAGE_MODULES.map(m => m.key))}
-                    style={{ fontSize: 11 }}>Select All</button>
-                  <button type="button" className="btn btn-sm btn-secondary"
-                    onClick={() => setAllowedPages([])}
-                    style={{ fontSize: 11 }}>Clear All</button>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess('edit')} style={{ fontSize: 11 }}>All Edit</button>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess('view')} style={{ fontSize: 11 }}>All View Only</button>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess(null)} style={{ fontSize: 11 }}>Clear All</button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
                   {PAGE_MODULES.map(m => {
-                    const checked = allowedPages.includes(m.key);
+                    const access = getModuleAccess(allowedPages, m.key);
+                    const bgMap = { edit: '#dcfce7', view: '#dbeafe', null: 'transparent' };
+                    const borderMap = { edit: '#86efac', view: '#93c5fd', null: 'transparent' };
+                    const labelMap = { edit: 'Edit', view: 'View', null: 'Off' };
+                    const colorMap = { edit: '#166534', view: '#1e40af', null: 'var(--text-muted)' };
                     return (
-                      <label key={m.key} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
-                        borderRadius: 6, cursor: 'pointer', fontSize: 12,
-                        background: checked ? 'var(--bg-accent)' : 'transparent',
-                        border: `1px solid ${checked ? 'var(--border-accent)' : 'transparent'}`,
+                      <div key={m.key} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '6px 10px', borderRadius: 6,
+                        background: bgMap[access] || 'transparent',
+                        border: `1px solid ${borderMap[access] || 'transparent'}`,
                         transition: 'all 0.15s',
                       }}>
-                        <input type="checkbox" checked={checked} onChange={() => togglePage(m.key)} />
-                        <span>{m.icon}</span>
-                        <span style={{ fontWeight: checked ? 600 : 400 }}>{m.label}</span>
-                      </label>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                          <span>{m.icon}</span>
+                          <span style={{ fontWeight: access ? 600 : 400 }}>{m.label}</span>
+                        </span>
+                        <button type="button" onClick={() => cycleAccess(m.key)}
+                          style={{
+                            padding: '2px 10px', borderRadius: 9999, fontSize: 10, fontWeight: 700,
+                            border: `1px solid ${borderMap[access] || 'var(--border)'}`,
+                            background: access ? (bgMap[access]) : 'var(--surface-1)',
+                            color: colorMap[access], cursor: 'pointer', minWidth: 52, textAlign: 'center',
+                            transition: 'all 0.15s',
+                          }}>
+                          {labelMap[access]}
+                        </button>
+                      </div>
                     );
                   })}
+                </div>
+                <div className="text-sm text-muted" style={{ marginTop: 8, fontSize: 11 }}>
+                  Click the badge to cycle: Off → View Only → View &amp; Edit → Off
                 </div>
               </div>
             )}
@@ -748,13 +782,18 @@ function PositionTemplatesView({ profile, roles, showToast }) {
                 {t.description && <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{t.description}</div>}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {pages.map(p => {
-                    const mod = PAGE_MODULES.find(m => m.key === p);
-                    return mod ? (
+                    const key = p.replace(/:view$|:edit$/, '');
+                    const access = p.endsWith(':view') ? 'view' : 'edit';
+                    const mod = PAGE_MODULES.find(m => m.key === key);
+                    if (!mod) return null;
+                    const isView = access === 'view';
+                    return (
                       <span key={p} style={{
-                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                        background: 'var(--bg-accent)', color: 'var(--text-accent)', fontWeight: 500,
-                      }}>{mod.icon} {mod.label}</span>
-                    ) : null;
+                        fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 500,
+                        background: isView ? '#dbeafe' : '#dcfce7',
+                        color: isView ? '#1e40af' : '#166534',
+                      }}>{mod.icon} {mod.label} {isView ? '(view)' : ''}</span>
+                    );
                   })}
                   {pages.length === 0 && <span className="text-sm text-muted">No modules assigned</span>}
                 </div>
@@ -786,10 +825,20 @@ function TemplateFormModal({ template, profile, roles, onClose, onSuccess, showT
   const [allowedPages, setAllowedPages] = useState(template?.allowed_pages || []);
   const [submitting, setSubmitting] = useState(false);
 
-  function togglePage(key) {
-    setAllowedPages(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
+  function cycleAccess(key) {
+    setAllowedPages(prev => {
+      const without = prev.filter(p => p !== key && p !== `${key}:view` && p !== `${key}:edit`);
+      const current = getModuleAccess(prev, key);
+      if (!current) return [...without, `${key}:view`];
+      if (current === 'view') return [...without, `${key}:edit`];
+      return without;
+    });
+  }
+
+  function setAllAccess(mode) {
+    if (mode === 'edit') setAllowedPages(PAGE_MODULES.map(m => `${m.key}:edit`));
+    else if (mode === 'view') setAllowedPages(PAGE_MODULES.map(m => `${m.key}:view`));
+    else setAllowedPages([]);
   }
 
   async function handleSubmit(e) {
@@ -842,34 +891,49 @@ function TemplateFormModal({ template, profile, roles, onClose, onSuccess, showT
             </span>
           </div>
 
-          {/* Module Checkboxes */}
+          {/* Module Access — 3-state: Off / View Only / View & Edit */}
           <div className="form-group mb-16">
             <label>Module Access</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button type="button" className="btn btn-sm btn-secondary"
-                onClick={() => setAllowedPages(PAGE_MODULES.map(m => m.key))}
-                style={{ fontSize: 11 }}>Select All</button>
-              <button type="button" className="btn btn-sm btn-secondary"
-                onClick={() => setAllowedPages([])}
-                style={{ fontSize: 11 }}>Clear All</button>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess('edit')} style={{ fontSize: 11 }}>All Edit</button>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess('view')} style={{ fontSize: 11 }}>All View Only</button>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setAllAccess(null)} style={{ fontSize: 11 }}>Clear All</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 10 }}>
               {PAGE_MODULES.map(m => {
-                const checked = allowedPages.includes(m.key);
+                const access = getModuleAccess(allowedPages, m.key);
+                const bgMap = { edit: '#dcfce7', view: '#dbeafe', null: 'transparent' };
+                const borderMap = { edit: '#86efac', view: '#93c5fd', null: 'transparent' };
+                const labelMap = { edit: 'Edit', view: 'View', null: 'Off' };
+                const colorMap = { edit: '#166534', view: '#1e40af', null: 'var(--text-muted)' };
                 return (
-                  <label key={m.key} style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
-                    borderRadius: 6, cursor: 'pointer', fontSize: 12,
-                    background: checked ? 'var(--bg-accent)' : 'transparent',
-                    border: `1px solid ${checked ? 'var(--border-accent)' : 'transparent'}`,
+                  <div key={m.key} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '6px 10px', borderRadius: 6,
+                    background: bgMap[access] || 'transparent',
+                    border: `1px solid ${borderMap[access] || 'transparent'}`,
                     transition: 'all 0.15s',
                   }}>
-                    <input type="checkbox" checked={checked} onChange={() => togglePage(m.key)} />
-                    <span>{m.icon}</span>
-                    <span style={{ fontWeight: checked ? 600 : 400 }}>{m.label}</span>
-                  </label>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <span>{m.icon}</span>
+                      <span style={{ fontWeight: access ? 600 : 400 }}>{m.label}</span>
+                    </span>
+                    <button type="button" onClick={() => cycleAccess(m.key)}
+                      style={{
+                        padding: '2px 10px', borderRadius: 9999, fontSize: 10, fontWeight: 700,
+                        border: `1px solid ${borderMap[access] || 'var(--border)'}`,
+                        background: access ? (bgMap[access]) : 'var(--surface-1)',
+                        color: colorMap[access], cursor: 'pointer', minWidth: 52, textAlign: 'center',
+                        transition: 'all 0.15s',
+                      }}>
+                      {labelMap[access]}
+                    </button>
+                  </div>
                 );
               })}
+            </div>
+            <div className="text-sm text-muted" style={{ marginTop: 6, fontSize: 11 }}>
+              Click the badge to cycle: Off → View Only → View &amp; Edit → Off
             </div>
           </div>
 

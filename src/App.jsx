@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase, hasRole, ROLE_LABELS } from './lib/supabase';
+import { supabase, hasRole, ROLE_LABELS, canViewModule, canEditModule } from './lib/supabase';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProjectsPage from './pages/ProjectsPage';
@@ -261,8 +261,8 @@ export default function App() {
             // Access control: platform admin sees all, otherwise check allowed_pages then fall back to role
             if (!profile.is_platform_admin) {
               if (profile.allowed_pages && profile.allowed_pages.length > 0) {
-                // User has specific page assignments — use those
-                if (!profile.allowed_pages.includes(item.key) && item.key !== 'dashboard' && item.key !== 'projects') return null;
+                // User has specific page assignments — use those (supports :view and :edit suffixes)
+                if (!canViewModule(profile.allowed_pages, item.key) && item.key !== 'dashboard' && item.key !== 'projects') return null;
               } else {
                 // Fall back to role-based access
                 if (!hasRole(profile.role, item.minRole)) return null;

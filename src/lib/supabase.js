@@ -33,6 +33,35 @@ export function assignableRoles(userRole) {
   return ALL_ROLES.filter(r => ROLE_LEVELS[r] < level && r !== 'pending');
 }
 
+/**
+ * Module access helpers.
+ * allowed_pages entries use suffix convention:
+ *   'boq:edit' = can view AND edit
+ *   'boq:view' = view only (no edit buttons, forms disabled)
+ *   'boq'      = legacy (treated as edit for backward compatibility)
+ */
+export function canViewModule(allowedPages, moduleKey) {
+  if (!allowedPages || !allowedPages.length) return false;
+  return allowedPages.some(p =>
+    p === moduleKey || p === `${moduleKey}:view` || p === `${moduleKey}:edit`
+  );
+}
+
+export function canEditModule(allowedPages, moduleKey) {
+  if (!allowedPages || !allowedPages.length) return false;
+  return allowedPages.some(p =>
+    p === moduleKey || p === `${moduleKey}:edit`
+  );
+}
+
+/** Get the access level for a module: 'edit', 'view', or null */
+export function getModuleAccess(allowedPages, moduleKey) {
+  if (!allowedPages || !allowedPages.length) return null;
+  if (allowedPages.includes(`${moduleKey}:edit`) || allowedPages.includes(moduleKey)) return 'edit';
+  if (allowedPages.includes(`${moduleKey}:view`)) return 'view';
+  return null;
+}
+
 export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'project_officer', 'resident_engineer', 'inspector', 'contractor_qs', 'viewer', 'pending'];
 
 export const ROLE_LABELS = {
