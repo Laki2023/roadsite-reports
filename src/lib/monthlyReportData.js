@@ -171,8 +171,8 @@ export async function fetchMonthlyReportData(projectId, month) {
   // ── Computed Summaries ──
 
   // Weather summary
-  const workingDays = dailyReports.filter(r => r.is_working_day).length;
-  const nonWorkingDays = dailyReports.filter(r => !r.is_working_day).length;
+  const workingDays = dailyReports.filter(r => (r.working_hours || 0) > 0).length;
+  const nonWorkingDays = dailyReports.filter(r => (r.working_hours || 0) === 0).length;
   const rainDays = dailyReports.filter(r => 
     r.weather?.includes('Rain') || r.weather?.includes('Storm')
   ).length;

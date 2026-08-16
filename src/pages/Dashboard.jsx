@@ -135,7 +135,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   async function loadDashboard() {
     const [projRes, repRes, boqRes, worksRes, eqRes, strRes, issRes, layerRes, testRes, ipcRes, aqRes] = await Promise.all([
       supabase.from('projects').select('*').order('name'),
-      supabase.from('daily_reports').select('id, report_date, project_id, submitted_by, work_done, urgent_flag, projects(name)').order('report_date', { ascending: false }).limit(10),
+      supabase.from('daily_reports').select('*, projects(name)').order('report_date', { ascending: false }).limit(10),
       supabase.from('boq_items').select('project_id, boq_amount, value_to_date, completed_quantity, boq_quantity'),
       supabase.from('works_activities').select('project_id, activity_name, status, completed_quantity, planned_quantity'),
       supabase.from('equipment_register').select('project_id, required_quantity, actual_on_site, is_key_equipment'),
@@ -146,6 +146,14 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
       supabase.from('ipc_certificates').select('project_id, ipc_no, certified_amount, paid_amount').order('ipc_no'),
       supabase.from('approval_queue').select('id, status, priority, current_approver_role').eq('status', 'pending'),
     ]);
+
+    // Surface any query failures instead of silently showing empty sections
+    const resultMap = { projects: projRes, daily_reports: repRes, boq_items: boqRes, works_activities: worksRes,
+      equipment_register: eqRes, structures: strRes, site_issues: issRes, pavement_layers: layerRes,
+      quality_tests: testRes, ipc_certificates: ipcRes, approval_queue: aqRes };
+    Object.entries(resultMap).forEach(([table, res]) => {
+      if (res.error) console.error(`Dashboard query failed [${table}]:`, res.error.message);
+    });
 
     const projs = projRes.data || [];
     const boq = boqRes.data || [];
@@ -660,7 +668,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                     <td className="text-mono" style={{ fontSize: 12 }}>{r.report_date}</td>
                     <td style={{ fontSize: 12 }}>{r.projects?.name}</td>
                     <td style={{ fontSize: 12, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.urgent_flag && <span style={{ color: 'var(--danger)', marginRight: 4 }}>🚨</span>}
+                      {(r.urgent_flag || r.is_urgent) && <span style={{ color: 'var(--danger)', marginRight: 4 }}>🚨</span>}
                       {r.work_done}
                     </td>
                   </tr>

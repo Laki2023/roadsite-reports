@@ -35,7 +35,7 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
       r.progress_pct || 0,
       (r.contractor_labour_skilled || 0) + (r.contractor_labour_unskilled || 0) + (r.subcontractor_labour || 0),
       `"${(r.challenges || '').replace(/"/g, '""')}"`,
-      r.urgent_flag ? 'YES' : '',
+      (r.urgent_flag || r.is_urgent) ? 'YES' : '',
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

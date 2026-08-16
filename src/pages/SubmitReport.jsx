@@ -490,6 +490,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     setSaving(true);
 
     try {
+      const warnings = [];
       // 1. Daily Report — CANONICAL columns (no dual-write)
       const reportData = {
         project_id: selectedProject,
@@ -508,6 +509,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         challenges: form.challenges || null,
         visitors: form.visitors || null,
         safety_incidents: form.safety_incidents || null,
+        urgent_flag: form.urgent_flag || false,
         progress_pct: 0,
       };
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
@@ -521,13 +523,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         const autoQty = isLinear && w.start_chainage && w.end_chainage
           ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage))
           : parseFloat(w.quantity) || 0;
-        await supabase.from('works_progress').insert({
+        const { error: wpErr } = await supabase.from('works_progress').insert({
           project_id: selectedProject, activity_id: w.activity_id || null,
           work_date: form.report_date, start_chainage: parseFloat(w.start_chainage) || 0,
           end_chainage: parseFloat(w.end_chainage) || 0, side: w.side || 'Both',
           quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : ''),
           reported_by: profile.id,
         });
+        if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
       }
 
       // 3. Equipment Status — auto-register items from reference list
@@ -536,19 +539,26 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         let eqId = eq.equipment_id;
         // If picked from reference list (no project equipment_id), auto-register it
         if (!eqId && eq.equipment_name) {
-          const { data: newEq } = await supabase.from('equipment_register').insert({
-            project_id: selectedProject, equipment_name: eq.equipment_name,
-            equipment_type: eq.equipment_name, actual_on_site: 1, required_quantity: 1,
-          }).select('id').single();
-          if (newEq) eqId = newEq.id;
+          const existing = equipment.find(e => e.equipment_name === eq.equipment_name);
+          if (existing) {
+            eqId = existing.id;
+          } else {
+            const { data: newEq, error: eqErr } = await supabase.from('equipment_register').insert({
+              project_id: selectedProject, equipment_name: eq.equipment_name,
+              equipment_type: eq.equipment_name, actual_on_site: 1, required_quantity: 1,
+            }).select('id').single();
+            if (eqErr) { warnings.push(`Equipment "${eq.equipment_name}": ${eqErr.message}`); continue; }
+            if (newEq) eqId = newEq.id;
+          }
         }
         if (eqId) {
-          await supabase.from('equipment_daily_status').upsert({
+          const { error: esErr } = await supabase.from('equipment_daily_status').upsert({
             equipment_id: eqId, project_id: selectedProject,
             status_date: form.report_date, status: eq.status,
             hours_worked: parseFloat(eq.hours_worked) || 0,
             notes: eq.notes || null, reported_by: profile.id,
           }, { onConflict: 'equipment_id,status_date' });
+          if (esErr) warnings.push(`Equipment status: ${esErr.message}`);
         }
       }
 
@@ -558,28 +568,36 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         let strId = s.structure_id;
         // If picked from reference list (no project structure_id), auto-register it
         if (!strId && s.structure_name) {
-          const strRef = s.structure_name.substring(0, 20).replace(/[^a-zA-Z0-9-]/g, '');
-          const { data: newStr } = await supabase.from('structures').insert({
-            project_id: selectedProject, structure_ref: strRef,
-            structure_type: s.structure_name, chainage: null, status: s.status || 'In Progress',
-          }).select('id').single();
-          if (newStr) strId = newStr.id;
+          const existing = structures.find(st => st.structure_type === s.structure_name);
+          if (existing) {
+            strId = existing.id;
+          } else {
+            const strRef = s.structure_name.substring(0, 15).replace(/[^a-zA-Z0-9]/g, '') + '-' + Date.now().toString().slice(-4);
+            const { data: newStr, error: strErr } = await supabase.from('structures').insert({
+              project_id: selectedProject, structure_ref: strRef,
+              structure_type: s.structure_name, chainage: 0,
+              overall_status: 'In Progress', percent_complete: 0,
+            }).select('id').single();
+            if (strErr) { warnings.push(`Structure "${s.structure_name}": ${strErr.message}`); continue; }
+            if (newStr) strId = newStr.id;
+          }
         }
         if (strId) {
-          await supabase.from('structure_progress').insert({
+          const { error: spErr } = await supabase.from('structure_progress').insert({
             structure_id: strId, project_id: selectedProject,
             stage: s.stage, status: s.status, work_date: form.report_date,
             concrete_volume_m3: s.concrete_volume_m3 ? parseFloat(s.concrete_volume_m3) : null,
             rebar_kg: s.rebar_kg ? parseFloat(s.rebar_kg) : null,
             notes: s.notes || null, reported_by: profile.id,
           });
+          if (spErr) warnings.push(`Structure progress: ${spErr.message}`);
         }
       }
 
       // 5. Quality Tests
       for (const t of testEntries) {
         if (!t.test_type) continue;
-        await supabase.from('quality_tests').insert({
+        const { error: qtErr } = await supabase.from('quality_tests').insert({
           project_id: selectedProject, test_type: t.test_type,
           test_date: form.report_date, location: t.location || null,
           chainage: t.chainage || null, sample_id: t.sample_id || null,
@@ -587,17 +605,19 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           result_status: t.result_status, notes: t.notes || null,
           tested_by: profile.id,
         });
+        if (qtErr) warnings.push(`Test "${t.test_type}": ${qtErr.message}`);
       }
 
       // 6. Site Issues
       for (const iss of issueEntries) {
         if (!iss.title) continue;
-        await supabase.from('site_issues').insert({
+        const { error: issErr } = await supabase.from('site_issues').insert({
           project_id: selectedProject, title: iss.title,
           category: iss.category, severity: iss.severity,
           description: iss.description || null, action_required: iss.action_required || null,
           status: 'Open', reported_by: profile.id, reported_date: form.report_date,
         });
+        if (issErr) warnings.push(`Issue "${iss.title}": ${issErr.message}`);
       }
 
       // 7. Site Instructions
@@ -605,24 +625,26 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         if (!instr.subject) continue;
         const { count } = await supabase.from('site_instructions')
           .select('id', { count: 'exact', head: true }).eq('project_id', selectedProject);
-        await supabase.from('site_instructions').insert({
+        const { error: siErr } = await supabase.from('site_instructions').insert({
           project_id: selectedProject, instruction_no: `SI-${String((count || 0) + 1).padStart(4, '0')}`,
           instruction_type: instr.instruction_type, subject: instr.subject,
           description: instr.description || null, chainage_from: instr.chainage || null,
           issued_by: profile.id, issued_by_role: profile.role,
           response_required: instr.response_required, status: 'issued',
         });
+        if (siErr) warnings.push(`Instruction "${instr.subject}": ${siErr.message}`);
       }
 
       // 8. Materials Received
       for (const m of materialEntries) {
         if (!m.material_type || !m.quantity) continue;
-        await supabase.from('project_materials').insert({
+        const { error: matErr } = await supabase.from('project_materials').insert({
           project_id: selectedProject, material_type: m.material_type,
           description: m.description || null, quantity: parseFloat(m.quantity) || 0,
           unit: m.unit, source: m.source || null, delivery_note: m.delivery_note || null,
           received_date: form.report_date, received_by: profile.id,
         });
+        if (matErr) warnings.push(`Material "${m.material_type}": ${matErr.message}`);
       }
 
       // 9. Upload Photos
@@ -658,7 +680,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           role_title: e.role_title, male_count: e.male_count || 0,
           female_count: e.female_count || 0, key_personnel_id: null, is_present: true,
         }));
-        await supabase.from('daily_labour').insert(labourRecords);
+        const { error: labErr } = await supabase.from('daily_labour').insert(labourRecords);
+        if (labErr) warnings.push(`Labour records: ${labErr.message}`);
       }
 
       // Update legacy labour columns
@@ -671,7 +694,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       }
 
       setSubmitted(true);
-      showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);
+      if (warnings.length > 0) {
+        console.error('Report submitted with warnings:', warnings);
+        showToast(`⚠️ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
+      } else {
+        showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);
+      }
     } catch (err) {
       showToast(err.message, 'error');
     } finally {

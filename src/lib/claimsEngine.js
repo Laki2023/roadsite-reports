@@ -17,7 +17,7 @@ const DETECTION_RULES = [
       const endDate = lastDayOfMonth(month);
 
       const { data } = await supabase.from('daily_reports')
-        .select('id, report_date, weather, rainfall_mm, is_working_day')
+        .select('id, report_date, weather, rainfall_mm, working_hours')
         .eq('project_id', projectId)
         .gte('report_date', startDate).lte('report_date', endDate);
 
@@ -41,7 +41,7 @@ const DETECTION_RULES = [
             event_date: r.report_date,
             description: `Rain day: ${r.weather}, ${r.rainfall_mm || 0}mm`,
             report_id: r.id,
-            days_lost: r.is_working_day === false ? 1 : 0.5,
+            days_lost: (r.working_hours || 0) === 0 ? 1 : 0.5,
           })),
         };
       }
