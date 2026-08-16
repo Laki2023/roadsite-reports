@@ -530,29 +530,50 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         });
       }
 
-      // 3. Equipment Status
+      // 3. Equipment Status — auto-register items from reference list
       for (const eq of equipEntries) {
         if (!eq.equipment_id && !eq.equipment_name) continue;
-        await supabase.from('equipment_daily_status').upsert({
-          equipment_id: eq.equipment_id || null, project_id: selectedProject,
-          status_date: form.report_date, status: eq.status,
-          hours_worked: parseFloat(eq.hours_worked) || 0,
-          notes: eq.equipment_name ? `[${eq.equipment_name}] ${eq.notes || ''}`.trim() : eq.notes,
-          reported_by: profile.id,
-        }, { onConflict: eq.equipment_id ? 'equipment_id,status_date' : undefined });
+        let eqId = eq.equipment_id;
+        // If picked from reference list (no project equipment_id), auto-register it
+        if (!eqId && eq.equipment_name) {
+          const { data: newEq } = await supabase.from('equipment_register').insert({
+            project_id: selectedProject, equipment_name: eq.equipment_name,
+            equipment_type: eq.equipment_name, actual_on_site: 1, required_quantity: 1,
+          }).select('id').single();
+          if (newEq) eqId = newEq.id;
+        }
+        if (eqId) {
+          await supabase.from('equipment_daily_status').upsert({
+            equipment_id: eqId, project_id: selectedProject,
+            status_date: form.report_date, status: eq.status,
+            hours_worked: parseFloat(eq.hours_worked) || 0,
+            notes: eq.notes || null, reported_by: profile.id,
+          }, { onConflict: 'equipment_id,status_date' });
+        }
       }
 
-      // 4. Structures
+      // 4. Structures — auto-register items from reference list
       for (const s of structEntries) {
         if ((!s.structure_id && !s.structure_name) || !s.stage) continue;
-        await supabase.from('structure_progress').insert({
-          structure_id: s.structure_id || null, project_id: selectedProject,
-          stage: s.stage, status: s.status, work_date: form.report_date,
-          concrete_volume_m3: s.concrete_volume_m3 ? parseFloat(s.concrete_volume_m3) : null,
-          rebar_kg: s.rebar_kg ? parseFloat(s.rebar_kg) : null,
-          notes: s.structure_name ? `[${s.structure_name}] ${s.notes || ''}`.trim() : s.notes,
-          reported_by: profile.id,
-        });
+        let strId = s.structure_id;
+        // If picked from reference list (no project structure_id), auto-register it
+        if (!strId && s.structure_name) {
+          const strRef = s.structure_name.substring(0, 20).replace(/[^a-zA-Z0-9-]/g, '');
+          const { data: newStr } = await supabase.from('structures').insert({
+            project_id: selectedProject, structure_ref: strRef,
+            structure_type: s.structure_name, chainage: null, status: s.status || 'In Progress',
+          }).select('id').single();
+          if (newStr) strId = newStr.id;
+        }
+        if (strId) {
+          await supabase.from('structure_progress').insert({
+            structure_id: strId, project_id: selectedProject,
+            stage: s.stage, status: s.status, work_date: form.report_date,
+            concrete_volume_m3: s.concrete_volume_m3 ? parseFloat(s.concrete_volume_m3) : null,
+            rebar_kg: s.rebar_kg ? parseFloat(s.rebar_kg) : null,
+            notes: s.notes || null, reported_by: profile.id,
+          });
+        }
       }
 
       // 5. Quality Tests
