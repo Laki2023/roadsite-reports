@@ -68,6 +68,10 @@ function StatusBadge({ status }) {
 
 export default function ProjectDashboard({ projectId, onBack, profile, navigateTo }) {
   const [d, setD] = useState(null);
+  const [showObModal, setShowObModal] = useState(false);
+  const [obForm, setObForm] = useState({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
+  const [obEditId, setObEditId] = useState(null);
+  const [obSaving, setObSaving] = useState(false);
   const isPlatformAdmin = profile.is_platform_admin === true;
 
   useEffect(() => { load(); }, [projectId]);
@@ -95,6 +99,44 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
       instructions:instructions.data||[], obligations:obligations.data||[] });
   }
+
+  // ── Statutory Obligations helpers ──
+  const OB_TYPES = [
+    'Performance Guarantee', 'Advance Payment Guarantee', 'Retention Guarantee',
+    "Contractor's All Risk Insurance", 'Third Party Liability Insurance',
+    "Workers' Compensation Insurance", 'Professional Indemnity Insurance',
+    'Motor Vehicle Insurance', 'NEMA Licence', 'NCA Registration',
+    'OSHA Registration', 'Tax Compliance Certificate', 'Other',
+  ];
+  const saveOb = async () => {
+    setObSaving(true);
+    try {
+      const payload = {
+        project_id: projectId, obligation_type: obForm.obligation_type,
+        provider: obForm.provider || null, amount: obForm.amount ? parseFloat(obForm.amount) : null,
+        reference_no: obForm.reference_no || null, expiry_date: obForm.expiry_date || null,
+        notes: obForm.notes || null, display_order: (d?.obligations?.length || 0) + 1,
+      };
+      if (obEditId) {
+        await supabase.from('project_obligations').update(payload).eq('id', obEditId);
+      } else {
+        await supabase.from('project_obligations').insert(payload);
+      }
+      setShowObModal(false); setObEditId(null);
+      setObForm({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
+      load();
+    } catch (err) { showToast(err.message, 'error'); }
+    finally { setObSaving(false); }
+  };
+  const deleteOb = async (id) => {
+    if (!window.confirm('Delete this obligation?')) return;
+    await supabase.from('project_obligations').delete().eq('id', id);
+    load();
+  };
+  const editOb = (ob) => {
+    setObForm({ obligation_type: ob.obligation_type, provider: ob.provider || '', amount: ob.amount || '', reference_no: ob.reference_no || '', expiry_date: ob.expiry_date || '', notes: ob.notes || '' });
+    setObEditId(ob.id); setShowObModal(true);
+  };
 
   if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>Loading project dashboard...</div>;
 
@@ -516,51 +558,6 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           if (days <= 90) return <span className="badge badge-warning">⚠ {days}d left</span>;
           return <span className="badge badge-success">✅ Valid</span>;
         };
-        const [showObModal, setShowObModal] = React.useState(false);
-        const [obForm, setObForm] = React.useState({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
-        const [obEditId, setObEditId] = React.useState(null);
-        const [obSaving, setObSaving] = React.useState(false);
-
-        const OB_TYPES = [
-          'Performance Guarantee', 'Advance Payment Guarantee', 'Retention Guarantee',
-          "Contractor's All Risk Insurance", 'Third Party Liability Insurance',
-          "Workers' Compensation Insurance", 'Professional Indemnity Insurance',
-          'Motor Vehicle Insurance', 'NEMA Licence', 'NCA Registration',
-          'OSHA Registration', 'Tax Compliance Certificate', 'Other',
-        ];
-
-        const saveOb = async () => {
-          setObSaving(true);
-          try {
-            const payload = {
-              project_id: projectId, obligation_type: obForm.obligation_type,
-              provider: obForm.provider || null, amount: obForm.amount ? parseFloat(obForm.amount) : null,
-              reference_no: obForm.reference_no || null, expiry_date: obForm.expiry_date || null,
-              notes: obForm.notes || null, display_order: obs.length + 1,
-            };
-            if (obEditId) {
-              await supabase.from('project_obligations').update(payload).eq('id', obEditId);
-            } else {
-              await supabase.from('project_obligations').insert(payload);
-            }
-            setShowObModal(false); setObEditId(null);
-            setObForm({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
-            load();
-          } catch (err) { showToast(err.message, 'error'); }
-          finally { setObSaving(false); }
-        };
-
-        const deleteOb = async (id) => {
-          if (!window.confirm('Delete this obligation?')) return;
-          await supabase.from('project_obligations').delete().eq('id', id);
-          load();
-        };
-
-        const editOb = (ob) => {
-          setObForm({ obligation_type: ob.obligation_type, provider: ob.provider || '', amount: ob.amount || '', reference_no: ob.reference_no || '', expiry_date: ob.expiry_date || '', notes: ob.notes || '' });
-          setObEditId(ob.id); setShowObModal(true);
-        };
-
         const expiredCount = obs.filter(o => daysUntil(o.expiry_date) !== null && daysUntil(o.expiry_date) < 0).length;
         const warningCount = obs.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d >= 0 && d <= 90; }).length;
 
