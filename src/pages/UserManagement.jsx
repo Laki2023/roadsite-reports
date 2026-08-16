@@ -125,6 +125,9 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
         <button className={tab === 'assignments' ? 'active' : ''} onClick={() => setTab('assignments')}>
           Project Assignments
         </button>
+        <button className={tab === 'templates' ? 'active' : ''} onClick={() => setTab('templates')}>
+          Position Templates
+        </button>
         <button className={tab === 'audit' ? 'active' : ''} onClick={() => setTab('audit')}>
           Audit Log
         </button>
@@ -259,6 +262,9 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
       {/* ── PROJECT ASSIGNMENTS TAB ── */}
       {tab === 'assignments' && <ProjectAssignmentsView users={activeUsers} projects={projects} profile={profile} showToast={showToast} onRefresh={loadAll} />}
 
+      {/* ── POSITION TEMPLATES TAB ── */}
+      {tab === 'templates' && <PositionTemplatesView profile={profile} roles={myRoles} showToast={showToast} />}
+
       {/* ── AUDIT LOG TAB ── */}
       {tab === 'audit' && (
         auditLogs.length === 0 ? (
@@ -386,6 +392,30 @@ function InviteModal({ projects, profile, roles, onClose, onSuccess, showToast }
   );
 }
 
+// ── Page Modules (same as AdminPanel) ──
+const PAGE_MODULES = [
+  { key: 'submit-report', label: 'Submit Report', icon: '📝' },
+  { key: 'reports', label: 'Daily Reports', icon: '📄' },
+  { key: 'works', label: 'Works Activities', icon: '⛏️' },
+  { key: 'issues', label: 'Site Issues', icon: '⚠️' },
+  { key: 'emergency', label: 'Emergency', icon: '🚨' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '🛣️' },
+  { key: 'quality', label: 'Quality Tests', icon: '🧪' },
+  { key: 'equipment', label: 'Equipment', icon: '🚜' },
+  { key: 'structures', label: 'Structures', icon: '🌉' },
+  { key: 'programme', label: 'Programme', icon: '📅' },
+  { key: 'boq', label: 'Bill of Quantities', icon: '📋' },
+  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐' },
+  { key: 'ipc', label: 'Payment Certificates', icon: '💰' },
+  { key: 'approvals', label: 'Approvals', icon: '✅' },
+  { key: 'monthly-report', label: 'Monthly Report', icon: '📋' },
+  { key: 'claims', label: 'Claims Management', icon: '⚖️' },
+  { key: 'key-personnel', label: 'Key Personnel', icon: '👥' },
+  { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐' },
+  { key: 'staff', label: 'Staff & Teams', icon: '👥' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡️' },
+];
+
 // ── Edit User Modal ──
 function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) {
   const [role, setRole] = useState(user.role || 'viewer');
@@ -393,15 +423,39 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
   const [designation, setDesignation] = useState(user.designation || '');
   const [organisation, setOrganisation] = useState(user.organisation || '');
   const [phone, setPhone] = useState(user.phone || '');
+  const [allowedPages, setAllowedPages] = useState(user.allowed_pages || []);
   const [supervisors, setSupervisors] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [showModules, setShowModules] = useState(false);
 
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, role')
-      .in('role', ['super_admin', 'engineer', 'resident_engineer'])
+      .in('role', ['super_admin', 'engineer', 'project_engineer', 'resident_engineer'])
       .eq('is_active', true).neq('id', user.id).order('full_name')
       .then(({ data }) => setSupervisors(data || []));
-  }, [user.id]);
+    // Load position templates
+    supabase.from('position_templates').select('*')
+      .eq('org_id', profile.organisation_id || profile.org_id || '')
+      .order('display_name')
+      .then(({ data }) => setTemplates(data || []))
+      .catch(() => setTemplates([]));
+  }, [user.id, profile.organisation_id, profile.org_id]);
+
+  function applyTemplate(templateId) {
+    const t = templates.find(tp => tp.id === templateId);
+    if (!t) return;
+    setRole(t.system_role);
+    setDesignation(t.display_name);
+    setAllowedPages(t.allowed_pages || []);
+    showToast(`Template "${t.display_name}" applied`);
+  }
+
+  function togglePage(key) {
+    setAllowedPages(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -412,6 +466,7 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
       designation: designation.trim() || null,
       organisation: organisation.trim() || null,
       phone: phone.trim() || null,
+      allowed_pages: allowedPages,
     }).eq('id', user.id);
     if (error) { showToast(error.message, 'error'); setSubmitting(false); return; }
     if (oldRole !== role) {
@@ -425,15 +480,35 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }}>
         <h3>Edit User — {user.full_name}<button onClick={onClose}>×</button></h3>
-        <div style={{ background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
-          Current role: <span className="badge badge-accent">{ROLE_LABELS[user.role]}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, flexWrap: 'wrap' }}>
+          <span>Current role: <span className="badge badge-accent">{ROLE_LABELS[user.role]}</span></span>
+          {user.designation && <span>· {user.designation}</span>}
+          {user.party && <span>· {user.party}</span>}
         </div>
+
+        {/* Position Template Selector */}
+        {templates.length > 0 && (
+          <div style={{ background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)', border: '1px solid #93c5fd', borderRadius: 'var(--radius)', padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 6 }}>QUICK ASSIGN — POSITION TEMPLATE</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {templates.map(t => (
+                <button key={t.id} type="button" className="btn btn-sm btn-secondary"
+                  onClick={() => applyTemplate(t.id)}
+                  style={{ fontSize: 12 }}>
+                  {t.display_name}
+                  <span style={{ opacity: 0.5, marginLeft: 4 }}>({ROLE_LABELS[t.system_role]})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>New Role</label>
+              <label>System Role</label>
               <select value={role} onChange={e => setRole(e.target.value)}>
                 {(roles.includes(user.role) ? roles : [user.role, ...roles]).map(r => (
                   <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -452,9 +527,9 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>Designation</label>
+              <label>Designation / Title</label>
               <input type="text" value={designation} onChange={e => setDesignation(e.target.value)}
-                placeholder="e.g. Site Inspector" />
+                placeholder="e.g. HQ Quantity Surveyor" />
             </div>
             <div className="form-group mb-16">
               <label>Organisation</label>
@@ -467,6 +542,47 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
               placeholder="+254 7XX XXX XXX" />
           </div>
+
+          {/* Module Access Checkboxes */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: 16 }}>
+            <button type="button" onClick={() => setShowModules(!showModules)}
+              style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              <span>Module Access ({allowedPages.length}/{PAGE_MODULES.length})</span>
+              <span style={{ fontSize: 16 }}>{showModules ? '▲' : '▼'}</span>
+            </button>
+            {showModules && (
+              <div style={{ padding: '0 14px 14px' }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button type="button" className="btn btn-sm btn-secondary"
+                    onClick={() => setAllowedPages(PAGE_MODULES.map(m => m.key))}
+                    style={{ fontSize: 11 }}>Select All</button>
+                  <button type="button" className="btn btn-sm btn-secondary"
+                    onClick={() => setAllowedPages([])}
+                    style={{ fontSize: 11 }}>Clear All</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {PAGE_MODULES.map(m => {
+                    const checked = allowedPages.includes(m.key);
+                    return (
+                      <label key={m.key} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
+                        borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                        background: checked ? 'var(--bg-accent)' : 'transparent',
+                        border: `1px solid ${checked ? 'var(--border-accent)' : 'transparent'}`,
+                        transition: 'all 0.15s',
+                      }}>
+                        <input type="checkbox" checked={checked} onChange={() => togglePage(m.key)} />
+                        <span>{m.icon}</span>
+                        <span style={{ fontWeight: checked ? 600 : 400 }}>{m.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="btn-group">
             <button className="btn btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Saving...' : 'Save Changes'}
@@ -559,6 +675,211 @@ function AssignProjectsModal({ user, projects, profile, roles, onClose, onSucces
           </button>
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Position Templates View ──
+function PositionTemplatesView({ profile, roles, showToast }) {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const loadTemplates = useCallback(async () => {
+    const { data } = await supabase.from('position_templates')
+      .select('*').order('display_name');
+    setTemplates(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  async function handleDelete(id, name) {
+    if (!window.confirm(`Delete template "${name}"? Users already assigned won't be affected.`)) return;
+    const { error } = await supabase.from('position_templates').delete().eq('id', id);
+    if (error) { showToast(error.message, 'error'); return; }
+    showToast(`Template "${name}" deleted`);
+    loadTemplates();
+  }
+
+  if (loading) return <div className="card" style={{ padding: 24, textAlign: 'center' }}>Loading templates...</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <div className="text-sm text-muted">
+            Create reusable position presets. When assigning a user, pick a template to auto-fill role + module access.
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setEditingTemplate(null); setShowForm(true); }}>
+          + New Template
+        </button>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="card empty-state">
+          <div className="icon">📋</div>
+          <p>No position templates yet. Create templates like "HQ Quantity Surveyor", "Environmental Officer", or "Assistant RE" to speed up user assignments.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+          {templates.map(t => {
+            const rc = ROLE_COLORS[t.system_role] || ROLE_COLORS.viewer;
+            const pages = t.allowed_pages || [];
+            return (
+              <div key={t.id} className="card" style={{ padding: 16, borderLeft: `3px solid ${rc.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{t.display_name}</div>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 9999,
+                      fontSize: 10, fontWeight: 600, background: rc.bg, color: rc.text, border: `1px solid ${rc.border}`,
+                      marginTop: 4
+                    }}>{ROLE_LABELS[t.system_role]}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-sm btn-secondary" onClick={() => { setEditingTemplate(t); setShowForm(true); }}>Edit</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(t.id, t.display_name)}>×</button>
+                  </div>
+                </div>
+                {t.description && <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{t.description}</div>}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {pages.map(p => {
+                    const mod = PAGE_MODULES.find(m => m.key === p);
+                    return mod ? (
+                      <span key={p} style={{
+                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                        background: 'var(--bg-accent)', color: 'var(--text-accent)', fontWeight: 500,
+                      }}>{mod.icon} {mod.label}</span>
+                    ) : null;
+                  })}
+                  {pages.length === 0 && <span className="text-sm text-muted">No modules assigned</span>}
+                </div>
+                <div className="text-sm text-muted" style={{ marginTop: 8, fontSize: 11 }}>
+                  Created by {t.created_by_name || 'Admin'} · {t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showForm && (
+        <TemplateFormModal
+          template={editingTemplate} profile={profile} roles={roles}
+          onClose={() => { setShowForm(false); setEditingTemplate(null); }}
+          onSuccess={() => { setShowForm(false); setEditingTemplate(null); showToast(editingTemplate ? 'Template updated' : 'Template created'); loadTemplates(); }}
+          showToast={showToast} />
+      )}
+    </div>
+  );
+}
+
+// ── Template Form Modal (Create / Edit) ──
+function TemplateFormModal({ template, profile, roles, onClose, onSuccess, showToast }) {
+  const [displayName, setDisplayName] = useState(template?.display_name || '');
+  const [description, setDescription] = useState(template?.description || '');
+  const [systemRole, setSystemRole] = useState(template?.system_role || 'project_officer');
+  const [allowedPages, setAllowedPages] = useState(template?.allowed_pages || []);
+  const [submitting, setSubmitting] = useState(false);
+
+  function togglePage(key) {
+    setAllowedPages(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!displayName.trim()) { showToast('Enter a position name', 'error'); return; }
+    setSubmitting(true);
+
+    const payload = {
+      display_name: displayName.trim(),
+      description: description.trim() || null,
+      system_role: systemRole,
+      allowed_pages: allowedPages,
+      org_id: profile.organisation_id || profile.org_id || null,
+      created_by: profile.id,
+      created_by_name: profile.full_name,
+    };
+
+    let error;
+    if (template) {
+      ({ error } = await supabase.from('position_templates').update(payload).eq('id', template.id));
+    } else {
+      ({ error } = await supabase.from('position_templates').insert(payload));
+    }
+    if (error) { showToast(error.message, 'error'); setSubmitting(false); return; }
+    onSuccess();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3>{template ? 'Edit' : 'New'} Position Template<button onClick={onClose}>×</button></h3>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group mb-16">
+            <label>Position Name *</label>
+            <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)}
+              placeholder="e.g. HQ Quantity Surveyor, Environmental Officer, Assistant RE" required />
+          </div>
+          <div className="form-group mb-16">
+            <label>Description</label>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="Brief description of this position's responsibilities" />
+          </div>
+          <div className="form-group mb-16">
+            <label>System Role (permission ceiling)</label>
+            <select value={systemRole} onChange={e => setSystemRole(e.target.value)}>
+              {roles.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+            <span className="text-sm text-muted" style={{ marginTop: 4, display: 'block' }}>
+              This sets the maximum permission level. Module checkboxes below control what they actually see.
+            </span>
+          </div>
+
+          {/* Module Checkboxes */}
+          <div className="form-group mb-16">
+            <label>Module Access</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button type="button" className="btn btn-sm btn-secondary"
+                onClick={() => setAllowedPages(PAGE_MODULES.map(m => m.key))}
+                style={{ fontSize: 11 }}>Select All</button>
+              <button type="button" className="btn btn-sm btn-secondary"
+                onClick={() => setAllowedPages([])}
+                style={{ fontSize: 11 }}>Clear All</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 10 }}>
+              {PAGE_MODULES.map(m => {
+                const checked = allowedPages.includes(m.key);
+                return (
+                  <label key={m.key} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
+                    borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                    background: checked ? 'var(--bg-accent)' : 'transparent',
+                    border: `1px solid ${checked ? 'var(--border-accent)' : 'transparent'}`,
+                    transition: 'all 0.15s',
+                  }}>
+                    <input type="checkbox" checked={checked} onChange={() => togglePage(m.key)} />
+                    <span>{m.icon}</span>
+                    <span style={{ fontWeight: checked ? 600 : 400 }}>{m.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="btn-group">
+            <button className="btn btn-primary" type="submit" disabled={submitting}>
+              {submitting ? 'Saving...' : template ? 'Update Template' : 'Create Template'}
+            </button>
+            <button className="btn btn-secondary" type="button" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   );

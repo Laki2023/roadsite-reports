@@ -9,10 +9,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
    director_general > super_admin > engineer > project_engineer > resident_engineer > inspector > viewer > pending
    Each level can do everything below it. */
 const ROLE_LEVELS = {
-  director_general: 7,
-  super_admin: 6,
-  engineer: 5,
-  project_engineer: 4,
+  director_general: 8,
+  super_admin: 7,
+  engineer: 6,
+  project_engineer: 5,
+  project_officer: 4,
   resident_engineer: 3,
   inspector: 2,
   contractor_qs: 1.5,
@@ -32,13 +33,14 @@ export function assignableRoles(userRole) {
   return ALL_ROLES.filter(r => ROLE_LEVELS[r] < level && r !== 'pending');
 }
 
-export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'resident_engineer', 'inspector', 'contractor_qs', 'viewer', 'pending'];
+export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'project_officer', 'resident_engineer', 'inspector', 'contractor_qs', 'viewer', 'pending'];
 
 export const ROLE_LABELS = {
   director_general: 'Director General',
   super_admin: 'Super Admin',
   engineer: 'Engineer',
   project_engineer: 'Project Engineer',
+  project_officer: 'Project Officer',
   resident_engineer: 'Resident Engineer',
   inspector: 'Inspector',
   contractor_qs: "Contractor Staff",
@@ -51,6 +53,7 @@ export const ROLE_COLORS = {
   super_admin: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
   engineer:    { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
   project_engineer: { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
+  project_officer: { bg: '#e0f2fe', text: '#075985', border: '#0ea5e9' },
   resident_engineer: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
   inspector:   { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' },
   contractor_qs: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
@@ -80,6 +83,13 @@ export const APPROVAL_AUTHORITY = {
     canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer', 'minor_works_change'],
     canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction'],
     canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice'],
+    escalateTo: 'project_engineer',
+  },
+  project_officer: {
+    label: 'Project Officer',
+    canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction'],
+    canIssue: ['site_instruction', 'noncompliance_notice'],
     escalateTo: 'project_engineer',
   },
   project_engineer: {

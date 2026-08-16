@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS, hasRole, assignableRoles } from '../lib/supabase';
 
-const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
+const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_officer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
 
 const PAGE_MODULES = [
   { key: 'submit-report', label: 'Submit Report', icon: '📝' },
