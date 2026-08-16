@@ -532,18 +532,25 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
       if (repErr) throw repErr;
 
-      // 2. Works Progress
+      // 2. Works Progress — linked to project activity register where possible
       for (const w of worksEntries) {
         if (!w.layer_name) continue;
-        const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
-        const isLinear = layerDef ? layerDef.unit === 'Km' : false;
+        // Resolve activity link: explicit selection, or auto-match by name
+        let actId = w.activity_id || null;
+        if (!actId) {
+          const match = activities.find(a => a.activity_name.toLowerCase() === w.layer_name.toLowerCase());
+          if (match) actId = match.id;
+        }
+        const linkedAct = actId ? activities.find(a => a.id === actId) : null;
+        const unit = linkedAct?.unit || (WORK_LAYERS.find(l => l.name === w.layer_name)?.unit) || 'Km';
+        const isLinear = unit === 'Km' || unit === 'km';
         const chFrom = parseChainage(w.start_chainage);
         const chTo = parseChainage(w.end_chainage);
         const autoQty = isLinear && chFrom != null && chTo != null
           ? Math.abs(chTo - chFrom)
           : parseFloat(w.quantity) || 0;
         const { error: wpErr } = await supabase.from('works_progress').insert({
-          project_id: selectedProject, activity_id: w.activity_id || null,
+          project_id: selectedProject, activity_id: actId,
           work_date: form.report_date, start_chainage: chFrom || 0,
           end_chainage: chTo || 0, side: w.side || 'Both',
           quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : ''),
@@ -842,40 +849,89 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
       {step === 4 && (
         <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
+          {activities.length > 0 && (
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+              📌 This project has {activities.length} registered activities — pick from "Project Activities" to link your entry directly to the activity register, BoQ and IPC. No re-entry needed.
+            </p>
+          )}
           {worksEntries.map((w, i) => {
-            const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
-            const isLinear = layerDef ? layerDef.unit === 'Km' : false;
+            // Linked project activity (if selected from register)
+            const linkedAct = w.activity_id ? activities.find(a => a.id === w.activity_id) : null;
+            const unit = linkedAct?.unit || (WORK_LAYERS.find(l => l.name === w.layer_name)?.unit) || 'Km';
+            const isLinear = unit === 'Km' || unit === 'km';
             const chFrom = parseChainage(w.start_chainage);
             const chTo = parseChainage(w.end_chainage);
             const autoKm = isLinear && chFrom != null && chTo != null
               ? Math.abs(chTo - chFrom).toFixed(3) : null;
+            const remaining = linkedAct && linkedAct.planned_quantity > 0
+              ? Math.max(0, linkedAct.planned_quantity - (linkedAct.completed_quantity || 0)) : null;
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
                 <div style={{ marginBottom: 8 }}>
                   <SearchableDropdown
-                    items={WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Earthworks', pavement: 'Pavement Layers', surfacing: 'Surfacing', drainage: 'Drainage & Structures', furniture: 'Road Furniture', other: 'Other' })[l.group] || l.group }))}
+                    items={[
+                      // Project's registered activities FIRST — linking these avoids double entry
+                      ...activities.map(a => ({
+                        name: `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}`,
+                        category: `Project Activities — ${a.category || 'General'}`,
+                      })),
+                      // Reference layers as fallback for unregistered work
+                      ...WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement Layers', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage & Structures', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })),
+                    ]}
                     value={w.layer_name}
-                    onChange={val => { const def = WORK_LAYERS.find(l => l.name === val); updateEntry(setWorksEntries, worksEntries, i, 'layer_name', val); if (def) updateEntry(setWorksEntries, worksEntries, i, 'unit', def.unit); }}
-                    placeholder="Search activity / layer..."
+                    onChange={val => {
+                      // Try to match a project activity (by "CODE — Name" or plain name)
+                      const projAct = activities.find(a =>
+                        `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}` === val ||
+                        a.activity_name === val ||
+                        a.activity_name.toLowerCase() === val.toLowerCase()
+                      );
+                      const copy = [...worksEntries];
+                      if (projAct) {
+                        copy[i] = { ...copy[i], activity_id: projAct.id, layer_name: projAct.activity_name, unit: projAct.unit || 'Km' };
+                      } else {
+                        const def = WORK_LAYERS.find(l => l.name === val);
+                        copy[i] = { ...copy[i], activity_id: '', layer_name: val, unit: def?.unit || 'Km' };
+                      }
+                      setWorksEntries(copy);
+                    }}
+                    placeholder={activities.length > 0 ? `Search ${activities.length} project activities...` : 'Search activity / layer...'}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
-                  <input type="text" placeholder="Start Chainage" value={w.start_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
-                  <input type="text" placeholder="End Chainage" value={w.end_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                {/* Live activity context — planned vs done */}
+                {linkedAct && (
+                  <div style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 10, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>🔗 Linked to register</span>
+                    <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
+                    <span>Done: <b>{(linkedAct.completed_quantity || 0).toFixed ? Number(linkedAct.completed_quantity || 0).toFixed(2) : linkedAct.completed_quantity} {unit}</b></span>
+                    {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: isLinear ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
+                  <input type="text" placeholder="Start Ch. e.g. 5+200" value={w.start_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'start_chainage', e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="text" placeholder="End Ch. e.g. 7+850" value={w.end_chainage} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'end_chainage', e.target.value)} style={{ fontSize: 12 }} />
                   <select value={w.side} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'side', e.target.value)} style={{ fontSize: 12 }}>
                     {['Both', 'LHS', 'RHS', 'Centre'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  {!isLinear && (
+                    <input type="number" step="0.01" placeholder={`Qty (${unit})`} value={w.quantity || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'quantity', e.target.value)} style={{ fontSize: 12 }} />
+                  )}
                 </div>
                 <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
                 {isLinear && autoKm && (
                   <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
-                    ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides
+                    ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides{linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
+                  </div>
+                )}
+                {!isLinear && w.quantity > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
+                    ✅ {w.quantity} {unit} of {w.layer_name}{linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
                   </div>
                 )}
               </EntryRow>
             );
           })}
-          <AddButton label="＋ Add Layer Progress" onClick={addWork} />
+          <AddButton label="＋ Add Works Progress" onClick={addWork} />
           <PhotoUploader projectId={selectedProject} category="works_progress" photos={worksPhotos} setPhotos={setWorksPhotos} maxPhotos={10} label="Works Photos" />
         </SectionCard>
       )}
