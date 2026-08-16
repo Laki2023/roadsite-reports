@@ -786,7 +786,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           project_id: selectedProject, title: iss.title,
           category: iss.category, severity: iss.severity,
           description: iss.description || null, action_required: iss.action_required || null,
-          status: 'Open', reported_by: profile.id, reported_date: form.report_date,
+          status: 'Open', raised_by: profile.id, date_raised: form.report_date,
         });
         if (issErr) warnings.push(`Issue "${iss.title}": ${issErr.message}`);
       }
