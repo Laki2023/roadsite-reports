@@ -47,7 +47,8 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
         longitude: form.longitude ? parseFloat(form.longitude) : null,
       };
       if (editId) {
-        await supabase.from('projects').update(payload).eq('id', editId);
+        const { error } = await supabase.from('projects').update(payload).eq('id', editId);
+        if (error) throw error;
         showToast('Project updated');
       } else {
         const { data, error } = await supabase.from('projects').insert(payload).select().single();
@@ -183,7 +184,7 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     <div>{p.county || '—'}</div>
                     {(p.sub_county || p.constituency) && (
                       <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                        {[p.sub_county, p.constituency].filter(Boolean).join(' · ')}
+                        {[p.sub_county, p.constituency].filter(Boolean).join(' | ')}
                       </div>
                     )}
                   </td>
@@ -279,19 +280,19 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     placeholder="e.g. Central" />
                 </div>
                 <div className="form-group">
-                  <label>County</label>
+                  <label>County(ies)</label>
                   <input value={form.county} onChange={e => setForm({ ...form, county: e.target.value })}
-                    placeholder="e.g. Murang'a" />
+                    placeholder="e.g. Murang'a, Nyeri" />
                 </div>
                 <div className="form-group">
-                  <label>Sub-County</label>
+                  <label>Sub-County(ies)</label>
                   <input value={form.sub_county || ''} onChange={e => setForm({ ...form, sub_county: e.target.value })}
-                    placeholder="e.g. Mathioya" />
+                    placeholder="e.g. Mathioya, Kigumo" />
                 </div>
                 <div className="form-group">
-                  <label>Constituency</label>
+                  <label>Constituency(ies)</label>
                   <input value={form.constituency || ''} onChange={e => setForm({ ...form, constituency: e.target.value })}
-                    placeholder="e.g. Mathioya" />
+                    placeholder="e.g. Mathioya, Kigumo" />
                 </div>
                 <div className="form-group">
                   <label>Phase</label>
