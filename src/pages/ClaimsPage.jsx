@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, hasRole, ROLE_LEVELS } from '../lib/supabase';
 import { detectClaimTriggers, createClaimFromTrigger, sendClaimNotifications } from '../lib/claimsEngine';
+import CITAssessment from '../components/CITAssessment';
 
 const TYPE_LABELS = { eot: '⏱️ EOT', cost: '💰 Cost', eot_and_cost: '⏱️💰 EOT & Cost', interest: '🏦 Interest', variation: '🔄 Variation', force_majeure: '🌪️ Force Majeure' };
 const STATUS_COLORS = {
@@ -25,6 +26,11 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
     return d.toISOString().slice(0, 7);
   });
   const [showClaimDetail, setShowClaimDetail] = useState(null);
+  const [detailTab, setDetailTab] = useState('overview');
+
+  // Access control
+  const isPlatformAdmin = profile?.is_platform_admin === true;
+  const canSeeCIT = isPlatformAdmin || (ROLE_LEVELS[profile?.role] || 0) >= (ROLE_LEVELS['project_officer'] || 0);
 
   useEffect(() => { loadProjects(); loadClauses(); loadNotifications(); }, []);
   useEffect(() => { if (selectedProject) loadClaims(); }, [selectedProject]);
@@ -393,10 +399,10 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
       {/* CLAIM DETAIL MODAL */}
       {showClaimDetail && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={() => setShowClaimDetail(null)}>
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 24, width: '100%', maxWidth: 600, maxHeight: '85vh', overflowY: 'auto' }}
+          onClick={() => { setShowClaimDetail(null); setDetailTab('overview'); }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 24, width: '100%', maxWidth: 750, maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{showClaimDetail.claim_number}</div>
                 <h3 style={{ fontSize: 16, fontWeight: 800, margin: '4px 0' }}>{showClaimDetail.title}</h3>
@@ -404,44 +410,82 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
                   <span style={{ fontFamily: 'monospace', background: 'var(--bg-hover)', padding: '1px 6px', borderRadius: 3 }}>{showClaimDetail.fidic_clause}</span>
                   <span style={{ background: STATUS_COLORS[showClaimDetail.status], color: '#fff', padding: '1px 6px', borderRadius: 3, fontWeight: 700 }}>{showClaimDetail.status?.replace(/_/g, ' ')}</span>
                   <span style={{ background: PRIORITY_COLORS[showClaimDetail.priority], color: '#fff', padding: '1px 6px', borderRadius: 3, fontWeight: 700 }}>{showClaimDetail.priority}</span>
+                  {showClaimDetail.cit_status && showClaimDetail.cit_status !== 'pending' && (
+                    <span style={{ background: '#8b5cf6', color: '#fff', padding: '1px 6px', borderRadius: 3, fontWeight: 700 }}>CIT: {showClaimDetail.cit_status.replace(/_/g, ' ')}</span>
+                  )}
                 </div>
               </div>
-              <button onClick={() => setShowClaimDetail(null)} style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => { setShowClaimDetail(null); setDetailTab('overview'); }} style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-              <div style={{ background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>EOT Claimed</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#6366f1' }}>{showClaimDetail.eot_days_claimed || 0} days</div>
-              </div>
-              <div style={{ background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Cost Claimed</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>KES {Number(showClaimDetail.cost_claimed || 0).toLocaleString()}</div>
-              </div>
+            {/* Detail tabs */}
+            <div style={{ display: 'flex', gap: 2, marginBottom: 14, borderBottom: '2px solid var(--border)' }}>
+              <button onClick={() => setDetailTab('overview')} style={{
+                padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'transparent', border: 'none',
+                borderBottom: detailTab === 'overview' ? '3px solid var(--accent)' : '3px solid transparent',
+                color: detailTab === 'overview' ? 'var(--accent)' : 'var(--text-muted)',
+              }}>Overview</button>
+              {canSeeCIT && (
+                <button onClick={() => setDetailTab('cit')} style={{
+                  padding: '7px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'transparent', border: 'none',
+                  borderBottom: detailTab === 'cit' ? '3px solid #8b5cf6' : '3px solid transparent',
+                  color: detailTab === 'cit' ? '#8b5cf6' : 'var(--text-muted)',
+                }}>📋 CIT Assessment</button>
+              )}
             </div>
 
-            <div style={{ fontSize: 12, marginBottom: 12 }}>
-              <strong>Description:</strong>
-              <div style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>{showClaimDetail.description || '—'}</div>
-            </div>
+            {/* OVERVIEW TAB */}
+            {detailTab === 'overview' && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                  <div style={{ background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>EOT Claimed</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#6366f1' }}>{showClaimDetail.eot_days_claimed || 0} days</div>
+                    {showClaimDetail.eot_days_awarded > 0 && <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>Awarded: {showClaimDetail.eot_days_awarded} days</div>}
+                  </div>
+                  <div style={{ background: 'var(--bg-hover)', padding: 10, borderRadius: 'var(--radius)' }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Cost Claimed</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>KES {Number(showClaimDetail.cost_claimed || 0).toLocaleString()}</div>
+                    {showClaimDetail.cost_awarded > 0 && <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>Awarded: KES {Number(showClaimDetail.cost_awarded).toLocaleString()}</div>}
+                  </div>
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, marginBottom: 12 }}>
-              <div><strong>Event Start:</strong> {showClaimDetail.event_start_date || '—'}</div>
-              <div><strong>Event End:</strong> {showClaimDetail.event_end_date || '—'}</div>
-              <div><strong>Notice Date:</strong> {showClaimDetail.notice_date || <span style={{ color: '#f59e0b' }}>Not yet issued</span>}</div>
-              <div><strong>Notice Deadline:</strong> {showClaimDetail.notice_deadline || '—'}</div>
-            </div>
+                <div style={{ fontSize: 12, marginBottom: 12 }}>
+                  <strong>Description:</strong>
+                  <div style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}>{showClaimDetail.description || '—'}</div>
+                </div>
 
-            {showClaimDetail.is_time_barred && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: 10, borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
-                ⚠️ TIME-BARRED: 28-day notice was not issued within the required period under Cl. 20.1
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11, marginBottom: 12 }}>
+                  <div><strong>Event Start:</strong> {showClaimDetail.event_start_date || '—'}</div>
+                  <div><strong>Event End:</strong> {showClaimDetail.event_end_date || '—'}</div>
+                  <div><strong>Notice Date:</strong> {showClaimDetail.notice_date || <span style={{ color: '#f59e0b' }}>Not yet issued</span>}</div>
+                  <div><strong>Notice Deadline:</strong> {showClaimDetail.notice_deadline || '—'}</div>
+                  {showClaimDetail.determination_date && <div><strong>Determination Date:</strong> {showClaimDetail.determination_date}</div>}
+                </div>
+
+                {showClaimDetail.is_time_barred && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: 10, borderRadius: 'var(--radius)', marginBottom: 12, fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
+                    ⚠️ TIME-BARRED: 28-day notice was not issued within the required period under Cl. 20.1
+                  </div>
+                )}
+
+                {showClaimDetail.auto_detected && (
+                  <div style={{ background: 'var(--bg-hover)', padding: 8, borderRadius: 'var(--radius)', fontSize: 10, color: 'var(--text-muted)' }}>
+                    🤖 Auto-detected by rule: {showClaimDetail.detection_rule}
+                  </div>
+                )}
+              </>
             )}
 
-            {showClaimDetail.auto_detected && (
-              <div style={{ background: 'var(--bg-hover)', padding: 8, borderRadius: 'var(--radius)', fontSize: 10, color: 'var(--text-muted)' }}>
-                🤖 Auto-detected by rule: {showClaimDetail.detection_rule}
-              </div>
+            {/* CIT ASSESSMENT TAB */}
+            {detailTab === 'cit' && canSeeCIT && (
+              <CITAssessment
+                claim={showClaimDetail}
+                projectId={selectedProject}
+                profile={profile}
+                showToast={showToast}
+                onUpdate={() => { loadClaims(); loadNotifications(); }}
+              />
             )}
           </div>
         </div>
