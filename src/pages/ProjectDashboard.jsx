@@ -487,6 +487,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 ['Addendums', p.addendums || 'None'],
                 ['Time Elapsed', `${elapsedMonths} months (${timePct}%)`],
                 ['Road Length', roadLen > 0 ? `${roadLen} Km (Ch. ${p.start_chainage || 0}+000 to ${p.end_chainage || roadLen}+000)` : '—'],
+                ['Location', [p.county, p.sub_county, p.constituency].filter(Boolean).join(', ') || '—'],
                 ['Performance Guarantee Expiry', p.performance_guarantee_expiry ? new Date(p.performance_guarantee_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
               ].map(([label, value], i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>

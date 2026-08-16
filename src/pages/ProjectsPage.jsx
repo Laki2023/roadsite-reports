@@ -4,7 +4,7 @@ import { supabase, hasRole, PROJECT_CATEGORIES, FIDIC_EDITIONS, PROJECT_PHASES }
 const EMPTY_PROJECT = {
   name: '', category: 'Construction', contract_no: '', contractor_name: '',
   contract_sum: '', fidic_edition: 'Red Book 1999', employer: 'KeNHA',
-  start_chainage: '', end_chainage: '', road_class: '', region: '', county: '',
+  start_chainage: '', end_chainage: '', road_class: '', region: '', county: '', sub_county: '', constituency: '',
   commencement_date: '', original_completion_date: '', current_phase: 'Mobilization',
   status: 'active',
   // Extended contract data
@@ -79,7 +79,7 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
       contract_sum: p.contract_sum || '', fidic_edition: p.fidic_edition || 'Red Book 1999',
       employer: p.employer || 'KeNHA', start_chainage: p.start_chainage || '',
       end_chainage: p.end_chainage || '', road_class: p.road_class || '',
-      region: p.region || '', county: p.county || '',
+      region: p.region || '', county: p.county || '', sub_county: p.sub_county || '', constituency: p.constituency || '',
       commencement_date: p.commencement_date || '', original_completion_date: p.original_completion_date || '',
       current_phase: p.current_phase || 'Construction', status: p.status || 'active',
     });
@@ -172,7 +172,14 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                   <td className="text-mono text-sm">{contractSum > 0 ? `KES ${(contractSum / 1e6).toFixed(1)}M` : '—'}</td>
                   <td><span className={`badge badge-${phaseColors[p.current_phase] || 'muted'}`}>{p.current_phase}</span></td>
                   <td className="text-mono text-sm">{roadLen > 0 ? `${roadLen.toFixed(1)}` : '—'}</td>
-                  <td className="text-sm">{p.county || '—'}</td>
+                  <td className="text-sm">
+                    <div>{p.county || '—'}</div>
+                    {(p.sub_county || p.constituency) && (
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                        {[p.sub_county, p.constituency].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ width: 100 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
@@ -268,6 +275,16 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                   <label>County</label>
                   <input value={form.county} onChange={e => setForm({ ...form, county: e.target.value })}
                     placeholder="e.g. Murang'a" />
+                </div>
+                <div className="form-group">
+                  <label>Sub-County</label>
+                  <input value={form.sub_county || ''} onChange={e => setForm({ ...form, sub_county: e.target.value })}
+                    placeholder="e.g. Mathioya" />
+                </div>
+                <div className="form-group">
+                  <label>Constituency</label>
+                  <input value={form.constituency || ''} onChange={e => setForm({ ...form, constituency: e.target.value })}
+                    placeholder="e.g. Mathioya" />
                 </div>
                 <div className="form-group">
                   <label>Phase</label>
