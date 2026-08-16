@@ -14,6 +14,23 @@ import {
 // ── Constants ──
 const ISSUE_SEVERITY = ['Low', 'Medium', 'High', 'Critical'];
 
+// ── Kenya chainage parser ──
+// Accepts: "5+200" → 5.2 | "Km 5+200" → 5.2 | "5200" (metres) → 5.2 | "5.2" (Km) → 5.2
+export function parseChainage(input) {
+  if (input == null || input === '') return null;
+  const str = String(input).trim().replace(/km/i, '').trim();
+  if (str.includes('+')) {
+    const [kmPart, mPart] = str.split('+');
+    const km = parseFloat(kmPart.replace(/[^0-9.]/g, '')) || 0;
+    const m = parseFloat(mPart.replace(/[^0-9.]/g, '')) || 0;
+    return km + m / 1000;
+  }
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return null;
+  // Plain numbers ≥ 200 are almost certainly metres (roads rarely exceed 200 Km chainage)
+  return num >= 200 ? num / 1000 : num;
+}
+
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
   { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
@@ -520,13 +537,15 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         if (!w.layer_name) continue;
         const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
         const isLinear = layerDef ? layerDef.unit === 'Km' : false;
-        const autoQty = isLinear && w.start_chainage && w.end_chainage
-          ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage))
+        const chFrom = parseChainage(w.start_chainage);
+        const chTo = parseChainage(w.end_chainage);
+        const autoQty = isLinear && chFrom != null && chTo != null
+          ? Math.abs(chTo - chFrom)
           : parseFloat(w.quantity) || 0;
         const { error: wpErr } = await supabase.from('works_progress').insert({
           project_id: selectedProject, activity_id: w.activity_id || null,
-          work_date: form.report_date, start_chainage: parseFloat(w.start_chainage) || 0,
-          end_chainage: parseFloat(w.end_chainage) || 0, side: w.side || 'Both',
+          work_date: form.report_date, start_chainage: chFrom || 0,
+          end_chainage: chTo || 0, side: w.side || 'Both',
           quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : ''),
           reported_by: profile.id,
         });
@@ -826,8 +845,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           {worksEntries.map((w, i) => {
             const layerDef = WORK_LAYERS.find(l => l.name === w.layer_name);
             const isLinear = layerDef ? layerDef.unit === 'Km' : false;
-            const autoKm = isLinear && w.start_chainage && w.end_chainage
-              ? Math.abs(parseFloat(w.end_chainage) - parseFloat(w.start_chainage)).toFixed(3) : null;
+            const chFrom = parseChainage(w.start_chainage);
+            const chTo = parseChainage(w.end_chainage);
+            const autoKm = isLinear && chFrom != null && chTo != null
+              ? Math.abs(chTo - chFrom).toFixed(3) : null;
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
                 <div style={{ marginBottom: 8 }}>

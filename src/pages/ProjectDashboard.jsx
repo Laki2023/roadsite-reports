@@ -121,7 +121,15 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   const hasRevisions = p.revised_completion_date || p.revised_contract_sum;
 
   const compActs = works.filter(w=>w.status==='Completed'||w.status==='Approved').length;
-  const physPct = pct(compActs, works.length);
+  // Quantity-weighted physical progress: each activity capped at 100% of its planned quantity,
+  // so over-measured entries can't inflate overall progress. Falls back to completed-count if no quantities.
+  const qtyPlanned = works.reduce((s,w)=>s+(w.planned_quantity||0),0);
+  const qtyDone = works.reduce((s,w)=>{
+    const planned = w.planned_quantity || 0;
+    if (planned <= 0) return s;
+    return s + Math.min(w.completed_quantity || 0, planned);
+  },0);
+  const physPct = qtyPlanned > 0 ? pct(qtyDone, qtyPlanned) : pct(compActs, works.length);
   const variance = physPct - timePct;
   const scheduleStatus = variance >= 0 ? 'On Track' : variance > -10 ? 'Behind' : 'Critical';
 
@@ -194,9 +202,13 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
 
   // Individual activity ranking (for detailed view)
   const topActivities = works
-    .map(w => ({
+    .map(w => {
+      const rawPct = w.planned_quantity > 0 ? pct(w.completed_quantity || 0, w.planned_quantity) : 0;
+      return {
       name: (w.activity_code ? w.activity_code + ' ' : '') + (w.activity_name || 'Unknown'),
-      pct: w.planned_quantity > 0 ? pct(w.completed_quantity || 0, w.planned_quantity) : 0,
+      pct: Math.min(100, rawPct),
+      overMeasured: rawPct > 100,
+      rawPct,
       status: w.status,
       isLive: w.last_progress_date === today,
       isActiveWeek: w.last_progress_date >= weekAgo,
@@ -204,7 +216,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       isCritical: w.is_critical,
       lastDate: w.last_progress_date,
       category: w.category,
-    }))
+    };})
     .filter(w => w.status !== 'Not Started' || w.pct > 0)
     .sort((a,b) => {
       if (a.isLive && !b.isLive) return -1;
@@ -700,7 +712,9 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                               : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : a.pct > 0 ? '#ef4444' : '#374151' }} />
                         </div>
                         <span style={{ fontSize:11, fontWeight:700, width:32, textAlign:'right',
-                          color: a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : '#ef4444' }}>{a.pct}%</span>
+                          color: a.overMeasured ? '#ef4444' : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : '#ef4444' }}
+                          title={a.overMeasured ? `Over-measured: recorded ${a.rawPct}% of planned quantity — check chainage entries` : ''}>
+                          {a.overMeasured ? '⚠100%' : `${a.pct}%`}</span>
                       </div>
                     </td>
                     <td style={{ padding:'8px', textAlign:'right', fontSize:11, color:'var(--text-muted)' }}>
