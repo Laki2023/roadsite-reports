@@ -1,318 +1,418 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import {
+  ACTIVITIES_LIST, ACTIVITY_CATEGORIES,
+  groupByCategory,
+} from '../data/referenceData';
+
+// ── Chainage helpers ──
+function parseChainage(input) {
+  if (input == null || input === '') return null;
+  const str = String(input).trim().replace(/km/i, '').trim();
+  if (str.includes('+')) {
+    const [kmPart, mPart] = str.split('+');
+    return (parseFloat(kmPart.replace(/[^0-9.]/g, '')) || 0) + (parseFloat(mPart.replace(/[^0-9.]/g, '')) || 0) / 1000;
+  }
+  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return null;
+  return num >= 200 ? num / 1000 : num;
+}
+function fmtCh(km) {
+  if (km == null) return '—';
+  const k = Math.floor(km); const m = Math.round((km - k) * 1000);
+  return `${k}+${String(m).padStart(3, '0')}`;
+}
 
 const CATEGORY_COLORS = {
-  Survey: '#6366f1', Earthworks: '#a16207', Drainage: '#0891b2', Pavement: '#d97706',
-  Surfacing: '#4b5563', 'Road Furniture': '#059669', Environmental: '#16a34a', Other: '#6b7280'
+  'Preliminary & General': '#6366f1', 'Setting Out & Survey': '#8b5cf6',
+  'Clearing & Grubbing': '#a16207', 'Earthworks': '#d97706',
+  'Gravel & Pavement Layers': '#ea580c', 'Bituminous Works': '#4b5563',
+  'Concrete Works': '#0891b2', 'Drainage': '#0d9488',
+  'Structures (Bridges/Culverts)': '#1d4ed8', 'Road Furniture & Safety': '#059669',
+  'Environmental & Landscaping': '#16a34a', 'Day Works & Variations': '#6b7280',
 };
 
 export default function WorksActivitiesPage({ profile, showToast, selectedProject: propProject }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
-  const [activities, setActivities] = useState([]);
-  const [progress, setProgress] = useState([]);
-  const [tab, setTab] = useState('activities');
-  const [showProgressModal, setShowProgressModal] = useState(null);
-  const [progressForm, setProgressForm] = useState({
-    work_date: new Date().toISOString().split('T')[0],
-    start_chainage: '', end_chainage: '', side: 'Both', quantity: '', equipment_used: '', materials_used: '', gang_size: 0, notes: ''
-  });
+  const [entries, setEntries] = useState([]);
+  const [tab, setTab] = useState('log');
   const [saving, setSaving] = useState(false);
-  const canManage = hasRole(profile?.role, 'resident_engineer');
+
+  // Log form state
+  const [logForm, setLogForm] = useState({
+    work_date: new Date().toISOString().split('T')[0],
+    activity: '', category: '',
+    chainage_from: '', chainage_to: '',
+    side: 'Both', width_m: '', notes: '',
+  });
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
 
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
   }, []);
 
-  useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
+  useEffect(() => { if (selectedProject) loadEntries(); }, [selectedProject]);
 
-  async function loadData() {
-    const [actRes, progRes] = await Promise.all([
-      supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name, activity_code)').eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('works_progress').select('*, activity:activity_id(activity_name, activity_code, parent_activity_id, is_component), reporter:reported_by(full_name)')
-        .eq('project_id', selectedProject).order('work_date', { ascending: false }).limit(50),
-    ]);
-    setActivities(actRes.data || []);
-    setProgress(progRes.data || []);
+  async function loadEntries() {
+    const { data } = await supabase.from('works_progress')
+      .select('*, reporter:reported_by(full_name)')
+      .eq('project_id', selectedProject)
+      .order('work_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(200);
+    setEntries(data || []);
   }
 
-  async function seedActivities() {
-    const proj = projects.find(p => p.id === selectedProject);
-    if (!proj) return;
-    const { error } = await supabase.rpc('seed_project_activities', { p_project_id: selectedProject, p_category: proj.category || 'Construction' });
-    if (error) { showToast(error.message, 'error'); return; }
-    showToast(`Activities seeded for ${proj.category} project`);
-    loadData();
-  }
-
-  async function logProgress(e) {
+  // ── Save a single activity entry ──
+  async function saveEntry(e) {
     e.preventDefault();
+    if (!logForm.activity) { showToast('Select an activity', 'error'); return; }
     setSaving(true);
-    const { error } = await supabase.from('works_progress').insert({
-      project_id: selectedProject, activity_id: showProgressModal,
-      ...progressForm, quantity: parseFloat(progressForm.quantity) || 0,
-      gang_size: parseInt(progressForm.gang_size) || 0,
-      start_chainage: parseFloat(progressForm.start_chainage) || 0,
-      end_chainage: parseFloat(progressForm.end_chainage) || 0,
-      reported_by: profile.id,
-    });
-    setSaving(false);
-    if (error) { showToast(error.message, 'error'); return; }
-    // Update completed quantity
-    const act = activities.find(a => a.id === showProgressModal);
-    if (act) {
-      await supabase.from('works_activities').update({
-        completed_quantity: (act.completed_quantity || 0) + (parseFloat(progressForm.quantity) || 0),
-        status: 'In Progress'
-      }).eq('id', showProgressModal);
+    try {
+      const chFrom = parseChainage(logForm.chainage_from);
+      const chTo = parseChainage(logForm.chainage_to);
+      const length = chFrom != null && chTo != null ? Math.abs(chTo - chFrom) : 0;
+
+      const { error } = await supabase.from('works_progress').insert({
+        project_id: selectedProject,
+        work_date: logForm.work_date,
+        activity_id: null, // standalone — not linked to works_activities
+        start_chainage: chFrom || 0,
+        end_chainage: chTo || 0,
+        side: logForm.side || 'Both',
+        quantity: length,
+        notes: `${logForm.activity}${logForm.category ? ' [' + logForm.category + ']' : ''}${logForm.width_m ? ' | Width: ' + logForm.width_m + 'm' : ''}${logForm.notes ? ' — ' + logForm.notes : ''}`,
+        reported_by: profile.id,
+      });
+      if (error) throw error;
+
+      showToast(`✅ ${logForm.activity} logged — ${fmtCh(chFrom)} → ${fmtCh(chTo)}`);
+      // Reset form but keep date and project
+      setLogForm(prev => ({ ...prev, activity: '', category: '', chainage_from: '', chainage_to: '', side: 'Both', width_m: '', notes: '' }));
+      loadEntries();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setSaving(false);
     }
-    showToast('Progress logged');
-    setShowProgressModal(null);
-    setProgressForm({ work_date: new Date().toISOString().split('T')[0], start_chainage: '', end_chainage: '', side: 'Both', quantity: '', equipment_used: '', materials_used: '', gang_size: 0, notes: '' });
-    loadData();
   }
 
-  async function updateActivityStatus(id, status) {
-    await supabase.from('works_activities').update({ status }).eq('id', id);
-    showToast(`Activity marked ${status}`);
-    loadData();
+  // ── Delete an entry ──
+  async function deleteEntry(id) {
+    if (!window.confirm('Delete this activity entry?')) return;
+    await supabase.from('works_progress').delete().eq('id', id);
+    showToast('Entry deleted');
+    loadEntries();
   }
 
+  // ── Group entries by date ──
   const grouped = {};
-  // Group: show parents with their children nested, hide standalone components from top level
-  const parentActs = activities.filter(a => !a.is_component && !a.parent_activity_id);
-  const childrenOf = (pid) => activities.filter(a => a.parent_activity_id === pid).sort((a,b) => (a.component_order||0) - (b.component_order||0));
-  parentActs.forEach(a => { if (!grouped[a.category]) grouped[a.category] = []; grouped[a.category].push(a); });
+  entries.forEach(e => {
+    const d = e.work_date || 'Unknown';
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(e);
+  });
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  // ── Activity picker — filter by search ──
+  const groupedActivities = groupByCategory(ACTIVITIES_LIST);
+  const filteredActivities = pickerSearch.trim()
+    ? ACTIVITIES_LIST.filter(a => a.name.toLowerCase().includes(pickerSearch.toLowerCase().trim()))
+    : ACTIVITIES_LIST;
+  const filteredGrouped = groupByCategory(filteredActivities);
+
+  // ── Parse activity name and category from notes for display ──
+  function parseEntry(entry) {
+    const notes = entry.notes || '';
+    const actMatch = notes.match(/^([^[\]—]+?)(?:\s*\[([^\]]+)\])?(?:\s*\|.*?)?(?:\s*—\s*(.*))?$/);
+    return {
+      activity: actMatch?.[1]?.trim() || notes.split(' — ')[0] || 'Activity',
+      category: actMatch?.[2] || '',
+      extraNotes: actMatch?.[3] || '',
+    };
+  }
+
+  const todayEntries = entries.filter(e => e.work_date === logForm.work_date);
 
   return (
     <div>
       <div className="page-header">
-        <div><h2>Works Activities</h2><div className="subtitle">Track construction progress by activity and chainage</div></div>
+        <div>
+          <h2>⛏️ Work Activities</h2>
+          <div className="subtitle">Log daily construction activities by chainage</div>
+        </div>
       </div>
 
       <div className="form-group mb-16" style={{ maxWidth: 400 }}>
         <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{ fontSize: 14 }}>
           <option value="">Select a project...</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name} ({p.category})</option>)}
+          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>
 
-      {selectedProject && activities.length === 0 && (
-        <div className="card empty-state">
-          <div className="icon">📋</div>
-          <p>No activities defined for this project yet</p>
-          {canManage && (
-            <button className="btn btn-primary mt-16" onClick={seedActivities}>
-              Auto-Generate Activities for {projects.find(p => p.id === selectedProject)?.category || 'Construction'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {selectedProject && activities.length > 0 && (
+      {selectedProject && (
         <>
           <div className="tabs">
-            <button className={tab === 'activities' ? 'active' : ''} onClick={() => setTab('activities')}>
-              Activities ({activities.length})
+            <button className={tab === 'log' ? 'active' : ''} onClick={() => setTab('log')}>
+              📝 Log Activity
             </button>
-            <button className={tab === 'progress' ? 'active' : ''} onClick={() => setTab('progress')}>
-              Recent Progress ({progress.length})
-            </button>
-            <button className={tab === 'matrix' ? 'active' : ''} onClick={() => setTab('matrix')}>
-              Progress Matrix
+            <button className={tab === 'daily' ? 'active' : ''} onClick={() => setTab('daily')}>
+              📋 Daily View ({sortedDates.length} days)
             </button>
           </div>
 
-          {tab === 'activities' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {Object.entries(grouped).map(([cat, acts]) => (
-                <div key={cat} className="card">
-                  <div className="card-header">
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 12, height: 12, borderRadius: 3, background: CATEGORY_COLORS[cat] || '#666', display: 'inline-block' }}></span>
-                      {cat}
-                    </h3>
-                    <span className="text-mono text-sm">{acts.length} activities</span>
-                  </div>
-                  <div className="table-wrap">
-                    <table>
-                      <thead><tr><th>Code</th><th>Activity</th><th>Planned</th><th>Completed</th><th>Progress</th><th>Status</th><th></th></tr></thead>
-                      <tbody>
-                        {acts.map(a => {
-                          const pct = a.planned_quantity > 0 ? Math.min(100, (a.completed_quantity / a.planned_quantity) * 100) : 0;
-                          const children = childrenOf(a.id);
-                          return (
-                            <React.Fragment key={a.id}>
-                            <tr>
-                              <td className="text-mono" style={{ fontWeight: 600 }}>{a.activity_code}</td>
-                              <td style={{ fontWeight: 600 }}>{a.activity_name} {children.length > 0 && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>({children.length} components)</span>}</td>
-                              <td className="text-mono">{a.planned_quantity} {a.unit}</td>
-                              <td className="text-mono">{a.completed_quantity} {a.unit}</td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 100 }}>
-                                  <div className="progress-bar" style={{ flex: 1 }}>
-                                    <div className={`fill ${pct >= 80 ? 'green' : pct >= 40 ? 'orange' : 'red'}`} style={{ width: `${pct}%` }} />
+          {/* ══════ LOG ACTIVITY TAB ══════ */}
+          {tab === 'log' && (
+            <div>
+              <div className="card" style={{ padding: 20 }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: 15 }}>Log Work Activity</h3>
+
+                {/* Date */}
+                <div className="form-group mb-16" style={{ maxWidth: 200 }}>
+                  <label>Date</label>
+                  <input type="date" value={logForm.work_date} onChange={e => setLogForm({ ...logForm, work_date: e.target.value })} />
+                </div>
+
+                {/* Activity Picker */}
+                <div className="form-group mb-16">
+                  <label>Activity *</label>
+                  <div style={{ position: 'relative' }}>
+                    <div onClick={() => setShowPicker(!showPicker)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 12px', border: `1.5px solid ${showPicker ? 'var(--accent)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 13, minHeight: 42,
+                        background: 'var(--bg-card)', transition: 'border-color 0.15s' }}>
+                      <span style={{ color: logForm.activity ? 'var(--text)' : 'var(--text-muted)' }}>
+                        {logForm.activity || 'Tap to select activity...'}
+                      </span>
+                      {logForm.activity && (
+                        <span onClick={e => { e.stopPropagation(); setLogForm({ ...logForm, activity: '', category: '' }); }}
+                          style={{ color: 'var(--text-muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }}>×</span>
+                      )}
+                    </div>
+                    {logForm.category && (
+                      <span style={{ fontSize: 10, color: 'var(--accent)', marginTop: 3, display: 'block' }}>{logForm.category}</span>
+                    )}
+
+                    {/* Dropdown picker */}
+                    {showPicker && (
+                      <>
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 }} onClick={() => { setShowPicker(false); setPickerSearch(''); }} />
+                        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                          marginTop: 4, border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+                          background: 'var(--bg-card)', boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
+                          maxHeight: 400, display: 'flex', flexDirection: 'column' }}>
+                          {/* Search */}
+                          <div style={{ padding: 10, borderBottom: '1px solid var(--border)' }}>
+                            <input autoFocus type="text" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)}
+                              placeholder="Type to search activities..."
+                              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border)',
+                                borderRadius: 4, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                                background: 'var(--bg-card)', color: 'var(--text)' }} />
+                          </div>
+                          {/* Grouped list */}
+                          <div style={{ overflowY: 'auto', flex: 1 }}>
+                            {Object.entries(filteredGrouped).map(([cat, items]) => (
+                              <div key={cat}>
+                                <div style={{ padding: '6px 12px', fontSize: 10, fontWeight: 700,
+                                  color: CATEGORY_COLORS[cat] || 'var(--text-muted)',
+                                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                                  background: 'var(--bg-hover)', position: 'sticky', top: 0 }}>
+                                  {cat}
+                                </div>
+                                {items.map(a => (
+                                  <div key={a.name}
+                                    onClick={() => { setLogForm({ ...logForm, activity: a.name, category: a.category }); setShowPicker(false); setPickerSearch(''); }}
+                                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                                      borderLeft: logForm.activity === a.name ? '3px solid var(--accent)' : '3px solid transparent',
+                                      background: logForm.activity === a.name ? 'var(--bg-hover)' : 'transparent',
+                                      fontWeight: logForm.activity === a.name ? 600 : 400 }}
+                                    onMouseOver={e => { if (logForm.activity !== a.name) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseOut={e => { if (logForm.activity !== a.name) e.currentTarget.style.background = 'transparent'; }}>
+                                    {a.name}
                                   </div>
-                                  <span className="text-mono text-sm">{pct.toFixed(0)}%</span>
-                                </div>
-                              </td>
-                              <td>
-                                <span className={`badge badge-${a.status === 'Completed' ? 'success' : a.status === 'Approved' ? 'success' : a.status === 'In Progress' ? 'accent' : a.status === 'On Hold' ? 'warning' : 'muted'}`}>
-                                  {a.status}
-                                </span>
-                              </td>
-                              <td>
-                                <div className="btn-group">
-                                  {children.length === 0 && <button className="btn btn-sm btn-primary" onClick={() => setShowProgressModal(a.id)}>+ Log</button>}
-                                  {canManage && a.status === 'In Progress' && (
-                                    <button className="btn btn-sm btn-success" onClick={() => updateActivityStatus(a.id, 'Completed')}>✓</button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                            {children.map(ch => {
-                              const chPct = ch.planned_quantity > 0 ? Math.min(100, (ch.completed_quantity / ch.planned_quantity) * 100) : 0;
-                              return (
-                                <tr key={ch.id} style={{ background: 'var(--bg-hover)' }}>
-                                  <td className="text-mono" style={{ paddingLeft: 24, fontSize: 11, color: 'var(--text-muted)' }}>↳</td>
-                                  <td style={{ paddingLeft: 24, fontSize: 12 }}>{ch.activity_name}</td>
-                                  <td className="text-mono" style={{ fontSize: 11 }}>{ch.planned_quantity} {ch.unit}</td>
-                                  <td className="text-mono" style={{ fontSize: 11 }}>{ch.completed_quantity} {ch.unit}</td>
-                                  <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 80 }}>
-                                      <div className="progress-bar" style={{ flex: 1, height: 4 }}>
-                                        <div className={`fill ${chPct >= 80 ? 'green' : chPct >= 40 ? 'orange' : 'red'}`} style={{ width: `${chPct}%` }} />
-                                      </div>
-                                      <span className="text-mono" style={{ fontSize: 10 }}>{chPct.toFixed(0)}%</span>
-                                    </div>
-                                  </td>
-                                  <td></td>
-                                  <td><button className="btn btn-sm btn-primary" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setShowProgressModal(ch.id)}>+ Log</button></td>
-                                </tr>
-                              );
-                            })}
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                ))}
+                              </div>
+                            ))}
+                            {filteredActivities.length === 0 && (
+                              <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+                                No matches — type to add custom activity
+                              </div>
+                            )}
+                            {/* Custom entry */}
+                            {pickerSearch.trim() && !ACTIVITIES_LIST.some(a => a.name.toLowerCase() === pickerSearch.toLowerCase().trim()) && (
+                              <div onClick={() => { setLogForm({ ...logForm, activity: pickerSearch.trim(), category: 'Other' }); setShowPicker(false); setPickerSearch(''); }}
+                                style={{ padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--accent)',
+                                  fontWeight: 600, borderTop: '1px solid var(--border)' }}
+                                onMouseOver={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                                + Add "{pickerSearch.trim()}" as custom activity
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {tab === 'progress' && (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>Activity</th><th>Chainage</th><th>Side</th><th>Qty</th><th>Gang</th><th>By</th></tr></thead>
-                <tbody>
-                  {progress.map(p => (
-                    <tr key={p.id}>
-                      <td className="text-mono">{p.work_date}</td>
-                      <td>{p.activity?.activity_name}{p.activity?.parent_activity_id ? <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 6 }}>({p.notes?.split(' — ')[0] || ''})</span> : ''}</td>
-                      <td className="text-mono">{p.start_chainage}–{p.end_chainage}</td>
-                      <td>{p.side}</td>
-                      <td className="text-mono">{p.quantity}</td>
-                      <td>{p.gang_size || '—'}</td>
-                      <td className="text-sm">{p.reporter?.full_name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                {/* Chainage, Side, Width */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                  <div className="form-group mb-16">
+                    <label>From Chainage</label>
+                    <input type="text" value={logForm.chainage_from} onChange={e => setLogForm({ ...logForm, chainage_from: e.target.value })}
+                      placeholder="e.g. 5+200" />
+                  </div>
+                  <div className="form-group mb-16">
+                    <label>To Chainage</label>
+                    <input type="text" value={logForm.chainage_to} onChange={e => setLogForm({ ...logForm, chainage_to: e.target.value })}
+                      placeholder="e.g. 7+850" />
+                  </div>
+                  <div className="form-group mb-16">
+                    <label>Side</label>
+                    <select value={logForm.side} onChange={e => setLogForm({ ...logForm, side: e.target.value })}>
+                      {['Both', 'LHS', 'RHS', 'Centre'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group mb-16">
+                    <label>Width (m)</label>
+                    <input type="number" step="0.1" value={logForm.width_m} onChange={e => setLogForm({ ...logForm, width_m: e.target.value })}
+                      placeholder="e.g. 6.5" />
+                  </div>
+                </div>
 
-          {tab === 'matrix' && (
-            <div className="card" style={{ overflowX: 'auto' }}>
-              <div className="card-header"><h3>Progress Matrix</h3></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '200px repeat(5, 1fr)', gap: 2, fontSize: 12 }}>
-                <div style={{ fontWeight: 700, padding: 8, background: 'var(--bg-hover)' }}>Activity</div>
-                {['Not Started','In Progress','Completed','Approved','On Hold'].map(s => (
-                  <div key={s} style={{ fontWeight: 700, padding: 8, background: 'var(--bg-hover)', textAlign: 'center' }}>{s}</div>
-                ))}
-                {activities.map(a => (
-                  <React.Fragment key={a.id}>
-                    <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
-                      <span className="text-mono">{a.activity_code}</span> {a.activity_name}
+                {/* Preview */}
+                {logForm.activity && logForm.chainage_from && logForm.chainage_to && (() => {
+                  const f = parseChainage(logForm.chainage_from);
+                  const t = parseChainage(logForm.chainage_to);
+                  if (f == null || t == null) return null;
+                  const len = Math.abs(t - f);
+                  return (
+                    <div style={{ padding: '8px 12px', background: '#05966915', border: '1px solid #05966930',
+                      borderRadius: 'var(--radius)', fontSize: 12, color: '#059669', fontWeight: 600, marginBottom: 12 }}>
+                      ✅ {logForm.activity}: {fmtCh(f)} → {fmtCh(t)} ({logForm.side}) = {len.toFixed(3)} Km
+                      {logForm.width_m && ` × ${logForm.width_m}m width`}
                     </div>
-                    {['Not Started','In Progress','Completed','Approved','On Hold'].map(s => (
-                      <div key={s} style={{
-                        padding: 6, textAlign: 'center', borderBottom: '1px solid var(--border)',
-                        background: a.status === s ? (
-                          s === 'Completed' || s === 'Approved' ? 'rgba(22,163,74,0.2)' :
-                          s === 'In Progress' ? 'rgba(232,123,53,0.2)' :
-                          s === 'On Hold' ? 'rgba(217,119,6,0.2)' : 'transparent'
-                        ) : 'transparent'
-                      }}>
-                        {a.status === s && '●'}
-                      </div>
-                    ))}
-                  </React.Fragment>
-                ))}
+                  );
+                })()}
+
+                {/* Notes */}
+                <div className="form-group mb-16">
+                  <label>Notes</label>
+                  <input type="text" value={logForm.notes} onChange={e => setLogForm({ ...logForm, notes: e.target.value })}
+                    placeholder="e.g. Gravel from Kamweti quarry, 2 tippers hauling" />
+                </div>
+
+                {/* Save button */}
+                <button className="btn btn-primary" onClick={saveEntry} disabled={saving || !logForm.activity}
+                  style={{ width: '100%', padding: 14, fontSize: 15, fontWeight: 700 }}>
+                  {saving ? '⏳ Saving...' : '✅ Log This Activity'}
+                </button>
               </div>
+
+              {/* Today's entries */}
+              {todayEntries.length > 0 && (
+                <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>
+                    📋 Logged Today — {logForm.work_date} ({todayEntries.length} {todayEntries.length === 1 ? 'entry' : 'entries'})
+                  </h3>
+                  {todayEntries.map(e => {
+                    const p = parseEntry(e);
+                    return (
+                      <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '8px 10px', marginBottom: 6, background: 'var(--bg-hover)',
+                        borderRadius: 'var(--radius)', borderLeft: `3px solid ${CATEGORY_COLORS[p.category] || '#6b7280'}` }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.activity}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {fmtCh(e.start_chainage)} → {fmtCh(e.end_chainage)} | {e.side}
+                            {e.quantity > 0 && ` | ${Number(e.quantity).toFixed(3)} Km`}
+                            {p.extraNotes && ` — ${p.extraNotes}`}
+                          </div>
+                        </div>
+                        <button onClick={() => deleteEntry(e.id)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '4px 8px' }}
+                          title="Delete">×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════ DAILY VIEW TAB ══════ */}
+          {tab === 'daily' && (
+            <div>
+              {sortedDates.length === 0 ? (
+                <div className="card empty-state">
+                  <div className="icon">📋</div>
+                  <p>No activities logged yet</p>
+                  <p className="text-sm text-muted">Switch to "Log Activity" tab to start recording</p>
+                </div>
+              ) : (
+                sortedDates.map(date => {
+                  const dayEntries = grouped[date];
+                  // Group this day's entries by activity category
+                  const byCat = {};
+                  dayEntries.forEach(e => {
+                    const p = parseEntry(e);
+                    const cat = p.category || 'Other';
+                    if (!byCat[cat]) byCat[cat] = [];
+                    byCat[cat].push({ ...e, ...p });
+                  });
+
+                  return (
+                    <details key={date} className="card" style={{ marginBottom: 8, padding: 0 }}
+                      open={date === new Date().toISOString().split('T')[0]}>
+                      <summary style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex',
+                        justifyContent: 'space-between', alignItems: 'center', userSelect: 'none',
+                        fontWeight: 600, fontSize: 14, listStyle: 'none' }}>
+                        <span>
+                          <span style={{ color: 'var(--accent)' }}>📅 {date}</span>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
+                            {dayEntries.length} {dayEntries.length === 1 ? 'activity' : 'activities'}
+                          </span>
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>▼</span>
+                      </summary>
+                      <div style={{ padding: '0 16px 16px' }}>
+                        {Object.entries(byCat).map(([cat, catEntries]) => (
+                          <div key={cat} style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                              letterSpacing: '0.05em', color: CATEGORY_COLORS[cat] || 'var(--text-muted)',
+                              marginBottom: 4, paddingBottom: 3, borderBottom: `2px solid ${CATEGORY_COLORS[cat] || 'var(--border)'}30` }}>
+                              {cat}
+                            </div>
+                            {catEntries.map(e => (
+                              <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start',
+                                padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                                <div>
+                                  <span style={{ fontWeight: 600, fontSize: 13 }}>{e.activity}</span>
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                    📍 {fmtCh(e.start_chainage)} → {fmtCh(e.end_chainage)}
+                                    <span style={{ margin: '0 6px' }}>|</span>{e.side}
+                                    {e.quantity > 0 && <><span style={{ margin: '0 6px' }}>|</span><b>{Number(e.quantity).toFixed(3)} Km</b></>}
+                                    {e.extraNotes && <><span style={{ margin: '0 6px' }}>|</span>{e.extraNotes}</>}
+                                  </div>
+                                </div>
+                                <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', marginLeft: 12 }}>
+                                  {e.reporter?.full_name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                })
+              )}
             </div>
           )}
         </>
-      )}
-
-      {/* Log Progress Modal */}
-      {showProgressModal && (
-        <div className="modal-overlay" onClick={() => setShowProgressModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-            <h3>Log Progress — {activities.find(a => a.id === showProgressModal)?.activity_name}
-              <button onClick={() => setShowProgressModal(null)}>×</button>
-            </h3>
-            <form onSubmit={logProgress}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                <div className="form-group mb-16">
-                  <label>Date *</label>
-                  <input type="date" value={progressForm.work_date} onChange={e => setProgressForm({ ...progressForm, work_date: e.target.value })} required />
-                </div>
-                <div className="form-group mb-16">
-                  <label>From Ch. *</label>
-                  <input type="number" step="0.001" value={progressForm.start_chainage} onChange={e => setProgressForm({ ...progressForm, start_chainage: e.target.value })} required placeholder="0+000" />
-                </div>
-                <div className="form-group mb-16">
-                  <label>To Ch. *</label>
-                  <input type="number" step="0.001" value={progressForm.end_chainage} onChange={e => setProgressForm({ ...progressForm, end_chainage: e.target.value })} required placeholder="1+000" />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                <div className="form-group mb-16">
-                  <label>Side</label>
-                  <select value={progressForm.side} onChange={e => setProgressForm({ ...progressForm, side: e.target.value })}>
-                    {['Both','LHS','RHS','CL'].map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="form-group mb-16">
-                  <label>Quantity *</label>
-                  <input type="number" step="0.001" value={progressForm.quantity} onChange={e => setProgressForm({ ...progressForm, quantity: e.target.value })} required placeholder="0.00" />
-                </div>
-                <div className="form-group mb-16">
-                  <label>Gang Size</label>
-                  <input type="number" value={progressForm.gang_size} onChange={e => setProgressForm({ ...progressForm, gang_size: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-group mb-16">
-                <label>Equipment Used</label>
-                <input value={progressForm.equipment_used} onChange={e => setProgressForm({ ...progressForm, equipment_used: e.target.value })} placeholder="e.g. 1x Grader, 2x Rollers, 3x Tippers" />
-              </div>
-              <div className="form-group mb-16">
-                <label>Materials Used</label>
-                <input value={progressForm.materials_used} onChange={e => setProgressForm({ ...progressForm, materials_used: e.target.value })} placeholder="e.g. Natural gravel from Borrow Pit 3" />
-              </div>
-              <div className="form-group mb-16">
-                <label>Notes</label>
-                <textarea rows={2} value={progressForm.notes} onChange={e => setProgressForm({ ...progressForm, notes: e.target.value })} />
-              </div>
-              <div className="btn-group">
-                <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Log Progress'}</button>
-                <button className="btn btn-secondary" type="button" onClick={() => setShowProgressModal(null)}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { section: 'Field Operations' },
   { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'inspector' },
   { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'inspector' },
-  { key: 'works', label: 'Works Activities', icon: '⛏️', minRole: 'inspector' },
+  { key: 'works', label: 'Work Activities', icon: '⛏️', minRole: 'inspector' },
   { key: 'issues', label: 'Site Issues', icon: '⚠️', minRole: 'inspector' },
   { key: 'emergency', label: 'Emergency', icon: '🚨', minRole: 'inspector' },
   { section: 'Engineering' },
