@@ -31,6 +31,30 @@ export function parseChainage(input) {
   return num >= 200 ? num / 1000 : num;
 }
 
+// ── Chainage overlap detection ──
+// Returns previous entries that overlap the given range for the same activity.
+// Sides conflict when either is 'Both' or they're equal (LHS vs RHS is legitimate).
+export function findOverlaps(recentProgress, activityId, chFrom, chTo, side) {
+  if (!activityId || chFrom == null || chTo == null) return [];
+  const lo = Math.min(chFrom, chTo), hi = Math.max(chFrom, chTo);
+  return recentProgress.filter(p => {
+    if (p.activity_id !== activityId) return false;
+    const pLo = Math.min(p.start_chainage || 0, p.end_chainage || 0);
+    const pHi = Math.max(p.start_chainage || 0, p.end_chainage || 0);
+    if (pLo === pHi) return false; // point entries can't overlap a range meaningfully
+    const sideConflict = side === 'Both' || p.side === 'Both' || p.side === side;
+    return sideConflict && Math.max(lo, pLo) < Math.min(hi, pHi);
+  });
+}
+
+// Format a Km value back to chainage notation: 5.2 → "5+200"
+export function fmtChainage(km) {
+  if (km == null) return '—';
+  const k = Math.floor(km);
+  const m = Math.round((km - k) * 1000);
+  return `${k}+${String(m).padStart(3, '0')}`;
+}
+
 const STEPS = [
   { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
   { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
@@ -409,6 +433,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [equipment, setEquipment] = useState([]);
   const [structures, setStructures] = useState([]);
   const [layers, setLayers] = useState([]);
+  const [recentProgress, setRecentProgress] = useState([]);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const isRE = hasRole(profile.role, 'resident_engineer') || isPlatformAdmin;
@@ -468,6 +493,16 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       setEquipment(eqRes.data || []);
       setStructures(strRes.data || []);
       setLayers(layRes.data || []);
+      // Recent progress entries for overlap detection (last 90 days)
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0];
+      supabase.from('works_progress')
+        .select('activity_id, start_chainage, end_chainage, side, work_date, quantity')
+        .eq('project_id', selectedProject)
+        .gte('work_date', ninetyDaysAgo)
+        .not('activity_id', 'is', null)
+        .order('work_date', { ascending: false })
+        .limit(500)
+        .then(({ data }) => setRecentProgress(data || []));
       setContractorPersonnel(contKpRes.data || []);
       const contPresence = {};
       (contKpRes.data || []).forEach(t => { contPresence[t.id] = true; });
@@ -549,11 +584,16 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         const autoQty = isLinear && chFrom != null && chTo != null
           ? Math.abs(chTo - chFrom)
           : parseFloat(w.quantity) || 0;
+        // Flag overlaps in the record so the RE sees them during review/measurement
+        const subOverlaps = actId ? findOverlaps(recentProgress, actId, chFrom, chTo, w.side || 'Both') : [];
+        const overlapTag = subOverlaps.length > 0
+          ? ` [⚠ OVERLAPS prior entry ${fmtChainage(subOverlaps[0].start_chainage)}→${fmtChainage(subOverlaps[0].end_chainage)} of ${subOverlaps[0].work_date} — verify at measurement]`
+          : '';
         const { error: wpErr } = await supabase.from('works_progress').insert({
           project_id: selectedProject, activity_id: actId,
           work_date: form.report_date, start_chainage: chFrom || 0,
           end_chainage: chTo || 0, side: w.side || 'Both',
-          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : ''),
+          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + overlapTag,
           reported_by: profile.id,
         });
         if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
@@ -865,6 +905,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               ? Math.abs(chTo - chFrom).toFixed(3) : null;
             const remaining = linkedAct && linkedAct.planned_quantity > 0
               ? Math.max(0, linkedAct.planned_quantity - (linkedAct.completed_quantity || 0)) : null;
+            // Last reported chainage for this activity — guides the inspector to continue, not repeat
+            const actHistory = w.activity_id ? recentProgress.filter(p => p.activity_id === w.activity_id) : [];
+            const lastEntry = actHistory.length > 0 ? actHistory[0] : null;
+            // Overlap check against previous entries
+            const overlaps = (chFrom != null && chTo != null && w.activity_id)
+              ? findOverlaps(recentProgress, w.activity_id, chFrom, chTo, w.side || 'Both') : [];
             return (
               <EntryRow key={i} onRemove={() => removeEntry(setWorksEntries, worksEntries, i)}>
                 <div style={{ marginBottom: 8 }}>
@@ -905,6 +951,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                     <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
                     <span>Done: <b>{(linkedAct.completed_quantity || 0).toFixed ? Number(linkedAct.completed_quantity || 0).toFixed(2) : linkedAct.completed_quantity} {unit}</b></span>
                     {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
+                    {lastEntry && (
+                      <span style={{ width: '100%', color: 'var(--text-muted)' }}>
+                        📍 Last reported: Ch {fmtChainage(lastEntry.start_chainage)} → {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side || 'Both'}) on {lastEntry.work_date} — enter only <b>today's new section</b>
+                      </span>
+                    )}
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: isLinear ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 6 }}>
@@ -918,9 +969,25 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                   )}
                 </div>
                 <input type="text" placeholder="Notes — e.g. 'Grading to formation level, compaction ongoing'" value={w.notes || ''} onChange={e => updateEntry(setWorksEntries, worksEntries, i, 'notes', e.target.value)} style={{ fontSize: 12, width: '100%' }} />
-                {isLinear && autoKm && (
+                {isLinear && autoKm && overlaps.length === 0 && (
                   <div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
                     ✅ {autoKm} Km of {w.layer_name} — {w.side || 'Both'} sides{linkedAct ? ' → auto-syncs to activity register, BoQ & IPC' : ''}
+                  </div>
+                )}
+                {overlaps.length > 0 && (
+                  <div style={{ marginTop: 6, padding: '8px 10px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 10 }}>
+                    <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>
+                      ⚠ OVERLAP — this range was already reported for this activity:
+                    </div>
+                    {overlaps.slice(0, 3).map((o, oi) => (
+                      <div key={oi} style={{ color: 'var(--text-muted)' }}>
+                        • Ch {fmtChainage(o.start_chainage)} → {fmtChainage(o.end_chainage)} ({o.side || 'Both'}) on {o.work_date}
+                      </div>
+                    ))}
+                    <div style={{ color: 'var(--text)', marginTop: 4 }}>
+                      If today you continued from where you stopped, enter only the <b>new section</b> (e.g. start from Ch {fmtChainage(Math.max(...overlaps.map(o => Math.max(o.start_chainage || 0, o.end_chainage || 0))))}).
+                      If this is a genuine repeat (second pass, rework, other layer), proceed — it will be flagged for the RE's review.
+                    </div>
                   </div>
                 )}
                 {!isLinear && w.quantity > 0 && (
