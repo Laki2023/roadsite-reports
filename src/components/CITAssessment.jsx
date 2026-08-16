@@ -297,12 +297,7 @@ export default function CITAssessment({ claim, projectId, profile, showToast, on
               <div className="form-group" style={{ flex: 1, minWidth: 140 }}><label>Name</label>
                 <input type="text" value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="Eng. John Doe" /></div>
               <div className="form-group" style={{ flex: 1, minWidth: 140 }}><label>Role</label>
-                <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })}>
-                  <option value="">Select...</option>
-                  <option value="CIT Chair">CIT Chair</option><option value="CIT Member">CIT Member</option>
-                  <option value="Project Engineer">Project Engineer</option><option value="Quantity Surveyor">Quantity Surveyor</option>
-                  <option value="Contracts Officer">Contracts Officer</option><option value="Resident Engineer">Resident Engineer</option>
-                </select></div>
+                <input type="text" value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} placeholder="e.g. CIT Chair, QS, Contracts Officer" /></div>
               <div className="form-group" style={{ flex: 1, minWidth: 140 }}><label>Organisation</label>
                 <input type="text" value={newMember.organisation} onChange={e => setNewMember({ ...newMember, organisation: e.target.value })} placeholder="KeNHA" /></div>
               <button className="btn btn-secondary" onClick={addMember} style={{ height: 38 }}>+ Add</button>
