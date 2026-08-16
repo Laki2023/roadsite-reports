@@ -456,6 +456,49 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         </div>
       </div>
 
+      {/* ══════ CONTRACT DATA ══════ */}
+      <details className="card" style={{ padding: 0, marginBottom: 16 }}>
+        <summary style={{ padding: '12px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14, userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>📋 Contract Data</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>▼ Click to expand</span>
+        </summary>
+        <div style={{ padding: '0 16px 16px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <tbody>
+              {[
+                ['Project Name', p.name],
+                ['Employer', p.employer || '—'],
+                ['Financier', p.financier || '—'],
+                ['Contractor', p.contractor_name || '—'],
+                ['Engineer', p.engineer_name || '—'],
+                ["Engineer's Representative", p.engineer_rep || '—'],
+                ['Contract Number', p.contract_no || '—'],
+                ['FIDIC Edition', p.fidic_edition || '—'],
+                ['Contract Award Date', p.contract_award_date ? new Date(p.contract_award_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+                ['Contract Signing Date', p.contract_signing_date ? new Date(p.contract_signing_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+                ['Order to Commence', p.order_to_commence_date ? new Date(p.order_to_commence_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+                ['Commencement Date', startDt ? new Date(startDt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+                ['Original Completion Date', originalEndDt ? new Date(originalEndDt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+                ['Extension of Time', totalEOT > 0 ? `${totalEOT} days` : 'None'],
+                ['Revised Completion Date', revisedEndDt && revisedEndDt !== originalEndDt ? new Date(revisedEndDt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'],
+                ['Defects Liability Period', p.defects_liability_months ? `${p.defects_liability_months} Months` : '—'],
+                ['Original Contract Sum', p.original_contract_sum ? `KES ${Number(p.original_contract_sum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : (contractSum > 0 ? `KES ${Number(contractSum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—')],
+                ['Revised Contract Sum', p.revised_contract_sum ? `KES ${Number(p.revised_contract_sum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A'],
+                ['Addendums', p.addendums || 'None'],
+                ['Time Elapsed', `${elapsedMonths} months (${timePct}%)`],
+                ['Road Length', roadLen > 0 ? `${roadLen} Km (Ch. ${p.start_chainage || 0}+000 to ${p.end_chainage || roadLen}+000)` : '—'],
+                ['Performance Guarantee Expiry', p.performance_guarantee_expiry ? new Date(p.performance_guarantee_expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'],
+              ].map(([label, value], i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--text-muted)', width: '40%', verticalAlign: 'top' }}>{label}</td>
+                  <td style={{ padding: '8px 10px', color: 'var(--text)' }}>{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+
       {/* ══════ TOP KPI ROW ══════ */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:16 }}>
         <div className="card" style={{ padding:12, borderTop:`3px solid ${gradeColor}` }}>

@@ -7,6 +7,12 @@ const EMPTY_PROJECT = {
   start_chainage: '', end_chainage: '', road_class: '', region: '', county: '',
   commencement_date: '', original_completion_date: '', current_phase: 'Mobilization',
   status: 'active',
+  // Extended contract data
+  financier: '', engineer_name: '', engineer_rep: '',
+  contract_award_date: '', contract_signing_date: '', order_to_commence_date: '',
+  original_contract_sum: '', revised_contract_sum: '',
+  defects_liability_months: 12, performance_guarantee_expiry: '',
+  addendums: '', latitude: '', longitude: '',
 };
 
 export default function ProjectsPage({ profile, showToast, navigateTo }) {
@@ -32,8 +38,13 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
       const payload = {
         ...form,
         contract_sum: form.contract_sum ? parseFloat(form.contract_sum) : null,
+        original_contract_sum: form.original_contract_sum ? parseFloat(form.original_contract_sum) : null,
+        revised_contract_sum: form.revised_contract_sum ? parseFloat(form.revised_contract_sum) : null,
         start_chainage: form.start_chainage ? parseFloat(form.start_chainage) : null,
         end_chainage: form.end_chainage ? parseFloat(form.end_chainage) : null,
+        defects_liability_months: form.defects_liability_months ? parseInt(form.defects_liability_months) : 12,
+        latitude: form.latitude ? parseFloat(form.latitude) : null,
+        longitude: form.longitude ? parseFloat(form.longitude) : null,
       };
       if (editId) {
         await supabase.from('projects').update(payload).eq('id', editId);
@@ -255,6 +266,71 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                   <label>Original Completion Date</label>
                   <input type="date" value={form.original_completion_date}
                     onChange={e => setForm({ ...form, original_completion_date: e.target.value })} />
+                </div>
+                {/* Extended Contract Data */}
+                <div className="form-group">
+                  <label>Financier</label>
+                  <input value={form.financier || ''} onChange={e => setForm({ ...form, financier: e.target.value })}
+                    placeholder="e.g. GOK, World Bank" />
+                </div>
+                <div className="form-group">
+                  <label>Engineer</label>
+                  <input value={form.engineer_name || ''} onChange={e => setForm({ ...form, engineer_name: e.target.value })}
+                    placeholder="e.g. Director, Development, KeNHA" />
+                </div>
+                <div className="form-group full-width">
+                  <label>Engineer's Representative</label>
+                  <input value={form.engineer_rep || ''} onChange={e => setForm({ ...form, engineer_rep: e.target.value })}
+                    placeholder="e.g. WITTS Engineering Consultancy Ltd" />
+                </div>
+                <div className="form-group">
+                  <label>Contract Award Date</label>
+                  <input type="date" value={form.contract_award_date || ''} onChange={e => setForm({ ...form, contract_award_date: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Contract Signing Date</label>
+                  <input type="date" value={form.contract_signing_date || ''} onChange={e => setForm({ ...form, contract_signing_date: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Order to Commence Date</label>
+                  <input type="date" value={form.order_to_commence_date || ''} onChange={e => setForm({ ...form, order_to_commence_date: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Original Contract Sum (KES)</label>
+                  <input type="number" step="0.01" value={form.original_contract_sum || ''}
+                    onChange={e => setForm({ ...form, original_contract_sum: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Revised Contract Sum (KES)</label>
+                  <input type="number" step="0.01" value={form.revised_contract_sum || ''}
+                    onChange={e => setForm({ ...form, revised_contract_sum: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Defects Liability (months)</label>
+                  <input type="number" value={form.defects_liability_months || 12}
+                    onChange={e => setForm({ ...form, defects_liability_months: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Performance Guarantee Expiry</label>
+                  <input type="date" value={form.performance_guarantee_expiry || ''}
+                    onChange={e => setForm({ ...form, performance_guarantee_expiry: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Addendums</label>
+                  <input value={form.addendums || ''} onChange={e => setForm({ ...form, addendums: e.target.value })}
+                    placeholder="e.g. Addendum No. 1, 2" />
+                </div>
+                <div className="form-group">
+                  <label>Latitude</label>
+                  <input type="number" step="0.0001" value={form.latitude || ''}
+                    onChange={e => setForm({ ...form, latitude: e.target.value })}
+                    placeholder="e.g. -0.52" />
+                </div>
+                <div className="form-group">
+                  <label>Longitude</label>
+                  <input type="number" step="0.0001" value={form.longitude || ''}
+                    onChange={e => setForm({ ...form, longitude: e.target.value })}
+                    placeholder="e.g. 37.05" />
                 </div>
               </div>
               <div className="btn-group mt-24">
