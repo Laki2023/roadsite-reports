@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://gyqmlynozcnzihbsfyfx.supabase.co';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'sb_publishable_leUaxFyWfgWEpwAGyVIaJQ_SjXXLu1p';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase environment variables. ' +
+    'Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in your .env file or hosting environment.'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -9,14 +16,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
    director_general > super_admin > engineer > project_engineer > resident_engineer > inspector > viewer > pending
    Each level can do everything below it. */
 const ROLE_LEVELS = {
-  director_general: 8,
-  super_admin: 7,
-  engineer: 6,
-  project_engineer: 5,
-  project_officer: 4,
-  resident_engineer: 3,
-  inspector: 2,
-  contractor_qs: 1.5,
+  director_general: 9,
+  super_admin: 8,
+  engineer: 7,
+  project_engineer: 6,
+  project_officer: 5,
+  resident_engineer: 4,
+  inspector: 3,
+  contractor_qs: 2,
   viewer: 1,
   pending: 0,
 };
