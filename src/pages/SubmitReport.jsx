@@ -10,6 +10,7 @@ import {
   MATERIALS_LIST,
   ISSUE_CATEGORIES as REF_ISSUE_CATEGORIES,
 } from '../data/referenceData';
+import { syncWorksActivity } from '../lib/syncWorksActivity';
 
 // ── Constants ──
 const ISSUE_SEVERITY = ['Low', 'Medium', 'High', 'Critical'];
@@ -702,6 +703,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           reported_by: profile.id,
         });
         if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
+        // Sync works_activities so Dashboard Physical Progress updates
+        if (!wpErr && actId) {
+          await syncWorksActivity(selectedProject, actId);
+        }
       }
 
       // 3. Equipment Status — auto-register items from reference list
