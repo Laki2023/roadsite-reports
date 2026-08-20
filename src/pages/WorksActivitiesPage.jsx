@@ -5,6 +5,7 @@ import {
   groupByCategory,
 } from '../data/referenceData';
 import { generateWorksDocx } from '../lib/generateWorksDocx';
+import { syncWorksActivity } from '../lib/syncWorksActivity';
 
 // ── Chainage helpers ──
 function parseChainage(input) {
@@ -77,10 +78,13 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
       const chTo = parseChainage(logForm.chainage_to);
       const length = chFrom != null && chTo != null ? Math.abs(chTo - chFrom) : 0;
 
+      // Find or create matching works_activities record so Dashboard picks up progress
+      const activityId = await syncWorksActivity(selectedProject, null, logForm.activity, logForm.category);
+
       const { error } = await supabase.from('works_progress').insert({
         project_id: selectedProject,
         work_date: logForm.work_date,
-        activity_id: null, // standalone — not linked to works_activities
+        activity_id: activityId || null,
         start_chainage: chFrom || 0,
         end_chainage: chTo || 0,
         side: logForm.side || 'Both',
@@ -89,6 +93,11 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
         reported_by: profile.id,
       });
       if (error) throw error;
+
+      // Re-sync the works_activities row with updated totals from works_progress
+      if (activityId) {
+        await syncWorksActivity(selectedProject, activityId);
+      }
 
       showToast(`✅ ${logForm.activity} logged — ${fmtCh(chFrom)} → ${fmtCh(chTo)}`);
       // Reset form but keep date and project
@@ -104,7 +113,13 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   // ── Delete an entry ──
   async function deleteEntry(id) {
     if (!window.confirm('Delete this activity entry?')) return;
+    // Get the activity_id before deleting so we can re-sync
+    const { data: entry } = await supabase.from('works_progress').select('activity_id').eq('id', id).single();
     await supabase.from('works_progress').delete().eq('id', id);
+    // Re-sync the works_activities totals after deletion
+    if (entry?.activity_id) {
+      await syncWorksActivity(selectedProject, entry.activity_id);
+    }
     showToast('Entry deleted');
     loadEntries();
   }
