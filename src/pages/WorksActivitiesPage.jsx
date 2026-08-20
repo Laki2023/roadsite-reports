@@ -4,6 +4,7 @@ import {
   ACTIVITIES_LIST, ACTIVITY_CATEGORIES,
   groupByCategory,
 } from '../data/referenceData';
+import { generateWorksDocx } from '../lib/generateWorksDocx';
 
 // ── Chainage helpers ──
 function parseChainage(input) {
@@ -38,6 +39,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   const [entries, setEntries] = useState([]);
   const [tab, setTab] = useState('log');
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Log form state
   const [logForm, setLogForm] = useState({
@@ -105,6 +107,24 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     await supabase.from('works_progress').delete().eq('id', id);
     showToast('Entry deleted');
     loadEntries();
+  }
+
+  // ── Export to Word ──
+  async function exportWord() {
+    if (entries.length === 0) { showToast('No activities to export', 'error'); return; }
+    setExporting(true);
+    try {
+      const proj = projects.find(p => p.id === selectedProject);
+      const fileName = await generateWorksDocx({
+        project: proj || { name: 'Project' },
+        entries,
+      });
+      showToast(`Exported ${fileName}`);
+    } catch (err) {
+      showToast('Export failed: ' + err.message, 'error');
+    } finally {
+      setExporting(false);
+    }
   }
 
   // ── Group entries by date ──
@@ -348,6 +368,14 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
           {/* ══════ DAILY VIEW TAB ══════ */}
           {tab === 'daily' && (
             <div>
+              {sortedDates.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                  <button className="btn btn-secondary" onClick={exportWord} disabled={exporting}
+                    style={{ fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {exporting ? '⏳ Exporting...' : '📄 Export Word'}
+                  </button>
+                </div>
+              )}
               {sortedDates.length === 0 ? (
                 <div className="card empty-state">
                   <div className="icon">📋</div>
@@ -373,7 +401,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                         justifyContent: 'space-between', alignItems: 'center', userSelect: 'none',
                         fontWeight: 600, fontSize: 14, listStyle: 'none' }}>
                         <span>
-                          <span style={{ color: 'var(--accent)' }}>📅 {date}</span>
+                          <span style={{ color: 'var(--accent)' }}>📁 {date}</span>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
                             {dayEntries.length} {dayEntries.length === 1 ? 'activity' : 'activities'}
                           </span>
