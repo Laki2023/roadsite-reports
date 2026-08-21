@@ -599,9 +599,25 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   function removeEntry(setter, list, i) { setter(list.filter((_, idx) => idx !== i)); }
 
   // ── Completeness ──
+  // Steps with no entries are valid (empty is fine for a daily report).
+  // When entries ARE added, their required fields must be filled.
+  const worksValid = worksEntries.every(w => (w.layer_name || w.activity_id) && w.quantity);
+  const equipValid = equipEntries.every(e => e.equipment_name || e.equipment_id);
+  const testsValid = testEntries.every(t => t.test_type);
+  const structsValid = structEntries.every(s => s.structure_name || s.structure_id);
+  const issuesValid = issueEntries.every(i => i.title && i.severity);
+  const instructionsValid = instructionEntries.every(i => i.subject && i.instruction_type);
+
   const stepComplete = [
-    selectedProject && form.report_date && form.weather,
-    true, true, true, true, true, true, true, true,
+    selectedProject && form.report_date && form.weather,  // 1: Project & Weather
+    true,                                                  // 2: Contractor Workforce (counts can be 0)
+    true,                                                  // 3: Engineer Team (counts can be 0)
+    worksValid,                                            // 4: Works Progress
+    equipValid,                                            // 5: Equipment
+    testsValid,                                            // 6: Quality & Materials
+    structsValid,                                          // 7: Structures
+    issuesValid && instructionsValid,                      // 8: Issues & Instructions
+    true,                                                  // 9: Review & Submit
   ];
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
@@ -1450,7 +1466,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </button>
         <span className="text-sm text-muted" style={{ alignSelf: 'center' }}>Step {step} of {STEPS.length}</span>
         {step < STEPS.length ? (
-          <button className="btn btn-primary" onClick={() => setStep(step + 1)} disabled={step === 1 && !selectedProject}>
+          <button className="btn btn-primary" onClick={() => setStep(step + 1)} disabled={!stepComplete[step - 1]}>
             Next →
           </button>
         ) : (
