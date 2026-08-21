@@ -28,6 +28,7 @@ import ClaimsPage from './pages/ClaimsPage';
 import KeyPersonnelPage from './pages/KeyPersonnelPage';
 import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
 import TakingOffPage from './pages/TakingOffPage';
+import ErrorBoundary from './components/ErrorBoundary';
 import ObligationsPage from './pages/ObligationsPage';
 
 const NAV_ITEMS = [
@@ -325,7 +326,9 @@ export default function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        {renderPage()}
+        <ErrorBoundary key={page}>
+          {renderPage()}
+        </ErrorBoundary>
       </main>
 
       {/* Toast */}
