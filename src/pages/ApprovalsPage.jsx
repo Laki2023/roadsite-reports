@@ -140,10 +140,7 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
 
     setSubmitting(true);
     // Generate instruction number
-    const { count } = await supabase.from('site_instructions')
-      .select('id', { count: 'exact', head: true })
-      .eq('project_id', instrForm.project_id);
-    const instrNo = `SI-${String((count || 0) + 1).padStart(4, '0')}`;
+    const { data: instrNo } = await supabase.rpc('next_instruction_no', { p_project_id: instrForm.project_id });
 
     const { error } = await supabase.from('site_instructions').insert({
       ...instrForm,
