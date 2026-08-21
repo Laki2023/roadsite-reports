@@ -66,7 +66,7 @@ const NAV_ITEMS = [
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState(() => window.location.hash.slice(1) || 'dashboard');
   const [selectedProject, setSelectedProject] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -129,9 +129,20 @@ export default function App() {
 
   function navigateTo(pg, project = null) {
     setPage(pg);
+    window.location.hash = pg;
     if (project !== undefined) setSelectedProject(project);
     setSidebarOpen(false);
   }
+
+  // Sync page state with browser back/forward buttons
+  useEffect(() => {
+    function onHashChange() {
+      const h = window.location.hash.slice(1);
+      if (h && h !== page) setPage(h);
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [page]);
 
   function timeAgo(dateStr) {
     if (!dateStr) return '';
