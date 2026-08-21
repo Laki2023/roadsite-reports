@@ -793,10 +793,9 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       // 7. Site Instructions
       for (const instr of instructionEntries) {
         if (!instr.subject) continue;
-        const { count } = await supabase.from('site_instructions')
-          .select('id', { count: 'exact', head: true }).eq('project_id', selectedProject);
+        const { data: instrNo } = await supabase.rpc('next_instruction_no', { p_project_id: selectedProject });
         const { error: siErr } = await supabase.from('site_instructions').insert({
-          project_id: selectedProject, instruction_no: `SI-${String((count || 0) + 1).padStart(4, '0')}`,
+          project_id: selectedProject, instruction_no: instrNo,
           instruction_type: instr.instruction_type, subject: instr.subject,
           description: instr.description || null, chainage_from: instr.chainage || null,
           issued_by: profile.id, issued_by_role: profile.role,
