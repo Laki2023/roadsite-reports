@@ -127,6 +127,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectDetail, setProjectDetail] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [queryErrors, setQueryErrors] = useState([]);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
 
@@ -134,26 +135,31 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
 
   async function loadDashboard() {
     const [projRes, repRes, boqRes, worksRes, eqRes, strRes, issRes, layerRes, testRes, ipcRes, aqRes] = await Promise.all([
-      supabase.from('projects').select('*').order('name'),
+      supabase.from('projects').select('*').order('name').limit(100),
       supabase.from('daily_reports').select('*, projects(name)').order('report_date', { ascending: false }).limit(10),
-      supabase.from('boq_items').select('project_id, boq_amount, value_to_date, completed_quantity, boq_quantity'),
-      supabase.from('works_activities').select('project_id, activity_name, status, completed_quantity, planned_quantity'),
-      supabase.from('equipment_register').select('project_id, required_quantity, actual_on_site, is_key_equipment'),
-      supabase.from('structures').select('project_id, structure_type, overall_status, percent_complete'),
-      supabase.from('site_issues').select('project_id, status, severity'),
-      supabase.from('pavement_layers').select('project_id, layer_type, layer_status'),
-      supabase.from('quality_tests').select('project_id, result_status'),
-      supabase.from('ipc_certificates').select('project_id, ipc_no, certified_amount, paid_amount').order('ipc_no'),
-      supabase.from('approval_queue').select('id, status, priority, current_approver_role').eq('status', 'pending'),
+      supabase.from('boq_items').select('project_id, boq_amount, value_to_date, completed_quantity, boq_quantity').limit(2000),
+      supabase.from('works_activities').select('project_id, activity_name, status, completed_quantity, planned_quantity').limit(2000),
+      supabase.from('equipment_register').select('project_id, required_quantity, actual_on_site, is_key_equipment').limit(1000),
+      supabase.from('structures').select('project_id, structure_type, overall_status, percent_complete').limit(1000),
+      supabase.from('site_issues').select('project_id, status, severity').limit(1000),
+      supabase.from('pavement_layers').select('project_id, layer_type, layer_status').limit(1000),
+      supabase.from('quality_tests').select('project_id, result_status').limit(2000),
+      supabase.from('ipc_certificates').select('project_id, ipc_no, certified_amount, paid_amount').order('ipc_no').limit(500),
+      supabase.from('approval_queue').select('id, status, priority, current_approver_role').eq('status', 'pending').limit(200),
     ]);
 
-    // Surface any query failures instead of silently showing empty sections
+    // Surface any query failures to the user instead of silently showing empty sections
     const resultMap = { projects: projRes, daily_reports: repRes, boq_items: boqRes, works_activities: worksRes,
       equipment_register: eqRes, structures: strRes, site_issues: issRes, pavement_layers: layerRes,
       quality_tests: testRes, ipc_certificates: ipcRes, approval_queue: aqRes };
+    const errors = [];
     Object.entries(resultMap).forEach(([table, res]) => {
-      if (res.error) console.error(`Dashboard query failed [${table}]:`, res.error.message);
+      if (res.error) {
+        console.error(`Dashboard query failed [${table}]:`, res.error.message);
+        errors.push(`${table}: ${res.error.message}`);
+      }
     });
+    if (errors.length > 0) setQueryErrors(errors);
 
     const projs = projRes.data || [];
     const boq = boqRes.data || [];
@@ -230,7 +236,15 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     setProjectDetail(true);
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>Loading dashboard...</div>;
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
+      <div style={{ width: 40, height: 40, border: '3px solid var(--border)', borderTopColor: '#e87b35',
+        borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ fontSize: 14, fontWeight: 500 }}>Loading dashboard...</div>
+      <div style={{ fontSize: 12, marginTop: 4 }}>Fetching project data</div>
+    </div>
+  );
 
   // Contractor's QS gets a limited view — just their assigned projects + link to Taking Off Sheet
   if (profile?.role === 'contractor_qs') {
@@ -367,6 +381,15 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Query error banner — visible to admins */}
+      {queryErrors.length > 0 && isPlatformAdmin && (
+        <div style={{ padding: '10px 14px', marginBottom: 16, borderRadius: 8, background: '#fef2f2',
+          border: '1px solid #fecaca', fontSize: 12, color: '#dc2626' }}>
+          <strong>⚠ Some dashboard data failed to load:</strong>
+          <span style={{ marginLeft: 8 }}>{queryErrors.join('; ')}</span>
         </div>
       )}
 
