@@ -22,9 +22,11 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
   const [entries, setEntries] = useState([]);
-  const [tab, setTab] = useState('log');
+  const [activities, setActivities] = useState([]);
+  const [tab, setTab] = useState('summary');
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [expandedActivity, setExpandedActivity] = useState(null);
 
   // Log form state
   const [logForm, setLogForm] = useState({
@@ -40,7 +42,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
   }, []);
 
-  useEffect(() => { if (selectedProject) loadEntries(); }, [selectedProject]);
+  useEffect(() => { if (selectedProject) { loadEntries(); loadActivities(); } }, [selectedProject]);
 
   async function loadEntries() {
     const { data } = await supabase.from('works_progress')
@@ -48,11 +50,19 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
       .eq('project_id', selectedProject)
       .order('work_date', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(200);
+      .limit(500);
     setEntries(data || []);
   }
 
-  // ── Save a single activity entry ──
+  async function loadActivities() {
+    const { data } = await supabase.from('works_activities')
+      .select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity, status, last_progress_date')
+      .eq('project_id', selectedProject)
+      .order('sort_order');
+    setActivities(data || []);
+  }
+
+  // ââ Save a single activity entry ââ
   async function saveEntry(e) {
     e.preventDefault();
     if (!logForm.activity) { showToast('Select an activity', 'error'); return; }
@@ -73,7 +83,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
         end_chainage: chTo || 0,
         side: logForm.side || 'Both',
         quantity: length,
-        notes: `${logForm.activity}${logForm.category ? ' [' + logForm.category + ']' : ''}${logForm.width_m ? ' | Width: ' + logForm.width_m + 'm' : ''}${logForm.notes ? ' — ' + logForm.notes : ''}`,
+        notes: `${logForm.activity}${logForm.category ? ' [' + logForm.category + ']' : ''}${logForm.width_m ? ' | Width: ' + logForm.width_m + 'm' : ''}${logForm.notes ? ' â ' + logForm.notes : ''}`,
         reported_by: profile.id,
       });
       if (error) throw error;
@@ -83,10 +93,11 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
         await syncWorksActivity(selectedProject, activityId);
       }
 
-      showToast(`✅ ${logForm.activity} logged — ${fmtCh(chFrom)} → ${fmtCh(chTo)}`);
+      showToast(`â ${logForm.activity} logged â ${fmtCh(chFrom)} â ${fmtCh(chTo)}`);
       // Reset form but keep date and project
       setLogForm(prev => ({ ...prev, activity: '', category: '', chainage_from: '', chainage_to: '', side: 'Both', width_m: '', notes: '' }));
       loadEntries();
+      loadActivities();
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -94,7 +105,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     }
   }
 
-  // ── Delete an entry ──
+  // ââ Delete an entry ââ
   async function deleteEntry(id) {
     if (!window.confirm('Delete this activity entry?')) return;
     // Get the activity_id before deleting so we can re-sync
@@ -106,9 +117,10 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     }
     showToast('Entry deleted');
     loadEntries();
+    loadActivities();
   }
 
-  // ── Export to Word ──
+  // ââ Export to Word ââ
   async function exportWord() {
     if (entries.length === 0) { showToast('No activities to export', 'error'); return; }
     setExporting(true);
@@ -126,7 +138,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     }
   }
 
-  // ── Group entries by date ──
+  // ââ Group entries by date ââ
   const grouped = {};
   entries.forEach(e => {
     const d = e.work_date || 'Unknown';
@@ -135,19 +147,19 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   });
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
-  // ── Activity picker — filter by search ──
+  // ââ Activity picker â filter by search ââ
   const groupedActivities = groupByCategory(ACTIVITIES_LIST);
   const filteredActivities = pickerSearch.trim()
     ? ACTIVITIES_LIST.filter(a => a.name.toLowerCase().includes(pickerSearch.toLowerCase().trim()))
     : ACTIVITIES_LIST;
   const filteredGrouped = groupByCategory(filteredActivities);
 
-  // ── Parse activity name and category from notes for display ──
+  // ââ Parse activity name and category from notes for display ââ
   function parseEntry(entry) {
     const notes = entry.notes || '';
-    const actMatch = notes.match(/^([^[\]—]+?)(?:\s*\[([^\]]+)\])?(?:\s*\|.*?)?(?:\s*—\s*(.*))?$/);
+    const actMatch = notes.match(/^([^[\]â]+?)(?:\s*\[([^\]]+)\])?(?:\s*\|.*?)?(?:\s*â\s*(.*))?$/);
     return {
-      activity: actMatch?.[1]?.trim() || notes.split(' — ')[0] || 'Activity',
+      activity: actMatch?.[1]?.trim() || notes.split(' â ')[0] || 'Activity',
       category: actMatch?.[2] || '',
       extraNotes: actMatch?.[3] || '',
     };
@@ -159,7 +171,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     <div>
       <div className="page-header">
         <div>
-          <h2>⛏️ Work Activities</h2>
+          <h2>âï¸ Work Activities</h2>
           <div className="subtitle">Log daily construction activities by chainage</div>
         </div>
       </div>
@@ -174,15 +186,148 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
       {selectedProject && (
         <>
           <div className="tabs">
+            <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>
+              ð Activity Summary ({activities.length})
+            </button>
             <button className={tab === 'log' ? 'active' : ''} onClick={() => setTab('log')}>
-              📝 Log Activity
+              ð Log Activity
             </button>
             <button className={tab === 'daily' ? 'active' : ''} onClick={() => setTab('daily')}>
-              📋 Daily View ({sortedDates.length} days)
+              ð Daily View ({sortedDates.length} days)
             </button>
           </div>
 
-          {/* ══════ LOG ACTIVITY TAB ══════ */}
+          {/* ââââââ ACTIVITY SUMMARY TAB ââââââ */}
+          {tab === 'summary' && (
+            <div>
+              {activities.length === 0 ? (
+                <div className="card empty-state">
+                  <div className="icon">ð</div>
+                  <p>No activities registered yet</p>
+                  <p className="text-sm text-muted">Activities are automatically created when you log work in daily reports or the Log Activity tab</p>
+                </div>
+              ) : (
+                activities.map(act => {
+                  const pct = act.planned_quantity > 0
+                    ? Math.min(100, Math.round((act.completed_quantity || 0) / act.planned_quantity * 100))
+                    : 0;
+                  const isExpanded = expandedActivity === act.id;
+                  // Get daily entries for this activity
+                  const actEntries = entries.filter(e => e.activity_id === act.id)
+                    .sort((a, b) => b.work_date?.localeCompare(a.work_date));
+                  const fromDailyReport = actEntries.filter(e => e.daily_report_id);
+                  const fromStandalone = actEntries.filter(e => !e.daily_report_id);
+
+                  return (
+                    <div key={act.id} className="card" style={{ padding: 0, marginBottom: 8 }}>
+                      {/* Activity header â clickable to expand */}
+                      <div
+                        onClick={() => setExpandedActivity(isExpanded ? null : act.id)}
+                        style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+
+                        {/* Status indicator */}
+                        <div style={{
+                          width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                          background: act.status === 'Completed' ? '#10b981' : act.status === 'In Progress' ? '#e87b35' : '#6b7280',
+                        }} />
+
+                        {/* Activity info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {act.activity_name}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {act.category && <span style={{ marginRight: 8 }}>{act.category}</span>}
+                            {act.last_progress_date && <span>Last: {act.last_progress_date}</span>}
+                            {actEntries.length > 0 && <span style={{ marginLeft: 8 }}>{actEntries.length} entries</span>}
+                            {fromDailyReport.length > 0 && (
+                              <span style={{ marginLeft: 6, color: '#6366f1', fontWeight: 600 }}>
+                                ({fromDailyReport.length} from daily reports)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div style={{ width: 140, flexShrink: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3, color: 'var(--text-muted)' }}>
+                            <span>{(act.completed_quantity || 0).toFixed(2)} / {(act.planned_quantity || 0).toFixed(2)} {act.unit || 'Km'}</span>
+                            <span style={{ fontWeight: 700, color: pct >= 80 ? '#10b981' : pct >= 40 ? '#e87b35' : '#ef4444' }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: 6, background: 'var(--bg-hover)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.3s',
+                              width: `${pct}%`,
+                              background: pct >= 80 ? '#10b981' : pct >= 40 ? '#e87b35' : '#ef4444',
+                            }} />
+                          </div>
+                        </div>
+
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{isExpanded ? 'â²' : 'â¼'}</span>
+                      </div>
+
+                      {/* Expanded: daily breakdown */}
+                      {isExpanded && (
+                        <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
+                          {actEntries.length === 0 ? (
+                            <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                              No progress entries yet
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: 12 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 80px 60px', gap: 4, padding: '4px 0',
+                                fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
+                                <span>Date</span>
+                                <span>Details</span>
+                                <span>Chainage</span>
+                                <span>Quantity</span>
+                                <span>Source</span>
+                              </div>
+                              {actEntries.map(e => {
+                                const p = parseEntry(e);
+                                return (
+                                  <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px 80px 60px', gap: 4,
+                                    padding: '6px 0', fontSize: 12, borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>{e.work_date}</span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {p.extraNotes || e.side || 'â'}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                      {fmtCh(e.start_chainage)}â{fmtCh(e.end_chainage)}
+                                    </span>
+                                    <span style={{ fontWeight: 600 }}>
+                                      {e.quantity ? Number(e.quantity).toFixed(3) : 'â'} {act.unit || 'Km'}
+                                    </span>
+                                    <span style={{
+                                      fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 600, textAlign: 'center',
+                                      background: e.daily_report_id ? '#6366f120' : '#e87b3520',
+                                      color: e.daily_report_id ? '#6366f1' : '#e87b35',
+                                    }}>
+                                      {e.daily_report_id ? 'Report' : 'Manual'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Running total */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 4px',
+                                fontSize: 12, fontWeight: 700, borderTop: '2px solid var(--border)', marginTop: 4 }}>
+                                <span>Cumulative Total</span>
+                                <span style={{ color: '#10b981' }}>
+                                  {actEntries.reduce((sum, e) => sum + (parseFloat(e.quantity) || 0), 0).toFixed(3)} {act.unit || 'Km'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* ââââââ LOG ACTIVITY TAB ââââââ */}
           {tab === 'log' && (
             <div>
               <div className="card" style={{ padding: 20 }}>
@@ -208,7 +353,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                       </span>
                       {logForm.activity && (
                         <span onClick={e => { e.stopPropagation(); setLogForm({ ...logForm, activity: '', category: '' }); }}
-                          style={{ color: 'var(--text-muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }}>×</span>
+                          style={{ color: 'var(--text-muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16 }}>Ã</span>
                       )}
                     </div>
                     {logForm.category && (
@@ -259,7 +404,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                             ))}
                             {filteredActivities.length === 0 && (
                               <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
-                                No matches — type to add custom activity
+                                No matches â type to add custom activity
                               </div>
                             )}
                             {/* Custom entry */}
@@ -313,8 +458,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                   return (
                     <div style={{ padding: '8px 12px', background: '#05966915', border: '1px solid #05966930',
                       borderRadius: 'var(--radius)', fontSize: 12, color: '#059669', fontWeight: 600, marginBottom: 12 }}>
-                      ✅ {logForm.activity}: {fmtCh(f)} → {fmtCh(t)} ({logForm.side}) = {len.toFixed(3)} Km
-                      {logForm.width_m && ` × ${logForm.width_m}m width`}
+                      â {logForm.activity}: {fmtCh(f)} â {fmtCh(t)} ({logForm.side}) = {len.toFixed(3)} Km
+                      {logForm.width_m && ` Ã ${logForm.width_m}m width`}
                     </div>
                   );
                 })()}
@@ -329,7 +474,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                 {/* Save button */}
                 <button className="btn btn-primary" onClick={saveEntry} disabled={saving || !logForm.activity}
                   style={{ width: '100%', padding: 14, fontSize: 15, fontWeight: 700 }}>
-                  {saving ? '⏳ Saving...' : '✅ Log This Activity'}
+                  {saving ? 'â³ Saving...' : 'â Log This Activity'}
                 </button>
               </div>
 
@@ -337,7 +482,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
               {todayEntries.length > 0 && (
                 <div className="card" style={{ padding: 16, marginTop: 16 }}>
                   <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>
-                    📋 Logged Today — {logForm.work_date} ({todayEntries.length} {todayEntries.length === 1 ? 'entry' : 'entries'})
+                    ð Logged Today â {logForm.work_date} ({todayEntries.length} {todayEntries.length === 1 ? 'entry' : 'entries'})
                   </h3>
                   {todayEntries.map(e => {
                     const p = parseEntry(e);
@@ -348,14 +493,14 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.activity}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {fmtCh(e.start_chainage)} → {fmtCh(e.end_chainage)} | {e.side}
+                            {fmtCh(e.start_chainage)} â {fmtCh(e.end_chainage)} | {e.side}
                             {e.quantity > 0 && ` | ${Number(e.quantity).toFixed(3)} Km`}
-                            {p.extraNotes && ` — ${p.extraNotes}`}
+                            {p.extraNotes && ` â ${p.extraNotes}`}
                           </div>
                         </div>
                         <button onClick={() => deleteEntry(e.id)}
                           style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '4px 8px' }}
-                          title="Delete">×</button>
+                          title="Delete">Ã</button>
                       </div>
                     );
                   })}
@@ -364,20 +509,20 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
             </div>
           )}
 
-          {/* ══════ DAILY VIEW TAB ══════ */}
+          {/* ââââââ DAILY VIEW TAB ââââââ */}
           {tab === 'daily' && (
             <div>
               {sortedDates.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
                   <button className="btn btn-secondary" onClick={exportWord} disabled={exporting}
                     style={{ fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {exporting ? '⏳ Exporting...' : '📄 Export Word'}
+                    {exporting ? 'â³ Exporting...' : 'ð Export Word'}
                   </button>
                 </div>
               )}
               {sortedDates.length === 0 ? (
                 <div className="card empty-state">
-                  <div className="icon">📋</div>
+                  <div className="icon">ð</div>
                   <p>No activities logged yet</p>
                   <p className="text-sm text-muted">Switch to "Log Activity" tab to start recording</p>
                 </div>
@@ -400,12 +545,12 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                         justifyContent: 'space-between', alignItems: 'center', userSelect: 'none',
                         fontWeight: 600, fontSize: 14, listStyle: 'none' }}>
                         <span>
-                          <span style={{ color: 'var(--accent)' }}>📁 {date}</span>
+                          <span style={{ color: 'var(--accent)' }}>ð {date}</span>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
                             {dayEntries.length} {dayEntries.length === 1 ? 'activity' : 'activities'}
                           </span>
                         </span>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>▼</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>â¼</span>
                       </summary>
                       <div style={{ padding: '0 16px 16px' }}>
                         {Object.entries(byCat).map(([cat, catEntries]) => (
@@ -421,15 +566,21 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                                 <div>
                                   <span style={{ fontWeight: 600, fontSize: 13 }}>{e.activity}</span>
                                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                    📍 {fmtCh(e.start_chainage)} → {fmtCh(e.end_chainage)}
+                                    ð {fmtCh(e.start_chainage)} â {fmtCh(e.end_chainage)}
                                     <span style={{ margin: '0 6px' }}>|</span>{e.side}
                                     {e.quantity > 0 && <><span style={{ margin: '0 6px' }}>|</span><b>{Number(e.quantity).toFixed(3)} Km</b></>}
                                     {e.extraNotes && <><span style={{ margin: '0 6px' }}>|</span>{e.extraNotes}</>}
                                   </div>
                                 </div>
-                                <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', marginLeft: 12 }}>
-                                  {e.reporter?.full_name}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 12 }}>
+                                  {e.daily_report_id && (
+                                    <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                                      background: '#6366f120', color: '#6366f1' }}>Report</span>
+                                  )}
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                    {e.reporter?.full_name}
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>
