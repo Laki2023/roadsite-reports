@@ -6,24 +6,8 @@ import {
 } from '../data/referenceData';
 import { generateWorksDocx } from '../lib/generateWorksDocx';
 import { syncWorksActivity } from '../lib/syncWorksActivity';
+import { parseChainage, fmtChainage as fmtCh } from '../lib/utils';
 
-// ── Chainage helpers ──
-function parseChainage(input) {
-  if (input == null || input === '') return null;
-  const str = String(input).trim().replace(/km/i, '').trim();
-  if (str.includes('+')) {
-    const [kmPart, mPart] = str.split('+');
-    return (parseFloat(kmPart.replace(/[^0-9.]/g, '')) || 0) + (parseFloat(mPart.replace(/[^0-9.]/g, '')) || 0) / 1000;
-  }
-  const num = parseFloat(str.replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return null;
-  return num >= 200 ? num / 1000 : num;
-}
-function fmtCh(km) {
-  if (km == null) return '—';
-  const k = Math.floor(km); const m = Math.round((km - k) * 1000);
-  return `${k}+${String(m).padStart(3, '0')}`;
-}
 
 const CATEGORY_COLORS = {
   'Preliminary & General': '#6366f1', 'Setting Out & Survey': '#8b5cf6',
