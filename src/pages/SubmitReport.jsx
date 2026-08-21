@@ -691,6 +691,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           : '';
         const { error: wpErr } = await supabase.from('works_progress').insert({
           project_id: selectedProject, activity_id: actId,
+          daily_report_id: report.id,
           work_date: form.report_date, start_chainage: chFrom || 0,
           end_chainage: chTo || 0, side: w.side || 'Both',
           quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + sideTag + overlapTag,
