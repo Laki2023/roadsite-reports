@@ -145,6 +145,15 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [page]);
 
+  // Close sidebar on Escape key
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'Escape' && sidebarOpen) setSidebarOpen(false);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen]);
+
   function timeAgo(dateStr) {
     if (!dateStr) return '';
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -248,11 +257,21 @@ export default function App() {
         <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>RoadSite Reports</span>
       </div>
 
+      {/* Skip to content link for keyboard users */}
+      <a href="#main-content" style={{
+        position: 'absolute', top: -40, left: 0, background: 'var(--accent, #3b82f6)',
+        color: '#fff', padding: '8px 16px', zIndex: 10000, fontSize: 14, fontWeight: 600,
+        transition: 'top 0.2s',
+      }} onFocus={(e) => { e.target.style.top = '0'; }}
+        onBlur={(e) => { e.target.style.top = '-40px'; }}>
+        Skip to main content
+      </a>
+
       {/* Sidebar Overlay */}
-      <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
 
       {/* Sidebar */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} role="navigation" aria-label="Main navigation">
         <div className="sidebar-brand">
           <h1>RoadSite Reports</h1>
           <div className="brand-sub">v15.9 — Road Project Management</div>
@@ -291,6 +310,7 @@ export default function App() {
             return (
               <button key={item.key}
                 className={isActive ? 'active' : ''}
+                aria-current={isActive ? 'page' : undefined}
                 onClick={() => navigateTo(item.key)}
                 style={{ position: 'relative' }}>
                 <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
@@ -325,14 +345,14 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="main-content">
+      <main id="main-content" className="main-content" role="main" aria-label="Page content">
         <ErrorBoundary key={page}>
           {renderPage()}
         </ErrorBoundary>
       </main>
 
       {/* Toast */}
-      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
+      {toast && <div className={`toast ${toast.type}`} role="alert" aria-live="polite">{toast.msg}</div>}
     </div>
   );
 }
