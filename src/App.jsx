@@ -30,6 +30,7 @@ import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
 import TakingOffPage from './pages/TakingOffPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import ObligationsPage from './pages/ObligationsPage';
+import ConstructionGuidePage from './pages/ConstructionGuidePage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
@@ -57,6 +58,8 @@ const NAV_ITEMS = [
   { key: 'key-personnel', label: 'Key Personnel', icon: '👥', minRole: 'inspector' },
   { key: 'obligations', label: 'Statutory Obligations', icon: '🔒', minRole: 'resident_engineer' },
   { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐', minRole: 'resident_engineer' },
+  { section: 'Knowledge Base' },
+  { key: 'construction-guide', label: 'Construction Guide', icon: '📚', minRole: 'inspector' },
   { section: 'Administration' },
   { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
   { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'resident_engineer' },
@@ -224,6 +227,7 @@ export default function App() {
       case 'obligations': return <ObligationsPage {...ctx} />;
       case 'key-personnel': return <KeyPersonnelPage {...ctx} />;
       case 'approvals-matrix': return <ApprovalsMatrixPage {...ctx} />;
+      case 'construction-guide': return <ConstructionGuidePage {...ctx} />;
       case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
