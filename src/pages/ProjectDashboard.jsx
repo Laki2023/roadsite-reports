@@ -90,7 +90,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       supabase.from('risk_register').select('*').eq('project_id', projectId),
       supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order'),
       supabase.from('project_materials').select('*').eq('project_id', projectId),
-      supabase.from('daily_reports').select('id, report_date').eq('project_id', projectId),
+      supabase.from('daily_reports').select('id, report_date, weather, rainfall_mm, max_temp_c, min_temp_c, is_working_day, non_working_reason, working_hours').eq('project_id', projectId).order('report_date'),
       supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
       supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
       supabase.from('claims').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
@@ -2161,6 +2161,456 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         })() : (
           <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
             No milestones set — add milestones in the Project Summary page to see the timeline.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ SITE INSTRUCTIONS & VARIATION ORDERS ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>📋 Site Instructions & Variation Orders</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {instructions.length > 0 && (() => {
+              const active = instructions.filter(i => !['Completed','Overridden'].includes(i.status)).length;
+              const vos = instructions.filter(i => i.instruction_type === 'Variation Order').length;
+              const overdue = instructions.filter(i => i.due_date && new Date(i.due_date) < new Date() && !['Completed','Overridden'].includes(i.status)).length;
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{active} active</span>
+                  {vos > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#8b5cf618', color:'#8b5cf6', fontWeight:600 }}>{vos} VOs</span>}
+                  {overdue > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#ef444418', color:'#ef4444', fontWeight:600 }}>{overdue} overdue</span>}
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('instructions', p)}>Full Register</button>
+          </div>
+        </div>
+        {instructions.length > 0 ? (() => {
+          const TYPE_ICONS = { 'Site Instruction':'📝', 'Variation Order':'🔄', 'Day Work Order':'⚡', 'Suspension Order':'⏸️', 'Resumption Order':'▶️', 'Defects Notice':'🔍', 'Taking Over Notice':'🏁', 'Other':'📄' };
+          const STATUS_COLORS = { 'Draft':'#94a3b8', 'Issued':'#3b82f6', 'Escalated':'#f59e0b', 'Approved':'#10b981', 'Rejected':'#ef4444', 'Acknowledged':'#6366f1', 'Completed':'#059669', 'Overridden':'#6b7280' };
+          const PRIORITY_COLORS = { 'Low':'#64748b', 'Normal':'#3b82f6', 'High':'#f59e0b', 'Urgent':'#ef4444' };
+          // Type breakdown
+          const typeBreakdown = {};
+          instructions.forEach(i => { const t = i.instruction_type || 'Other'; typeBreakdown[t] = (typeBreakdown[t] || 0) + 1; });
+          const typeEntries = Object.entries(typeBreakdown).sort((a,b) => b[1] - a[1]);
+          // Status pipeline
+          const STATUSES = ['Draft','Issued','Escalated','Approved','Acknowledged','Completed','Rejected','Overridden'];
+          const statusData = STATUSES.map(s => ({ status: s, count: instructions.filter(i => i.status === s).length, color: STATUS_COLORS[s] })).filter(d => d.count > 0);
+          const maxStatus = Math.max(1, ...statusData.map(d => d.count));
+          // Overdue
+          const overdue = instructions.filter(i => i.due_date && new Date(i.due_date) < new Date() && !['Completed','Overridden'].includes(i.status));
+          // Active sorted by priority
+          const PRIO_ORDER = { 'Urgent':0, 'High':1, 'Normal':2, 'Low':3 };
+          const activeList = instructions.filter(i => !['Completed','Overridden'].includes(i.status))
+            .sort((a,b) => (PRIO_ORDER[a.priority] ?? 4) - (PRIO_ORDER[b.priority] ?? 4));
+          // Compliance rate
+          const completed = instructions.filter(i => i.status === 'Completed').length;
+          const complianceRate = Math.round((completed / instructions.length) * 100);
+          return (
+            <>
+              {/* KPI row */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8, marginBottom:16 }}>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{instructions.length}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Total</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#10b981' }}>{complianceRate}%</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Compliance</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#8b5cf6' }}>{instructions.filter(i => i.instruction_type === 'Variation Order').length}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Variation Orders</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color: overdue.length > 0 ? '#ef4444' : '#10b981' }}>{overdue.length}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Overdue</div>
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+                {/* Status Pipeline */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Status Pipeline</div>
+                  {statusData.map(d => (
+                    <div key={d.status} style={{ marginBottom:4 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:1 }}>
+                        <span style={{ fontWeight:600 }}>{d.status}</span>
+                        <span style={{ fontWeight:700, color: d.color }}>{d.count}</span>
+                      </div>
+                      <div style={{ height:8, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${(d.count / maxStatus) * 100}%`, background:d.color, borderRadius:4, transition:'width 0.8s' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Type Breakdown */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>By Type</div>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    {typeEntries.map(([type, count]) => (
+                      <div key={type} style={{ padding:'6px 12px', borderRadius:8, background:'var(--bg)', textAlign:'center' }}>
+                        <div style={{ fontSize:10, marginBottom:2 }}>{TYPE_ICONS[type] || '📄'} {type}</div>
+                        <div style={{ fontSize:16, fontWeight:800 }}>{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Active Instructions Table */}
+              {activeList.length > 0 && (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', fontSize:11, borderCollapse:'separate', borderSpacing:'0 2px' }}>
+                    <thead>
+                      <tr style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>No.</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Subject</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Type</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Priority</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>FIDIC</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Due</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeList.slice(0, 8).map((ins, i) => {
+                        const isOverdue = ins.due_date && new Date(ins.due_date) < new Date();
+                        return (
+                          <tr key={ins.id} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--bg-card)' }}>
+                            <td style={{ padding:'6px 8px', fontWeight:700, fontFamily:'monospace', fontSize:10, color:'var(--text-muted)' }}>{ins.instruction_no || `#${i+1}`}</td>
+                            <td style={{ padding:'6px 8px', fontWeight:500, maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ins.subject}</td>
+                            <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{TYPE_ICONS[ins.instruction_type] || ''} {ins.instruction_type || '—'}</td>
+                            <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                              <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600, background:`${PRIORITY_COLORS[ins.priority] || '#6b7280'}18`, color: PRIORITY_COLORS[ins.priority] || '#6b7280' }}>{ins.priority || '—'}</span>
+                            </td>
+                            <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10, fontFamily:'monospace' }}>{ins.fidic_clause || '—'}</td>
+                            <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10, color: isOverdue ? '#ef4444' : 'var(--text-muted)', fontWeight: isOverdue ? 700 : 400 }}>{ins.due_date ? new Date(ins.due_date).toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : '—'}</td>
+                            <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                              <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600, background:`${STATUS_COLORS[ins.status] || '#6b7280'}18`, color: STATUS_COLORS[ins.status] || '#6b7280' }}>{ins.status}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {activeList.length > 8 && (
+                    <div style={{ textAlign:'center', fontSize:10, color:'var(--text-muted)', marginTop:6 }}>
+                      +{activeList.length - 8} more — see Instructions Register
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Overdue warning */}
+              {overdue.length > 0 && (
+                <div style={{ marginTop:12, padding:'8px 12px', background:'#fef2f2', borderRadius:'var(--radius)', borderLeft:'3px solid #ef4444', fontSize:10, color:'#991b1b' }}>
+                  ⚠️ <strong>{overdue.length} overdue instruction{overdue.length !== 1 ? 's' : ''}:</strong> {overdue.slice(0, 3).map(o => o.subject || o.instruction_no).join(', ')}{overdue.length > 3 ? ` +${overdue.length - 3} more` : ''}
+                </div>
+              )}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No instructions recorded — use the Site Instructions page to issue and track instructions.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ WEATHER IMPACT & WORKING DAYS ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>🌦️ Weather Impact & Working Days Analysis</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {reports.length > 0 && (() => {
+              const workingDays = reports.filter(r => r.is_working_day === true).length;
+              const nonWorking = reports.filter(r => r.is_working_day === false).length;
+              const rainDays = reports.filter(r => r.rainfall_mm > 0).length;
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#10b98118', color:'#10b981', fontWeight:600 }}>{workingDays} working</span>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#ef444418', color:'#ef4444', fontWeight:600 }}>{nonWorking} non-working</span>
+                  {rainDays > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{rainDays} rain days</span>}
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('reports', p)}>Daily Reports</button>
+          </div>
+        </div>
+        {reports.length > 0 ? (() => {
+          // Monthly aggregation
+          const monthly = {};
+          reports.forEach(r => {
+            const m = r.report_date ? r.report_date.substring(0, 7) : null;
+            if (!m) return;
+            if (!monthly[m]) monthly[m] = { working: 0, nonWorking: 0, rainDays: 0, totalRainfall: 0, reports: 0, totalHours: 0, maxTemp: -Infinity, minTemp: Infinity };
+            monthly[m].reports++;
+            if (r.is_working_day === true) monthly[m].working++;
+            if (r.is_working_day === false) monthly[m].nonWorking++;
+            if (r.rainfall_mm > 0) { monthly[m].rainDays++; monthly[m].totalRainfall += r.rainfall_mm; }
+            if (r.working_hours) monthly[m].totalHours += r.working_hours;
+            if (r.max_temp_c != null && r.max_temp_c > monthly[m].maxTemp) monthly[m].maxTemp = r.max_temp_c;
+            if (r.min_temp_c != null && r.min_temp_c < monthly[m].minTemp) monthly[m].minTemp = r.min_temp_c;
+          });
+          const monthKeys = Object.keys(monthly).sort();
+          const monthLabels = monthKeys.map(k => { const [y,m] = k.split('-'); return new Date(y, m-1).toLocaleDateString('en-GB', { month:'short', year:'2-digit' }); });
+          const maxDays = Math.max(1, ...monthKeys.map(k => monthly[k].working + monthly[k].nonWorking));
+          // Overall stats
+          const totalWorking = reports.filter(r => r.is_working_day === true).length;
+          const totalNonWorking = reports.filter(r => r.is_working_day === false).length;
+          const totalRainDays = reports.filter(r => r.rainfall_mm > 0).length;
+          const totalRainfall = reports.reduce((s, r) => s + (r.rainfall_mm || 0), 0);
+          const avgRainfall = totalRainDays > 0 ? (totalRainfall / totalRainDays).toFixed(1) : 0;
+          const utilizationRate = reports.length > 0 ? Math.round((totalWorking / reports.length) * 100) : 0;
+          // Weather distribution
+          const weatherDist = {};
+          reports.forEach(r => { const w = r.weather || 'Unknown'; weatherDist[w] = (weatherDist[w] || 0) + 1; });
+          const weatherEntries = Object.entries(weatherDist).sort((a,b) => b[1] - a[1]);
+          const WEATHER_ICONS = { 'Sunny':'☀️', 'Clear':'☀️', 'Partly Cloudy':'⛅', 'Cloudy':'☁️', 'Overcast':'🌥️', 'Light Rain':'🌦️', 'Rain':'🌧️', 'Heavy Rain':'⛈️', 'Thunderstorm':'⛈️', 'Drizzle':'🌦️', 'Fog':'🌫️', 'Windy':'💨', 'Hot':'🌡️', 'Cold':'❄️' };
+          // Non-working reasons
+          const reasons = {};
+          reports.filter(r => r.is_working_day === false && r.non_working_reason).forEach(r => { reasons[r.non_working_reason] = (reasons[r.non_working_reason] || 0) + 1; });
+          const reasonEntries = Object.entries(reasons).sort((a,b) => b[1] - a[1]);
+          return (
+            <>
+              {/* KPI row */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8, marginBottom:16 }}>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#10b981' }}>{utilizationRate}%</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Utilization Rate</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{totalWorking}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Working Days</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#ef4444' }}>{totalNonWorking}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Non-Working</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#0ea5e9' }}>{totalRainDays}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Rain Days</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#6366f1' }}>{totalRainfall.toFixed(0)}mm</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Total Rainfall</div>
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+                {/* Monthly Working Days Chart */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Monthly Working vs Non-Working Days</div>
+                  {monthKeys.map((k, idx) => {
+                    const m = monthly[k];
+                    const total = m.working + m.nonWorking;
+                    return (
+                      <div key={k} style={{ marginBottom:4 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:1 }}>
+                          <span style={{ fontWeight:600 }}>{monthLabels[idx]}</span>
+                          <span style={{ color:'var(--text-muted)' }}>{m.working}w / {m.nonWorking}nw{m.rainDays > 0 ? ` / ${m.rainDays}🌧` : ''}</span>
+                        </div>
+                        <div style={{ height:10, background:'var(--border)', borderRadius:5, overflow:'hidden', display:'flex' }}>
+                          {m.working > 0 && <div style={{ height:'100%', width:`${(m.working/maxDays)*100}%`, background:'#10b981', transition:'width 0.8s' }} title={`${m.working} working days`} />}
+                          {m.nonWorking > 0 && <div style={{ height:'100%', width:`${(m.nonWorking/maxDays)*100}%`, background:'#ef4444', transition:'width 0.8s' }} title={`${m.nonWorking} non-working days`} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ display:'flex', gap:12, marginTop:6, fontSize:9, justifyContent:'center' }}>
+                    <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#10b981' }} />Working</span>
+                    <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#ef4444' }} />Non-Working</span>
+                  </div>
+                </div>
+                {/* Weather Distribution + Non-working reasons */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Weather Conditions</div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+                    {weatherEntries.slice(0, 8).map(([weather, count]) => (
+                      <div key={weather} style={{ padding:'5px 10px', borderRadius:8, background:'var(--bg)', textAlign:'center', minWidth:60 }}>
+                        <div style={{ fontSize:14 }}>{WEATHER_ICONS[weather] || '🌤️'}</div>
+                        <div style={{ fontSize:9, color:'var(--text-muted)' }}>{weather}</div>
+                        <div style={{ fontSize:14, fontWeight:800 }}>{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {reasonEntries.length > 0 && (
+                    <>
+                      <div style={{ fontSize:11, fontWeight:600, marginBottom:4 }}>Non-Working Reasons</div>
+                      {reasonEntries.slice(0, 5).map(([reason, count]) => (
+                        <div key={reason} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'3px 0', borderBottom:'1px solid var(--border)' }}>
+                          <span>{reason}</span>
+                          <span style={{ fontWeight:700, color:'#ef4444' }}>{count} day{count !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* Rainfall info note */}
+              {totalRainfall > 0 && (
+                <div style={{ padding:'8px 12px', background:'#eff6ff', borderRadius:'var(--radius)', borderLeft:'3px solid #3b82f6', fontSize:10, color:'#1e40af' }}>
+                  🌧️ <strong>Rainfall Summary:</strong> {totalRainfall.toFixed(1)}mm total across {totalRainDays} rain days (avg {avgRainfall}mm/rain day).
+                  {totalNonWorking > 0 && ` Non-working days account for ${Math.round((totalNonWorking / reports.length) * 100)}% of reported days.`}
+                </div>
+              )}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No daily reports submitted — weather and working day analysis will appear automatically.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ SITE ISSUES TRACKER ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>⚠️ Site Issues Tracker</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {issues.length > 0 && (() => {
+              const open = issues.filter(i => i.status === 'Open' || i.status === 'In Progress' || i.status === 'Escalated').length;
+              const critical = issues.filter(i => i.severity === 'Critical' && !['Resolved','Closed'].includes(i.status)).length;
+              const resolved = issues.filter(i => i.status === 'Resolved' || i.status === 'Closed').length;
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background: critical > 0 ? '#ef444418' : '#10b98118', color: critical > 0 ? '#ef4444' : '#10b981', fontWeight:600 }}>{open} open</span>
+                  {critical > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#ef444418', color:'#ef4444', fontWeight:600 }}>{critical} critical</span>}
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#6b728018', color:'#6b7280', fontWeight:600 }}>{resolved} resolved</span>
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('issues', p)}>Full Register</button>
+          </div>
+        </div>
+        {issues.length > 0 ? (() => {
+          const SEV_COLORS = { 'Critical':'#ef4444', 'High':'#f59e0b', 'Medium':'#eab308', 'Low':'#22c55e' };
+          const STAT_COLORS = { 'Open':'#3b82f6', 'In Progress':'#f59e0b', 'Escalated':'#ef4444', 'Resolved':'#10b981', 'Closed':'#6b7280' };
+          // Severity breakdown
+          const sevBreakdown = {};
+          issues.forEach(i => { const s = i.severity || 'Medium'; sevBreakdown[s] = (sevBreakdown[s] || 0) + 1; });
+          // Category breakdown
+          const catBreakdown = {};
+          issues.forEach(i => { const c = i.category || 'General'; catBreakdown[c] = (catBreakdown[c] || 0) + 1; });
+          const catEntries = Object.entries(catBreakdown).sort((a,b) => b[1] - a[1]);
+          const maxCat = Math.max(1, ...catEntries.map(e => e[1]));
+          // Status breakdown
+          const statusBreakdown = {};
+          issues.forEach(i => { const s = i.status || 'Open'; statusBreakdown[s] = (statusBreakdown[s] || 0) + 1; });
+          // Resolution time for resolved issues
+          const resolvedIssues = issues.filter(i => i.date_resolved && i.date_raised);
+          const avgResolution = resolvedIssues.length > 0 ? Math.round(resolvedIssues.reduce((s, i) => s + daysBetween(i.date_raised, i.date_resolved), 0) / resolvedIssues.length) : null;
+          // Active issues sorted by severity
+          const activeIssues = issues.filter(i => !['Resolved','Closed'].includes(i.status))
+            .sort((a,b) => {
+              const svl = { 'Critical':0, 'High':1, 'Medium':2, 'Low':3 };
+              return (svl[a.severity] ?? 4) - (svl[b.severity] ?? 4);
+            });
+          return (
+            <>
+              {/* KPI row */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(100px, 1fr))', gap:8, marginBottom:16 }}>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{issues.length}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Total Issues</div>
+                </div>
+                {['Critical','High','Medium','Low'].map(sev => (
+                  <div key={sev} style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                    <div style={{ fontSize:20, fontWeight:800, color: SEV_COLORS[sev] }}>{sevBreakdown[sev] || 0}</div>
+                    <div style={{ fontSize:10, color:'var(--text-muted)' }}>{sev}</div>
+                  </div>
+                ))}
+                {avgResolution !== null && (
+                  <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                    <div style={{ fontSize:20, fontWeight:800, color:'#6366f1' }}>{avgResolution}d</div>
+                    <div style={{ fontSize:10, color:'var(--text-muted)' }}>Avg Resolution</div>
+                  </div>
+                )}
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+                {/* Category Breakdown */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Issues by Category</div>
+                  {catEntries.slice(0, 8).map(([cat, count]) => (
+                    <div key={cat} style={{ marginBottom:4 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:1 }}>
+                        <span style={{ fontWeight:600 }}>{cat}</span>
+                        <span style={{ color:'var(--text-muted)' }}>{count}</span>
+                      </div>
+                      <div style={{ height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${(count / maxCat) * 100}%`, background:'#f59e0b', borderRadius:3, transition:'width 0.8s' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Status Distribution */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Status Distribution</div>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
+                    {Object.entries(statusBreakdown).sort((a,b) => b[1] - a[1]).map(([status, count]) => (
+                      <div key={status} style={{ textAlign:'center', padding:'6px 14px', borderRadius:8, background:`${STAT_COLORS[status] || '#6b7280'}12` }}>
+                        <div style={{ fontSize:18, fontWeight:800, color: STAT_COLORS[status] || '#6b7280' }}>{count}</div>
+                        <div style={{ fontSize:9, color:'var(--text-muted)' }}>{status}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Resolution bar */}
+                  {resolvedIssues.length > 0 && (
+                    <div style={{ marginTop:12 }}>
+                      <div style={{ fontSize:11, fontWeight:600, marginBottom:4 }}>Resolution Progress</div>
+                      <div style={{ height:14, background:'var(--border)', borderRadius:7, overflow:'hidden', display:'flex' }}>
+                        <div style={{ height:'100%', width:`${pct(issues.filter(i => ['Resolved','Closed'].includes(i.status)).length, issues.length)}%`, background:'#10b981', transition:'width 0.8s' }} title={`Resolved: ${issues.filter(i => ['Resolved','Closed'].includes(i.status)).length}`} />
+                        <div style={{ height:'100%', width:`${pct(issues.filter(i => !['Resolved','Closed'].includes(i.status)).length, issues.length)}%`, background:'#f59e0b', transition:'width 0.8s' }} title={`Open: ${issues.filter(i => !['Resolved','Closed'].includes(i.status)).length}`} />
+                      </div>
+                      <div style={{ display:'flex', gap:12, marginTop:4, fontSize:9, justifyContent:'center' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#10b981' }} />Resolved</span>
+                        <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#f59e0b' }} />Open</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Active Issues Table */}
+              {activeIssues.length > 0 && (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', fontSize:11, borderCollapse:'separate', borderSpacing:'0 2px' }}>
+                    <thead>
+                      <tr style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>#</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Title</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Severity</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Category</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Assigned</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Raised</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeIssues.slice(0, 8).map((iss, i) => (
+                        <tr key={iss.id} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--bg-card)' }}>
+                          <td style={{ padding:'6px 8px', fontWeight:600, color:'var(--text-muted)' }}>{i + 1}</td>
+                          <td style={{ padding:'6px 8px', fontWeight:500, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{iss.title}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:700, background:`${SEV_COLORS[iss.severity] || '#6b7280'}18`, color: SEV_COLORS[iss.severity] || '#6b7280' }}>{iss.severity || '—'}</span>
+                          </td>
+                          <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{iss.category || '—'}</td>
+                          <td style={{ padding:'6px 8px', fontSize:10, color:'var(--text-muted)' }}>{iss.assigned_to || '—'}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10, color:'var(--text-muted)' }}>{iss.date_raised ? new Date(iss.date_raised).toLocaleDateString('en-GB', { day:'2-digit', month:'short' }) : '—'}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600, background:`${STAT_COLORS[iss.status] || '#6b7280'}18`, color: STAT_COLORS[iss.status] || '#6b7280' }}>{iss.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {activeIssues.length > 8 && (
+                    <div style={{ textAlign:'center', fontSize:10, color:'var(--text-muted)', marginTop:6 }}>
+                      +{activeIssues.length - 8} more — see Issues Register
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No site issues recorded — issues raised in the field will appear here automatically.
           </div>
         )}
       </div>
