@@ -879,7 +879,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           </div>
         </div>
 
-        {/* Chainage Progress */}
+        {/* Chainage Progress — mini summary */}
         <div className="card" style={{ padding:14, display:'flex', flexDirection:'column' }}>
           <h3 style={{ margin:'0 0 10px', fontSize:14 }}>Chainage Progress</h3>
           {chainageBlocks.length > 0 ? (
@@ -911,6 +911,147 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             </>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
         </div>
+      </div>
+
+      {/* ══════ CHAINAGE STRIP MAP ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>🗺️ Chainage Strip Map — Layer-by-Layer Progress</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {layers.length > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{layers.length} segments</span>}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('pavement', p)}>Full View</button>
+          </div>
+        </div>
+        {layers.length > 0 && roadLen > 0 ? (() => {
+          const STRIP_LAYERS = ['Subgrade','Improved Subgrade','Sub-base','Base','Prime Coat','Binder Course','Wearing Course','Surface Dressing','Seal Coat'];
+          const stripColors = {
+            'Subgrade':'#8B6914','Improved Subgrade':'#A0823B','Sub-base':'#C4956A','Base':'#D4A574',
+            'Prime Coat':'#2a2a2a','Binder Course':'#3d3d3d','Wearing Course':'#555','Surface Dressing':'#4a4a4a','Seal Coat':'#333'
+          };
+          const statusOpacity = { 'Completed':1, 'Approved':1, 'In Progress':0.65, 'Not Started':0.2, 'Rejected':0.3 };
+          const statusPattern = { 'Rejected': true };
+          const chStart = p.start_chainage || 0;
+          const chEnd = chStart + roadLen;
+          // Only show layer types that have data
+          const typesPresent = STRIP_LAYERS.filter(lt => layers.some(l => l.layer_type === lt));
+          // Chainage tick marks
+          const tickCount = Math.min(20, Math.max(4, Math.ceil(roadLen)));
+          const tickStep = roadLen / tickCount;
+          const ticks = [];
+          for (let i = 0; i <= tickCount; i++) ticks.push(chStart + i * tickStep);
+          // Summary per layer type
+          const layerSummary = typesPresent.map(lt => {
+            const segs = layers.filter(l => l.layer_type === lt);
+            const totalLen = segs.reduce((s,l) => s + ((l.end_chainage || l.start_chainage) - l.start_chainage), 0);
+            const doneLen = segs.filter(l => l.layer_status === 'Completed' || l.layer_status === 'Approved')
+              .reduce((s,l) => s + ((l.end_chainage || l.start_chainage) - l.start_chainage), 0);
+            const pr = totalLen > 0 ? Math.round((doneLen / totalLen) * 100) : 0;
+            return { type: lt, segs: segs.length, totalLen, doneLen, pr };
+          });
+          return (
+            <>
+              <div style={{ overflowX:'auto', marginBottom:12 }}>
+                <div style={{ minWidth: Math.max(600, typesPresent.length > 6 ? 800 : 600) }}>
+                  {/* Chainage axis (top) */}
+                  <div style={{ display:'flex', marginLeft:120, marginBottom:2, position:'relative', height:18 }}>
+                    {ticks.map((t,i) => {
+                      const leftPct = ((t - chStart) / roadLen) * 100;
+                      return (
+                        <div key={i} style={{ position:'absolute', left:`${leftPct}%`, transform:'translateX(-50%)', fontSize:9, color:'var(--text-muted)', whiteSpace:'nowrap' }}>
+                          {t.toFixed(t % 1 === 0 ? 0 : 1)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Grid lines + layer rows */}
+                  {typesPresent.map((lt, ri) => {
+                    const segs = layers.filter(l => l.layer_type === lt);
+                    const summary = layerSummary.find(s => s.type === lt);
+                    return (
+                      <div key={lt} style={{ display:'flex', alignItems:'center', marginBottom:2 }}>
+                        {/* Layer label */}
+                        <div style={{ width:120, flexShrink:0, paddingRight:8, textAlign:'right' }}>
+                          <div style={{ fontSize:11, fontWeight:600, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lt}</div>
+                          <div style={{ fontSize:9, color:'var(--text-muted)' }}>{summary.pr}% done</div>
+                        </div>
+                        {/* Strip bar */}
+                        <div style={{ flex:1, position:'relative', height:22, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                          {/* Vertical grid lines */}
+                          {ticks.map((t,i) => {
+                            const leftPct = ((t - chStart) / roadLen) * 100;
+                            return <div key={i} style={{ position:'absolute', left:`${leftPct}%`, top:0, bottom:0, width:1, background:'var(--bg-card)', opacity:0.6, zIndex:1 }} />;
+                          })}
+                          {/* Segments */}
+                          {segs.map((seg, si) => {
+                            const segStart = Math.max(seg.start_chainage, chStart);
+                            const segEnd = Math.min(seg.end_chainage || seg.start_chainage, chEnd);
+                            const leftPct = ((segStart - chStart) / roadLen) * 100;
+                            const widthPct = ((segEnd - segStart) / roadLen) * 100;
+                            if (widthPct <= 0) return null;
+                            const op = statusOpacity[seg.layer_status] || 0.4;
+                            const isRejected = statusPattern[seg.layer_status];
+                            return (
+                              <div key={si}
+                                title={`${lt} Ch.${seg.start_chainage}–${seg.end_chainage || '?'} [${seg.layer_status}]${seg.material_type ? ' — '+seg.material_type : ''}`}
+                                style={{
+                                  position:'absolute', left:`${leftPct}%`, width:`${Math.max(widthPct, 0.5)}%`,
+                                  top:1, bottom:1, borderRadius:2, zIndex:2, cursor:'pointer',
+                                  background: isRejected
+                                    ? `repeating-linear-gradient(45deg, ${stripColors[lt]||'#888'}, ${stripColors[lt]||'#888'} 3px, #ef4444 3px, #ef4444 6px)`
+                                    : (stripColors[lt]||'#888'),
+                                  opacity: op, transition:'opacity 0.2s',
+                                  borderLeft: si > 0 ? '1px solid var(--bg-card)' : 'none',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={e => e.currentTarget.style.opacity = String(op)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Bottom chainage axis */}
+                  <div style={{ display:'flex', marginLeft:120, marginTop:2, position:'relative', height:14 }}>
+                    {ticks.filter((_,i) => i % 2 === 0 || ticks.length <= 10).map((t,i) => {
+                      const leftPct = ((t - chStart) / roadLen) * 100;
+                      return (
+                        <div key={i} style={{ position:'absolute', left:`${leftPct}%`, transform:'translateX(-50%)', fontSize:8, color:'var(--text-muted)' }}>
+                          Km{t.toFixed(0)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {/* Legend + Summary Stats */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 }}>
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                  {[['Completed/Approved',1],['In Progress',0.65],['Not Started',0.2],['Rejected','pattern']].map(([label,op]) => (
+                    <span key={label} style={{ fontSize:9, display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ width:14, height:10, borderRadius:2,
+                        background: op === 'pattern' ? 'repeating-linear-gradient(45deg, #666, #666 2px, #ef4444 2px, #ef4444 4px)' : '#666',
+                        opacity: typeof op === 'number' ? op : 1 }} />
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                  {layerSummary.slice(0, 6).map(ls => (
+                    <div key={ls.type} style={{ textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:800, color: ls.pr >= 80 ? '#10b981' : ls.pr >= 40 ? '#f59e0b' : ls.pr > 0 ? '#ef4444' : 'var(--text-muted)' }}>{ls.pr}%</div>
+                      <div style={{ fontSize:9, color:'var(--text-muted)', maxWidth:60, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{ls.type}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No pavement layer data — add layers in the Pavement page to see the strip map.
+          </div>
+        )}
       </div>
 
       {/* ══════ PROGRESS SUMMARY — KEY LAYERS (full width) ══════ */}
@@ -1853,6 +1994,171 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         ) : (
           <div className="text-sm text-muted" style={{ textAlign:'center', padding:30 }}>
             No site photos yet — photos attached to daily reports will appear here automatically.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ MILESTONES TIMELINE ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>🏁 Project Milestones Timeline</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {miles.length > 0 && (() => {
+              const achieved = miles.filter(m => m.status === 'Completed' || m.actual_date).length;
+              const overdue = miles.filter(m => (m.status === 'Overdue' || m.status === 'Delayed') && !m.actual_date).length;
+              const upcoming = miles.filter(m => m.status === 'Upcoming' || m.status === 'On Track').length;
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#10b98118', color:'#10b981', fontWeight:600 }}>{achieved} achieved</span>
+                  {overdue > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#ef444418', color:'#ef4444', fontWeight:600 }}>{overdue} overdue</span>}
+                  {upcoming > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{upcoming} upcoming</span>}
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('summary', p)}>Manage</button>
+          </div>
+        </div>
+        {miles.length > 0 ? (() => {
+          // Build timeline
+          const today = new Date().toISOString().slice(0,10);
+          const allDates = miles.filter(m => m.planned_date).map(m => m.planned_date).concat(miles.filter(m => m.actual_date).map(m => m.actual_date));
+          if (startDt) allDates.push(startDt);
+          if (endDt) allDates.push(endDt);
+          allDates.push(today);
+          const minDate = allDates.length > 0 ? allDates.sort()[0] : today;
+          const maxDate = allDates.length > 0 ? allDates.sort()[allDates.length - 1] : today;
+          const totalSpan = Math.max(1, daysBetween(minDate, maxDate));
+          const dateToPos = (dt) => dt ? Math.max(0, Math.min(100, (daysBetween(minDate, dt) / totalSpan) * 100)) : null;
+          const todayPos = dateToPos(today);
+
+          // Status colors
+          const msColors = { 'Completed':'#10b981', 'On Track':'#3b82f6', 'Upcoming':'#6b7280', 'Delayed':'#f59e0b', 'Overdue':'#ef4444' };
+          const msIcons = { 'Completed':'✓', 'On Track':'●', 'Upcoming':'○', 'Delayed':'⚠', 'Overdue':'✗' };
+
+          return (
+            <>
+              {/* Horizontal timeline bar */}
+              <div style={{ position:'relative', margin:'0 0 20px 0', padding:'30px 20px 50px 20px' }}>
+                {/* Main timeline bar */}
+                <div style={{ position:'absolute', left:20, right:20, top:42, height:4, background:'var(--border)', borderRadius:2 }}>
+                  {/* Progress fill to today */}
+                  <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${todayPos}%`, background:'linear-gradient(90deg, #e87b35, #f59e0b)', borderRadius:2 }} />
+                </div>
+                {/* Today marker */}
+                <div style={{ position:'absolute', left:`calc(${todayPos}% + 10px)`, top:28, transform:'translateX(-50%)', zIndex:5 }}>
+                  <div style={{ width:2, height:32, background:'#ef4444', margin:'0 auto' }} />
+                  <div style={{ fontSize:8, color:'#ef4444', fontWeight:700, textAlign:'center', marginTop:1, whiteSpace:'nowrap' }}>TODAY</div>
+                </div>
+                {/* Milestone markers */}
+                {miles.map((m, i) => {
+                  const pos = dateToPos(m.planned_date);
+                  if (pos === null) return null;
+                  const actualPos = dateToPos(m.actual_date);
+                  const c = msColors[m.status] || '#6b7280';
+                  const icon = msIcons[m.status] || '●';
+                  const isCompleted = m.status === 'Completed' || m.actual_date;
+                  // Stagger labels to avoid overlap — alternate above and below
+                  const above = i % 2 === 0;
+                  return (
+                    <React.Fragment key={m.id || i}>
+                      {/* Planned position marker */}
+                      <div style={{ position:'absolute', left:`calc(${pos}% + 10px)`, top:above ? 16 : 48, transform:'translateX(-50%)', zIndex:3, textAlign:'center', cursor:'pointer' }}
+                        title={`${m.milestone_name}\nPlanned: ${m.planned_date || '—'}\nActual: ${m.actual_date || '—'}\nStatus: ${m.status}`}>
+                        {/* Connector line */}
+                        <div style={{ position:'absolute', left:'50%', width:1, background:c,
+                          ...(above ? { bottom:-2, height:14 } : { top:-2, height:14 }), transform:'translateX(-50%)' }} />
+                        {/* Milestone dot */}
+                        <div style={{
+                          width:isCompleted ? 18 : 14, height:isCompleted ? 18 : 14, borderRadius:'50%',
+                          background: isCompleted ? c : 'var(--bg-card)', border:`2px solid ${c}`,
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          fontSize: isCompleted ? 10 : 8, color: isCompleted ? 'white' : c, fontWeight:700,
+                          margin:'0 auto', ...(above ? {} : {}),
+                          boxShadow: isCompleted ? `0 0 6px ${c}40` : 'none'
+                        }}>{icon}</div>
+                        {/* Label */}
+                        <div style={{ fontSize:9, fontWeight:600, color:c, maxWidth:80, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                          ...(above ? { marginBottom:4, order:-1, position:'absolute', bottom:'100%', left:'50%', transform:'translateX(-50%)' }
+                                    : { marginTop:4, position:'absolute', top:'100%', left:'50%', transform:'translateX(-50%)' }) }}>
+                          {m.milestone_name.length > 14 ? m.milestone_name.slice(0,13)+'…' : m.milestone_name}
+                        </div>
+                      </div>
+                      {/* Actual date connector (if different from planned) */}
+                      {actualPos !== null && Math.abs(actualPos - pos) > 1 && (
+                        <div style={{ position:'absolute', top:43, height:2, zIndex:2,
+                          left: `calc(${Math.min(pos, actualPos)}% + 10px)`, width:`${Math.abs(actualPos - pos)}%`,
+                          background: actualPos > pos ? '#ef4444' : '#10b981', opacity:0.5, borderRadius:1 }}
+                          title={`${m.milestone_name}: ${actualPos > pos ? 'Late' : 'Early'} by ${Math.abs(daysBetween(m.planned_date, m.actual_date))} days`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              {/* Milestone detail table */}
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ borderBottom:'2px solid var(--border)' }}>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>#</th>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Milestone</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:100 }}>Planned Date</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:100 }}>Actual Date</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:80 }}>Variance</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:90 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {miles.map((m, i) => {
+                      const c = msColors[m.status] || '#6b7280';
+                      const varDays = m.planned_date && m.actual_date ? daysBetween(m.planned_date, m.actual_date) : null;
+                      const isLate = varDays !== null && varDays > 0;
+                      const isEarly = varDays !== null && varDays < 0;
+                      const daysUntil = m.planned_date && !m.actual_date ? daysBetween(today, m.planned_date) : null;
+                      return (
+                        <tr key={m.id || i} style={{ borderBottom:'1px solid var(--border)', background: m.status === 'Overdue' ? '#ef444408' : m.status === 'Completed' ? '#10b98108' : 'transparent' }}>
+                          <td style={{ padding:'6px', color:'var(--text-muted)', fontSize:11 }}>{i+1}</td>
+                          <td style={{ padding:'6px', fontWeight:600 }}>{m.milestone_name}</td>
+                          <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontSize:11 }}>{m.planned_date || '—'}</td>
+                          <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontSize:11, fontWeight: m.actual_date ? 700 : 400, color: m.actual_date ? '#10b981' : 'var(--text-muted)' }}>{m.actual_date || '—'}</td>
+                          <td style={{ textAlign:'center', padding:'6px', fontSize:11, fontWeight:700 }}>
+                            {varDays !== null ? (
+                              <span style={{ color: isLate ? '#ef4444' : isEarly ? '#10b981' : '#6b7280' }}>
+                                {isLate ? `+${varDays}d late` : isEarly ? `${varDays}d early` : 'On time'}
+                              </span>
+                            ) : daysUntil !== null ? (
+                              <span style={{ color: daysUntil < 0 ? '#ef4444' : daysUntil <= 30 ? '#f59e0b' : 'var(--text-muted)', fontSize:10 }}>
+                                {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `in ${daysUntil}d`}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td style={{ textAlign:'center', padding:'6px' }}>
+                            <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:700, background:c+'18', color:c }}>
+                              <span style={{ width:5, height:5, borderRadius:'50%', background:c }} />{m.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* Critical path warning */}
+              {(() => {
+                const overdue = miles.filter(m => (m.status === 'Overdue' || m.status === 'Delayed') && !m.actual_date);
+                if (overdue.length === 0) return null;
+                return (
+                  <div style={{ marginTop:10, padding:'8px 12px', background:'#fef2f2', borderRadius:'var(--radius)', borderLeft:'3px solid #ef4444', fontSize:11, color:'#991b1b' }}>
+                    ⚠ <strong>{overdue.length} milestone{overdue.length > 1 ? 's' : ''} at risk:</strong>{' '}
+                    {overdue.slice(0,3).map(m => m.milestone_name).join(' · ')}{overdue.length > 3 ? ` · +${overdue.length - 3} more` : ''}
+                    {' — Review programme per FIDIC Cl. 8.3'}
+                  </div>
+                );
+              })()}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No milestones set — add milestones in the Project Summary page to see the timeline.
           </div>
         )}
       </div>
