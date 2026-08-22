@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import ProjectDashboard from './ProjectDashboard';
 
 const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
-const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
+const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : 'â';
 const fmtB = (n) => {
   if (!n) return 'KES 0';
   if (n >= 1e9) return 'KES ' + (n/1e9).toFixed(2) + ' B';
@@ -71,7 +71,7 @@ function KPICard({ title, value, subtitle, icon, trend, trendLabel, color, onCli
       </div>
       {trend != null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11 }}>
-          <span style={{ color: trendColor, fontWeight: 700 }}>{trend > 0 ? '▲' : trend < 0 ? '▼' : '●'} {Math.abs(trend)}%</span>
+          <span style={{ color: trendColor, fontWeight: 700 }}>{trend > 0 ? 'â²' : trend < 0 ? 'â¼' : 'â'} {Math.abs(trend)}%</span>
           {trendLabel && <span style={{ color: 'var(--text-muted)' }}>{trendLabel}</span>}
         </div>
       )}
@@ -124,6 +124,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   const [structData, setStructData] = useState([]);
   const [ipcData, setIpcData] = useState([]);
   const [approvalData, setApprovalData] = useState([]);
+  const [lastReportMap, setLastReportMap] = useState({});
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectDetail, setProjectDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -171,6 +172,21 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     const tests = testRes.data || [];
     const ipcs = ipcRes.data || [];
     const approvals = aqRes.data || [];
+
+    // Fetch most recent report date per project
+    const lrMap = {};
+    if (projs.length > 0) {
+      const { data: lastReps } = await supabase.from('daily_reports')
+        .select('project_id, report_date')
+        .order('report_date', { ascending: false })
+        .limit(500);
+      if (lastReps) {
+        lastReps.forEach(r => {
+          if (!lrMap[r.project_id]) lrMap[r.project_id] = r.report_date;
+        });
+      }
+    }
+    setLastReportMap(lrMap);
 
     setProjects(projs);
     setRecentReports(repRes.data || []);
@@ -246,12 +262,12 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     </div>
   );
 
-  // Contractor's QS gets a limited view — just their assigned projects + link to Taking Off Sheet
+  // Contractor's QS gets a limited view â just their assigned projects + link to Taking Off Sheet
   if (profile?.role === 'contractor_qs') {
     return (
       <div className="fade-in">
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🏗️</div>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>ðï¸</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Contractor Portal</h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Submit your measurements for assigned projects</p>
         </div>
@@ -271,10 +287,10 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #e87b35, #f59e0b)' }} />
                 <div style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                  {p.road_name || ''} {p.county ? `· ${p.county}` : ''} {p.contract_no ? `· ${p.contract_no}` : ''}
+                  {p.road_name || ''} {p.county ? `Â· ${p.county}` : ''} {p.contract_no ? `Â· ${p.contract_no}` : ''}
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e87b3520', color: '#e87b35' }}>📐 Open Taking Off Sheet →</span>
+                  <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e87b3520', color: '#e87b35' }}>ð Open Taking Off Sheet â</span>
                 </div>
               </div>
             ))}
@@ -282,7 +298,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         )}
 
         <div style={{ textAlign: 'center', marginTop: 24, padding: 14, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-          🔒 Your access is limited to measurement submissions only. Rates, payment certificates, and other contract data are restricted.
+          ð Your access is limited to measurement submissions only. Rates, payment certificates, and other contract data are restricted.
         </div>
       </div>
     );
@@ -327,7 +343,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     return { name: p.name?.length > 18 ? p.name.substring(0, 18) + '...' : p.name, contractSum: cv, valueDone: vd };
   }).filter(p => p.contractSum > 0);
 
-  // S-Curve data (monthly placeholder — enhance with real monthly data later)
+  // S-Curve data (monthly placeholder â enhance with real monthly data later)
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const currentMonth = new Date().getMonth();
   const sCurveData = months.slice(0, currentMonth + 1).map((m, i) => {
@@ -340,10 +356,18 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
   const warnings = [];
   if (stats.variance < -10) warnings.push({ type: 'critical', msg: 'Physical progress significantly behind schedule' });
   if (stats.criticalIssues > 0) warnings.push({ type: 'critical', msg: `${stats.criticalIssues} critical issue${stats.criticalIssues > 1 ? 's' : ''} unresolved` });
-  if (stats.equipUtil < 70 && stats.totalEquipReq > 0) warnings.push({ type: 'warning', msg: `Equipment utilization at ${stats.equipUtil}% — below target` });
-  if (stats.qualityScore < 80 && stats.testsTotal > 0) warnings.push({ type: 'warning', msg: `Quality pass rate at ${stats.qualityScore}% — needs attention` });
+  if (stats.equipUtil < 70 && stats.totalEquipReq > 0) warnings.push({ type: 'warning', msg: `Equipment utilization at ${stats.equipUtil}% â below target` });
+  if (stats.qualityScore < 80 && stats.testsTotal > 0) warnings.push({ type: 'warning', msg: `Quality pass rate at ${stats.qualityScore}% â needs attention` });
   if (stats.pendingApprovals > 5) warnings.push({ type: 'info', msg: `${stats.pendingApprovals} items pending approval` });
-  if (stats.financialProgress > stats.physicalProgress + 15) warnings.push({ type: 'warning', msg: 'Financial progress ahead of physical — possible overpayment risk' });
+  if (stats.financialProgress > stats.physicalProgress + 15) warnings.push({ type: 'warning', msg: 'Financial progress ahead of physical â possible overpayment risk' });
+
+  // Check for stale projects (no report in 7+ days)
+  const staleProjects = projects.filter(p => {
+    const lastDate = lastReportMap[p.id];
+    if (!lastDate) return true;
+    return daysBetween(lastDate, new Date().toISOString().slice(0, 10)) > 7;
+  });
+  if (staleProjects.length > 0) warnings.push({ type: 'warning', msg: `${staleProjects.length} project${staleProjects.length > 1 ? 's' : ''} with no report in 7+ days` });
 
   return (
     <div>
@@ -351,15 +375,15 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22 }}>
-            {isPlatformAdmin ? '🔒 Platform' : ''} Dashboard
+            {isPlatformAdmin ? 'ð Platform' : ''} Dashboard
           </h2>
-          <div className="subtitle">Welcome back, {profile.full_name} · {isPlatformAdmin ? 'Platform Admin' : ROLE_LABELS[profile.role]}</div>
+          <div className="subtitle">Welcome back, {profile.full_name} Â· {isPlatformAdmin ? 'Platform Admin' : ROLE_LABELS[profile.role]}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {stats.pendingApprovals > 0 && (
             <button className="btn btn-sm" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' }}
               onClick={() => navigateTo('approvals')}>
-              ⏳ {stats.pendingApprovals} Pending Approval{stats.pendingApprovals > 1 ? 's' : ''}
+              â³ {stats.pendingApprovals} Pending Approval{stats.pendingApprovals > 1 ? 's' : ''}
             </button>
           )}
           <span className="text-sm text-muted">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
@@ -372,10 +396,10 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
           {activeEmergencies.map(em => (
             <div key={em.id} className="dashboard-emergency-card" onClick={() => navigateTo('emergency')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 28, animation: em.status === 'Reported' ? 'emergencyPulse 0.8s ease-in-out infinite' : 'none' }}>🚨</span>
+                <span style={{ fontSize: 28, animation: em.status === 'Reported' ? 'emergencyPulse 0.8s ease-in-out infinite' : 'none' }}>ð¨</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>{em.emergency_type}</div>
-                  <div style={{ fontSize: 13, opacity: 0.9 }}>{em.projects?.name}{em.chainage ? ` — Ch. ${em.chainage}` : ''}</div>
+                  <div style={{ fontSize: 13, opacity: 0.9 }}>{em.projects?.name}{em.chainage ? ` â Ch. ${em.chainage}` : ''}</div>
                 </div>
                 <span style={{ fontSize: 12, background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 4 }}>{em.status}</span>
               </div>
@@ -384,38 +408,38 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       )}
 
-      {/* Query error banner — visible to admins */}
+      {/* Query error banner â visible to admins */}
       {queryErrors.length > 0 && isPlatformAdmin && (
         <div style={{ padding: '10px 14px', marginBottom: 16, borderRadius: 8, background: '#fef2f2',
           border: '1px solid #fecaca', fontSize: 12, color: '#dc2626' }}>
-          <strong>⚠ Some dashboard data failed to load:</strong>
+          <strong>â  Some dashboard data failed to load:</strong>
           <span style={{ marginLeft: 8 }}>{queryErrors.join('; ')}</span>
         </div>
       )}
 
-      {/* ══════ TOP KPI ROW ══════ */}
+      {/* ââââââ TOP KPI ROW ââââââ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <KPICard title="Active Projects" value={stats.totalProjects} icon="📊"
+        <KPICard title="Active Projects" value={stats.totalProjects} icon="ð"
           borderColor="#e87b35" onClick={() => navigateTo('projects')} />
         <KPICard title="Physical Progress" value={`${stats.physicalProgress}%`}
-          trend={stats.variance} trendLabel="vs schedule" icon="📈"
+          trend={stats.variance} trendLabel="vs schedule" icon="ð"
           borderColor={stats.variance >= 0 ? '#10b981' : '#ef4444'}
           color={stats.variance >= 0 ? '#10b981' : '#ef4444'} />
         <KPICard title="Financial Progress" value={`${stats.financialProgress}%`}
           subtitle={`${fmtB(stats.totalValueDone)} of ${fmtB(stats.totalContract)}`}
-          icon="💰" borderColor="#2563eb" />
+          icon="ð°" borderColor="#2563eb" />
         <KPICard title="Time Elapsed" value={`${stats.timePerformance}%`}
-          subtitle={scheduleStatus} icon="⏱"
+          subtitle={scheduleStatus} icon="â±"
           borderColor={scheduleStatus === 'On Track' ? '#10b981' : '#f59e0b'}
           color={scheduleStatus === 'On Track' ? '#10b981' : scheduleStatus === 'Behind' ? '#f59e0b' : '#ef4444'} />
         <KPICard title="Open Issues" value={stats.openIssues}
           subtitle={stats.criticalIssues > 0 ? `${stats.criticalIssues} critical` : 'All manageable'}
-          icon="⚠" borderColor={stats.openIssues > 0 ? '#ef4444' : '#10b981'}
+          icon="â " borderColor={stats.openIssues > 0 ? '#ef4444' : '#10b981'}
           color={stats.criticalIssues > 0 ? '#ef4444' : stats.openIssues > 0 ? '#f59e0b' : '#10b981'}
           onClick={() => navigateTo('issues')} />
       </div>
 
-      {/* ══════ SCORES ROW ══════ */}
+      {/* ââââââ SCORES ROW ââââââ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
         <div className="card" style={{ padding: 16, textAlign: 'center' }}>
           <ScoreRing value={stats.healthScore} size={80} color={health.color} />
@@ -440,16 +464,16 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       </div>
 
-      {/* ══════ EARLY WARNING ══════ */}
+      {/* ââââââ EARLY WARNING ââââââ */}
       {warnings.length > 0 && (
         <div className="card" style={{ padding: 16, marginBottom: 20, borderLeft: '4px solid #f59e0b' }}>
-          <h3 style={{ marginBottom: 10, fontSize: 14 }}>⚡ Early Warning System</h3>
+          <h3 style={{ marginBottom: 10, fontSize: 14 }}>â¡ Early Warning System</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {warnings.map((w, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
                 padding: '6px 10px', borderRadius: 'var(--radius)',
                 background: w.type === 'critical' ? '#fef2f2' : w.type === 'warning' ? '#fffbeb' : '#eff6ff' }}>
-                <span>{w.type === 'critical' ? '🔴' : w.type === 'warning' ? '🟡' : '🔵'}</span>
+                <span>{w.type === 'critical' ? 'ð´' : w.type === 'warning' ? 'ð¡' : 'ðµ'}</span>
                 <span style={{ color: w.type === 'critical' ? '#dc2626' : w.type === 'warning' ? '#d97706' : '#2563eb' }}>{w.msg}</span>
               </div>
             ))}
@@ -457,7 +481,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       )}
 
-      {/* ══════ CHARTS ROW 1: S-Curve + Activities ══════ */}
+      {/* ââââââ CHARTS ROW 1: S-Curve + Activities ââââââ */}
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 20 }}>
         {/* S-Curve */}
         <div className="card" style={{ padding: 16 }}>
@@ -510,7 +534,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       </div>
 
-      {/* ══════ CHARTS ROW 2: Financial + Works Status + Issues ══════ */}
+      {/* ââââââ CHARTS ROW 2: Financial + Works Status + Issues ââââââ */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* Financial Progress */}
         <div className="card" style={{ padding: 16 }}>
@@ -581,7 +605,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
             </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 180 }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
+              <div style={{ fontSize: 48, marginBottom: 8 }}>â</div>
               <div style={{ fontWeight: 700 }}>No Open Issues</div>
               <div className="text-sm text-muted">All clear</div>
             </div>
@@ -589,10 +613,10 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       </div>
 
-      {/* ══════ PROJECT CARDS ══════ */}
+      {/* ââââââ PROJECT CARDS ââââââ */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Projects — Click to explore</h3>
-        <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('projects')}>View All →</button>
+        <h3 style={{ margin: 0 }}>Projects â Click to explore</h3>
+        <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('projects')}>View All â</button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
         {projects.map(p => {
@@ -618,7 +642,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{p.name}</div>
-                    <div className="text-sm text-muted">{p.contractor_name || '—'} · {p.contract_no || ''}</div>
+                    <div className="text-sm text-muted">{p.contractor_name || 'â'} Â· {p.contract_no || ''}</div>
                   </div>
                   <div style={{ textAlign: 'center', marginLeft: 12 }}>
                     <div style={{ fontSize: 20, fontWeight: 800, color: h.color }}>{h.grade}</div>
@@ -664,6 +688,23 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                   </div>
                 </div>
 
+                {/* Days since last report */}
+                {(() => {
+                  const lastDate = lastReportMap[p.id];
+                  const days = lastDate ? daysBetween(lastDate, new Date().toISOString().slice(0, 10)) : null;
+                  const dColor = days === null ? '#6b7280' : days <= 2 ? '#10b981' : days <= 7 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '5px 8px',
+                      background: dColor + '10', borderRadius: 6, fontSize: 11 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: dColor, flexShrink: 0 }} />
+                      <span style={{ color: dColor, fontWeight: 600 }}>
+                        {days === null ? 'No reports yet' : days === 0 ? 'Reported today' : `${days}d since last report`}
+                      </span>
+                      {lastDate && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>{lastDate}</span>}
+                    </div>
+                  );
+                })()}
+
                 {/* Footer */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
                   <span className="badge badge-muted" style={{ fontSize: 9 }}>{p.category || 'Construction'}</span>
@@ -675,12 +716,12 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         })}
       </div>
 
-      {/* ══════ RECENT REPORTS ══════ */}
+      {/* ââââââ RECENT REPORTS ââââââ */}
       {recentReports.length > 0 && (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>Recent Reports</h3>
-            <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('reports')}>View All →</button>
+            <button className="btn btn-sm btn-secondary" onClick={() => navigateTo('reports')}>View All â</button>
           </div>
           <div className="table-wrap">
             <table>
@@ -691,7 +732,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                     <td className="text-mono" style={{ fontSize: 12 }}>{r.report_date}</td>
                     <td style={{ fontSize: 12 }}>{r.projects?.name}</td>
                     <td style={{ fontSize: 12, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {(r.urgent_flag || r.is_urgent) && <span style={{ color: 'var(--danger)', marginRight: 4 }}>🚨</span>}
+                      {(r.urgent_flag || r.is_urgent) && <span style={{ color: 'var(--danger)', marginRight: 4 }}>ð¨</span>}
                       {r.work_done}
                     </td>
                   </tr>
