@@ -943,7 +943,9 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             const pctRaw = planned > 0 ? (done / planned) * 100 : 0;
             const pctDisplay = Math.min(100, Math.round(pctRaw));
             const isLive = act?.last_progress_date === today;
-            return { name, act, planned, done, unit, pctDisplay, isLive, itemNo: i + 1 };
+            const remaining = Math.max(0, planned - done);
+            const layerStatus = pctDisplay >= 100 ? 'Completed' : pctDisplay > 0 ? 'In Progress' : 'Not Started';
+            return { name, act, planned, done, unit, pctDisplay, isLive, remaining, layerStatus, itemNo: i + 1 };
           });
           const layersStarted = rows.filter(r => r.pctDisplay > 0).length;
           const layersComplete = rows.filter(r => r.pctDisplay >= 100).length;
@@ -971,7 +973,9 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                       <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:45 }}>Unit</th>
                       <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:65 }}>Billed</th>
                       <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:75 }}>Achieved</th>
+                      <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:75 }}>Remaining</th>
                       <th style={{ padding:'8px 6px', width:120 }}></th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:95 }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -988,6 +992,9 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                           color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.done > 0 ? '#ef4444' : 'var(--text-muted)' }}>
                           {r.done > 0 ? Number(r.done).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
                         </td>
+                        <td className="text-mono" style={{ textAlign:'right', padding:'6px', color:'var(--text-muted)' }}>
+                          {r.planned > 0 && r.pctDisplay < 100 ? Number(r.remaining).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : r.pctDisplay >= 100 ? '0.00' : '—'}
+                        </td>
                         <td style={{ padding:'6px' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                             <div style={{ width:70, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
@@ -1000,11 +1007,156 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                             </span>
                           </div>
                         </td>
+                        <td style={{ textAlign:'center', padding:'6px' }}>
+                          {(() => {
+                            const sc = r.layerStatus === 'Completed' ? '#10b981' : r.layerStatus === 'In Progress' ? '#e87b35' : '#6b7280';
+                            return <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:9999, fontSize:9, fontWeight:700,
+                              background:sc+'18', color:sc, border:`1px solid ${sc}35`, whiteSpace:'nowrap' }}>{r.layerStatus}</span>;
+                          })()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </>
+          );
+        })()}
+      </div>
+
+      {/* ══════ ENGINEER'S INSIGHTS & RECOMMENDATIONS ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <h3 style={{ margin:'0 0 12px', fontSize:15 }}>🧠 Engineer's Insights &amp; Recommendations</h3>
+        {(() => {
+          const insights = [];
+          const monthsRemaining = Math.max(0.1, remainingDays / 30);
+          const requiredRate = (100 - physPct) / monthsRemaining;
+          const actualRate = elapsedMonths > 0 ? physPct / elapsedMonths : 0;
+          const rateMultiple = actualRate > 0 ? (requiredRate / actualRate) : Infinity;
+
+          // Schedule insight
+          if (variance < -10) {
+            insights.push({ sev:'critical', icon:'📅', title:'Schedule Recovery Required',
+              detail:`Physical progress (${physPct}%) trails time elapsed (${timePct}%) by ${Math.abs(variance)} points. At the current rate of ${actualRate.toFixed(1)}%/month, the required rate to finish on time is ${requiredRate.toFixed(1)}%/month — a ${isFinite(rateMultiple) ? rateMultiple.toFixed(1) + '×' : 'major'} acceleration.`,
+              action:'Request a revised programme under FIDIC Cl. 8.3 and consider a Cl. 8.6 rate-of-progress notice.' });
+          } else if (variance >= 0) {
+            insights.push({ sev:'positive', icon:'📅', title:'Programme On Track',
+              detail:`Physical progress (${physPct}%) is ${variance > 0 ? variance + ' points ahead of' : 'level with'} time elapsed (${timePct}%).`,
+              action:'Maintain current production rates and resource levels.' });
+          }
+
+          // Cost / EV insight
+          if (cpiVal > 0 && cpiVal < 0.95) {
+            insights.push({ sev:'warning', icon:'💰', title:'Cost Efficiency Below Par',
+              detail:`CPI of ${cpiVal.toFixed(2)} means every KES 1.00 certified earns only KES ${cpiVal.toFixed(2)} of value. Estimate at Completion is ${fmtB(eacVal)} against a budget of ${fmtB(contractSum)} (${vacVal < 0 ? fmtB(Math.abs(vacVal)) + ' projected overrun' : 'within budget'}).`,
+              action:'Audit measured quantities vs certified amounts; tighten interim valuations.' });
+          } else if (cpiVal >= 1) {
+            insights.push({ sev:'positive', icon:'💰', title:'Cost Performance Healthy',
+              detail:`CPI of ${cpiVal.toFixed(2)} — value earned exceeds amounts certified. EAC ${fmtB(eacVal)} vs budget ${fmtB(contractSum)}.`,
+              action:'No corrective action needed; keep certification discipline.' });
+          }
+
+          // Cash flow insight
+          if (totalUnpaid > 0 && certified > 0 && paymentRatio < 80) {
+            insights.push({ sev:'warning', icon:'🏦', title:'Payment Lag',
+              detail:`${fmtB(totalUnpaid)} certified but unpaid (${100 - paymentRatio}% of certifications outstanding). Sustained lag risks contractor cash-flow claims under FIDIC Cl. 14.8 (delayed payment financing charges).`,
+              action:'Escalate outstanding certificates to the Employer for settlement.' });
+          }
+
+          // Productivity insight
+          if (stalledActivities.length > 0) {
+            insights.push({ sev:'warning', icon:'⚙️', title:`${stalledActivities.length} Stalled Activit${stalledActivities.length > 1 ? 'ies' : 'y'}`,
+              detail:`${stalledActivities.length} in-progress activit${stalledActivities.length > 1 ? 'ies have' : 'y has'} recorded no progress for 14+ days${liveActivities.length === 0 ? ', and no activity reported progress today' : ''}.`,
+              action:'Review resourcing of stalled fronts at the next site meeting.' });
+          }
+
+          // Equipment insight
+          if (eqReq > 0 && eqPct < 70) {
+            insights.push({ sev:'critical', icon:'🚜', title:'Equipment Mobilization Gap',
+              detail:`Only ${eqOn} of ${eqReq} required equipment units are on site (${eqPct}%). Under-mobilization is the leading predictor of the current delay probability (${delayProb}%).`,
+              action:'Issue a mobilization notice to the Contractor listing the deficit plant.' });
+          }
+
+          // Quality insight
+          if (tests.length > 0 && testFail > 0) {
+            insights.push({ sev: qPct < 80 ? 'critical' : 'warning', icon:'🧪', title:'Quality Watch',
+              detail:`${testFail} of ${tests.length} tests failed (pass rate ${qPct}%). Failed layers must be reworked before overlaying.`,
+              action:'Hold points on subsequent layers until retests pass.' });
+          } else if (tests.length === 0) {
+            insights.push({ sev:'info', icon:'🧪', title:'No Test Records',
+              detail:'No quality tests are recorded. Compaction, CBR and density verification should accompany each completed layer.',
+              action:'Log all field/lab test results in the Quality module.' });
+          }
+
+          // Obligations insight
+          {
+            const obs = d.obligations || [];
+            const todayD = new Date();
+            const valid = obs.filter(o => o.expiry_date && new Date(o.expiry_date) >= todayD).length;
+            const expired = obs.filter(o => o.expiry_date && new Date(o.expiry_date) < todayD).length;
+            if (obs.length === 0) {
+              insights.push({ sev:'info', icon:'🛡️', title:'Statutory Obligations Unrecorded',
+                detail:'No guarantees, insurances or licences are logged. The Employer is exposed if the Performance Guarantee or CAR insurance has lapsed unnoticed.',
+                action:'Populate the Statutory Obligations Matrix from the contract documents.' });
+            } else if (expired > 0) {
+              insights.push({ sev:'critical', icon:'🛡️', title:`${expired} Obligation${expired > 1 ? 's' : ''} Expired`,
+                detail:`${expired} of ${obs.length} recorded obligations have passed expiry; only ${valid} remain valid.`,
+                action:'Demand renewal certificates from the Contractor immediately.' });
+            }
+          }
+
+          // Risk insight
+          if (critRisks > 0) {
+            insights.push({ sev:'warning', icon:'⚠️', title:`${critRisks} Critical Risk${critRisks > 1 ? 's' : ''} Open`,
+              detail:`The risk register carries ${openRisks} open risk${openRisks > 1 ? 's' : ''}, ${critRisks} rated critical.`,
+              action:'Review mitigation owners and dates at the monthly progress meeting.' });
+          }
+
+          // Completion projection
+          if (projectedOverrun > 30 && spiVal > 0 && spiVal < 0.9) {
+            insights.push({ sev:'critical', icon:'🏁', title:'Completion Forecast Slipping',
+              detail:`At SPI ${spiVal.toFixed(2)}, the works trend toward ${projectedEndDays} days total duration — roughly ${Math.round(projectedOverrun / 30)} month${Math.round(projectedOverrun / 30) > 1 ? 's' : ''} beyond the approved ${totalDays}-day period.`,
+              action:'Evaluate acceleration options now; EOT alone will not recover the Employer\'s programme.' });
+          }
+
+          const sevRank = { critical: 0, warning: 1, info: 2, positive: 3 };
+          insights.sort((a, b) => sevRank[a.sev] - sevRank[b.sev]);
+          const sevColors = { critical:'#ef4444', warning:'#f59e0b', info:'#3b82f6', positive:'#10b981' };
+          const counts = insights.reduce((m, i) => { m[i.sev] = (m[i.sev] || 0) + 1; return m; }, {});
+
+          return (
+            <>
+              <div style={{ display:'flex', gap:10, marginBottom:12, flexWrap:'wrap' }}>
+                {Object.entries(sevColors).map(([sev, c]) => counts[sev] ? (
+                  <span key={sev} style={{ padding:'3px 10px', borderRadius:9999, fontSize:10, fontWeight:700,
+                    background:c+'18', color:c, border:`1px solid ${c}35`, textTransform:'capitalize' }}>
+                    {counts[sev]} {sev}
+                  </span>
+                ) : null)}
+              </div>
+              {insights.length === 0 ? (
+                <div className="text-sm text-muted" style={{ textAlign:'center', padding:20 }}>All metrics nominal — no findings to report.</div>
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:10 }}>
+                  {insights.map((ins, i) => {
+                    const c = sevColors[ins.sev];
+                    return (
+                      <div key={i} style={{ padding:'12px 14px', borderRadius:10, background:c+'0a',
+                        border:`1px solid ${c}25`, borderLeft:`4px solid ${c}` }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                          <span style={{ fontSize:16 }}>{ins.icon}</span>
+                          <span style={{ fontSize:13, fontWeight:700, color:c }}>{ins.title}</span>
+                        </div>
+                        <div style={{ fontSize:12, lineHeight:1.55, marginBottom:8 }}>{ins.detail}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', gap:6 }}>
+                          <span style={{ fontWeight:700, color:c, whiteSpace:'nowrap' }}>→ Action:</span>
+                          <span>{ins.action}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </>
           );
         })()}
