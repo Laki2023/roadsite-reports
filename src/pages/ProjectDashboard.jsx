@@ -77,7 +77,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   useEffect(() => { load(); }, [projectId]);
 
   async function load() {
-    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions,obligations] = await Promise.all([
+    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions,obligations,claimsRes] = await Promise.all([
       supabase.from('projects').select('*').eq('id', projectId).single(),
       supabase.from('boq_items').select('*').eq('project_id', projectId),
       supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name)').eq('project_id', projectId).order('sort_order'),
@@ -93,6 +93,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       supabase.from('daily_reports').select('id, report_date').eq('project_id', projectId),
       supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
       supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
+      supabase.from('claims').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     ]);
     // Latest site photos with signed URLs (best-effort — dashboard still loads if storage fails)
     let photosWithUrls = [];
@@ -109,7 +110,8 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
     setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
       issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
       risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
-      instructions:instructions.data||[], obligations:obligations.data||[], photos:photosWithUrls });
+      instructions:instructions.data||[], obligations:obligations.data||[], photos:photosWithUrls,
+      claims:claimsRes.data||[] });
   }
 
   // ── Statutory Obligations helpers ──
@@ -152,7 +154,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
 
   if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>Loading project dashboard...</div>;
 
-  const { p, boq, works, equip, structs, issues, layers, tests, ipcs, risks, miles, mats, reports, instructions } = d;
+  const { p, boq, works, equip, structs, issues, layers, tests, ipcs, risks, miles, mats, reports, instructions, claims } = d;
 
   // ── Computed Metrics ──
   const originalContractSum = p.original_contract_sum || p.contract_sum || 0;
@@ -2159,6 +2161,358 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         })() : (
           <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
             No milestones set — add milestones in the Project Summary page to see the timeline.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ RISK OVERVIEW — HEAT MAP & REGISTER ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>🛡️ Risk Overview — Heat Map &amp; Register</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {risks.length > 0 && (() => {
+              const open = risks.filter(r => r.status === 'Open' || r.status === 'Mitigating').length;
+              const crit = risks.filter(r => r.risk_level === 'Critical' && r.status !== 'Closed').length;
+              const closed = risks.filter(r => r.status === 'Closed').length;
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background: crit > 0 ? '#ef444418' : '#10b98118', color: crit > 0 ? '#ef4444' : '#10b981', fontWeight:600 }}>{open} open</span>
+                  {crit > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#ef444418', color:'#ef4444', fontWeight:600 }}>{crit} critical</span>}
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#6b728018', color:'#6b7280', fontWeight:600 }}>{closed} closed</span>
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('summary', p)}>Manage</button>
+          </div>
+        </div>
+        {risks.length > 0 ? (() => {
+          // Risk heat map data
+          const PROBS = ['Very High','High','Medium','Low'];
+          const IMPACTS = ['Low','Medium','High','Very High'];
+          const heatColors = {
+            'Very High-Very High':'#991b1b','Very High-High':'#dc2626','Very High-Medium':'#f59e0b','Very High-Low':'#f59e0b',
+            'High-Very High':'#dc2626','High-High':'#ef4444','High-Medium':'#f59e0b','High-Low':'#84cc16',
+            'Medium-Very High':'#f59e0b','Medium-High':'#f59e0b','Medium-Medium':'#eab308','Medium-Low':'#84cc16',
+            'Low-Very High':'#f59e0b','Low-High':'#84cc16','Low-Medium':'#84cc16','Low-Low':'#22c55e',
+          };
+          // Category breakdown
+          const categories = {};
+          risks.forEach(r => { const c = r.category || 'Other'; categories[c] = (categories[c] || 0) + 1; });
+          const catEntries = Object.entries(categories).sort((a,b) => b[1] - a[1]);
+          const catColors = { 'Technical':'#3b82f6','Financial':'#10b981','Environmental':'#84cc16','Contractual':'#f59e0b','Safety':'#ef4444','Political':'#8b5cf6','Social':'#ec4899','Other':'#6b7280' };
+          // Open risks sorted by severity
+          const openRisksList = risks.filter(r => r.status !== 'Closed')
+            .sort((a,b) => {
+              const lvl = { 'Critical':0, 'High':1, 'Medium':2, 'Low':3 };
+              return (lvl[a.risk_level] ?? 4) - (lvl[b.risk_level] ?? 4);
+            });
+          const riskLevelColors = { 'Critical':'#ef4444', 'High':'#f59e0b', 'Medium':'#eab308', 'Low':'#22c55e' };
+          const statusColors = { 'Open':'#3b82f6', 'Mitigating':'#f59e0b', 'Closed':'#6b7280' };
+          return (
+            <>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+                {/* Heat Map */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8, textAlign:'center' }}>Probability × Impact Matrix</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'auto repeat(4, 1fr)', gap:2, fontSize:10 }}>
+                    {/* Header row */}
+                    <div style={{ padding:4 }} />
+                    {IMPACTS.map(imp => (
+                      <div key={imp} style={{ padding:4, textAlign:'center', fontWeight:700, fontSize:9, color:'var(--text-muted)' }}>{imp}</div>
+                    ))}
+                    {/* Data rows */}
+                    {PROBS.map(prob => (
+                      <React.Fragment key={prob}>
+                        <div style={{ padding:'6px 4px', fontWeight:700, fontSize:9, color:'var(--text-muted)', textAlign:'right', whiteSpace:'nowrap' }}>{prob}</div>
+                        {IMPACTS.map(imp => {
+                          const count = risks.filter(r => r.status !== 'Closed' && r.probability === prob && r.impact === imp).length;
+                          const bg = heatColors[`${prob}-${imp}`] || '#6b7280';
+                          return (
+                            <div key={imp} style={{
+                              padding:6, textAlign:'center', borderRadius:4,
+                              background: count > 0 ? bg : `${bg}18`,
+                              color: count > 0 ? '#fff' : 'var(--text-muted)',
+                              fontWeight: count > 0 ? 800 : 400,
+                              fontSize: count > 0 ? 14 : 10,
+                              transition:'all 0.3s',
+                              cursor: count > 0 ? 'default' : 'default',
+                            }}
+                              title={`${prob} probability × ${imp} impact: ${count} risk${count !== 1 ? 's' : ''}`}
+                            >
+                              {count > 0 ? count : '·'}
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                    {/* Axis labels */}
+                    <div style={{ gridColumn:'1', textAlign:'center', fontSize:8, color:'var(--text-muted)', paddingTop:4, fontStyle:'italic' }}>↑ Probability</div>
+                    <div style={{ gridColumn:'2 / 6', textAlign:'center', fontSize:8, color:'var(--text-muted)', paddingTop:4, fontStyle:'italic' }}>Impact →</div>
+                  </div>
+                </div>
+                {/* Category Breakdown */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8, textAlign:'center' }}>Risk Categories</div>
+                  {catEntries.map(([cat, count]) => {
+                    const total = risks.length;
+                    const pctVal = Math.round((count / total) * 100);
+                    const color = catColors[cat] || '#6b7280';
+                    return (
+                      <div key={cat} style={{ marginBottom:6 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}>
+                          <span style={{ fontWeight:600 }}>{cat}</span>
+                          <span style={{ color:'var(--text-muted)' }}>{count} ({pctVal}%)</span>
+                        </div>
+                        <div style={{ height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:`${pctVal}%`, background:color, borderRadius:3, transition:'width 0.8s ease' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Risk level summary */}
+                  <div style={{ display:'flex', gap:8, marginTop:12, justifyContent:'center' }}>
+                    {['Critical','High','Medium','Low'].map(lvl => {
+                      const c = risks.filter(r => r.risk_level === lvl && r.status !== 'Closed').length;
+                      return (
+                        <div key={lvl} style={{ textAlign:'center', padding:'4px 10px', borderRadius:6, background:`${riskLevelColors[lvl]}12` }}>
+                          <div style={{ fontSize:16, fontWeight:800, color:riskLevelColors[lvl] }}>{c}</div>
+                          <div style={{ fontSize:9, color:'var(--text-muted)' }}>{lvl}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {/* Top Risks Table */}
+              {openRisksList.length > 0 && (
+                <div style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', fontSize:11, borderCollapse:'separate', borderSpacing:'0 2px' }}>
+                    <thead>
+                      <tr style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>#</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Risk Description</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Level</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Prob.</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Impact</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Mitigation</th>
+                        <th style={{ padding:'6px 8px', textAlign:'left' }}>Owner</th>
+                        <th style={{ padding:'6px 8px', textAlign:'center' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {openRisksList.slice(0, 8).map((r, i) => (
+                        <tr key={r.id} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--bg-card)' }}>
+                          <td style={{ padding:'6px 8px', fontWeight:600, color:'var(--text-muted)' }}>{i + 1}</td>
+                          <td style={{ padding:'6px 8px', fontWeight:500, maxWidth:250, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.risk_description}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:700,
+                              background:`${riskLevelColors[r.risk_level] || '#6b7280'}18`,
+                              color: riskLevelColors[r.risk_level] || '#6b7280' }}>{r.risk_level}</span>
+                          </td>
+                          <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{r.probability || '—'}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{r.impact || '—'}</td>
+                          <td style={{ padding:'6px 8px', fontSize:10, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text-muted)' }}>{r.mitigation || '—'}</td>
+                          <td style={{ padding:'6px 8px', fontSize:10, color:'var(--text-muted)' }}>{r.owner || '—'}</td>
+                          <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                            <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600,
+                              background:`${statusColors[r.status] || '#6b7280'}18`,
+                              color: statusColors[r.status] || '#6b7280' }}>{r.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {openRisksList.length > 8 && (
+                    <div style={{ textAlign:'center', fontSize:10, color:'var(--text-muted)', marginTop:6 }}>
+                      +{openRisksList.length - 8} more — see Risk Register
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No risks registered — add risks in the Project Summary page to see the heat map.
+          </div>
+        )}
+      </div>
+
+      {/* ══════ CLAIMS DASHBOARD ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>⚖️ Claims Dashboard — FIDIC Contractual Claims</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            {(claims || []).length > 0 && (() => {
+              const active = claims.filter(c => !['approved','rejected','withdrawn','time_barred'].includes(c.status)).length;
+              const approved = claims.filter(c => c.status === 'approved').length;
+              const totalClaimed = claims.reduce((s, c) => s + (c.cost_claimed || 0), 0);
+              return (
+                <>
+                  <span style={{ padding:'3px 10px', borderRadius:9999, background:'#f59e0b18', color:'#f59e0b', fontWeight:600 }}>{active} active</span>
+                  {approved > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#10b98118', color:'#10b981', fontWeight:600 }}>{approved} approved</span>}
+                  {totalClaimed > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{fmtB(totalClaimed)} claimed</span>}
+                </>
+              );
+            })()}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('claims', p)}>Full Register</button>
+          </div>
+        </div>
+        {(claims || []).length > 0 ? (() => {
+          const TYPE_LABELS = { eot:'⏱️ EOT', cost:'💰 Cost', eot_and_cost:'⏱️💰 EOT & Cost', interest:'🏦 Interest', variation:'🔄 Variation', force_majeure:'🌪️ Force Majeure' };
+          const STATUS_COLORS = {
+            detected:'#f59e0b', notified:'#6366f1', under_preparation:'#0284c7', submitted:'#8b5cf6',
+            under_review:'#e87b35', additional_info:'#f59e0b', partially_approved:'#059669',
+            approved:'#059669', rejected:'#dc2626', withdrawn:'#94a3b8', time_barred:'#dc2626',
+          };
+          const PRIORITY_COLORS = { low:'#64748b', medium:'#f59e0b', high:'#e87b35', critical:'#dc2626' };
+          // Pipeline stages
+          const PIPELINE = ['detected','notified','under_preparation','submitted','under_review','additional_info','partially_approved','approved','rejected','withdrawn','time_barred'];
+          const PIPELINE_LABELS = { detected:'Detected', notified:'Notified', under_preparation:'Preparing', submitted:'Submitted', under_review:'Under Review', additional_info:'Add. Info', partially_approved:'Partial', approved:'Approved', rejected:'Rejected', withdrawn:'Withdrawn', time_barred:'Time-barred' };
+          const pipelineData = PIPELINE.map(s => ({ stage: s, label: PIPELINE_LABELS[s], count: claims.filter(c => c.status === s).length, color: STATUS_COLORS[s] })).filter(d => d.count > 0);
+          const maxPipeline = Math.max(1, ...pipelineData.map(d => d.count));
+
+          // Financial summary
+          const totalCostClaimed = claims.reduce((s, c) => s + (c.cost_claimed || 0), 0);
+          const totalEotClaimed = claims.reduce((s, c) => s + (c.eot_days_claimed || 0), 0);
+          const approvedCost = claims.filter(c => c.status === 'approved' || c.status === 'partially_approved').reduce((s, c) => s + (c.cost_claimed || 0), 0);
+          const rejectedCost = claims.filter(c => c.status === 'rejected').reduce((s, c) => s + (c.cost_claimed || 0), 0);
+          const pendingCost = totalCostClaimed - approvedCost - rejectedCost;
+
+          // Type breakdown
+          const typeBreakdown = {};
+          claims.forEach(c => { const t = c.claim_type || 'other'; typeBreakdown[t] = (typeBreakdown[t] || 0) + 1; });
+          const typeEntries = Object.entries(typeBreakdown).sort((a,b) => b[1] - a[1]);
+
+          return (
+            <>
+              {/* Top KPI row */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:8, marginBottom:16 }}>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#3b82f6' }}>{claims.length}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Total Claims</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#f59e0b' }}>{fmtB(totalCostClaimed)}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Cost Claimed</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#10b981' }}>{fmtB(approvedCost)}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Approved</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#ef4444' }}>{fmtB(rejectedCost)}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Rejected</div>
+                </div>
+                <div style={{ textAlign:'center', padding:10, background:'var(--bg)', borderRadius:'var(--radius)' }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:'#8b5cf6' }}>{totalEotClaimed}</div>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>EOT Days Claimed</div>
+                </div>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+                {/* Claims Pipeline */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Claims Pipeline</div>
+                  {pipelineData.map(d => (
+                    <div key={d.stage} style={{ marginBottom:4 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:1 }}>
+                        <span style={{ fontWeight:600 }}>{d.label}</span>
+                        <span style={{ fontWeight:700, color: d.color }}>{d.count}</span>
+                      </div>
+                      <div style={{ height:8, background:'var(--border)', borderRadius:4, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${(d.count / maxPipeline) * 100}%`, background:d.color, borderRadius:4, transition:'width 0.8s' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Type + Financial Exposure */}
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, marginBottom:8 }}>Claims by Type</div>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                    {typeEntries.map(([type, count]) => (
+                      <div key={type} style={{ padding:'6px 12px', borderRadius:8, background:'var(--bg)', textAlign:'center' }}>
+                        <div style={{ fontSize:10, marginBottom:2 }}>{TYPE_LABELS[type] || type}</div>
+                        <div style={{ fontSize:16, fontWeight:800 }}>{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Financial exposure bar */}
+                  {totalCostClaimed > 0 && (
+                    <div>
+                      <div style={{ fontSize:11, fontWeight:600, marginBottom:4 }}>Financial Exposure</div>
+                      <div style={{ height:14, background:'var(--border)', borderRadius:7, overflow:'hidden', display:'flex' }}>
+                        {approvedCost > 0 && <div style={{ height:'100%', width:`${(approvedCost/totalCostClaimed)*100}%`, background:'#10b981', transition:'width 0.8s' }} title={`Approved: ${fmtB(approvedCost)}`} />}
+                        {pendingCost > 0 && <div style={{ height:'100%', width:`${(pendingCost/totalCostClaimed)*100}%`, background:'#f59e0b', transition:'width 0.8s' }} title={`Pending: ${fmtB(pendingCost)}`} />}
+                        {rejectedCost > 0 && <div style={{ height:'100%', width:`${(rejectedCost/totalCostClaimed)*100}%`, background:'#ef4444', transition:'width 0.8s' }} title={`Rejected: ${fmtB(rejectedCost)}`} />}
+                      </div>
+                      <div style={{ display:'flex', gap:12, marginTop:4, fontSize:9, justifyContent:'center' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#10b981' }} />Approved</span>
+                        <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#f59e0b' }} />Pending</span>
+                        <span style={{ display:'flex', alignItems:'center', gap:3 }}><span style={{ width:8, height:8, borderRadius:2, background:'#ef4444' }} />Rejected</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Active Claims Table */}
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', fontSize:11, borderCollapse:'separate', borderSpacing:'0 2px' }}>
+                  <thead>
+                    <tr style={{ fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                      <th style={{ padding:'6px 8px', textAlign:'left' }}>Ref</th>
+                      <th style={{ padding:'6px 8px', textAlign:'left' }}>Title</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Type</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>FIDIC</th>
+                      <th style={{ padding:'6px 8px', textAlign:'right' }}>Cost</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>EOT</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Priority</th>
+                      <th style={{ padding:'6px 8px', textAlign:'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claims.slice(0, 10).map((c, i) => (
+                      <tr key={c.id} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--bg-card)' }}>
+                        <td style={{ padding:'6px 8px', fontWeight:700, fontFamily:'monospace', fontSize:10, color:'var(--text-muted)' }}>{c.claim_number || `#${i+1}`}</td>
+                        <td style={{ padding:'6px 8px', fontWeight:500, maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.title}</td>
+                        <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{TYPE_LABELS[c.claim_type] || c.claim_type || '—'}</td>
+                        <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10, fontFamily:'monospace' }}>{c.fidic_clause || '—'}</td>
+                        <td style={{ padding:'6px 8px', textAlign:'right', fontWeight:600, fontFamily:'monospace', fontSize:10 }}>{c.cost_claimed ? fmtB(c.cost_claimed) : '—'}</td>
+                        <td style={{ padding:'6px 8px', textAlign:'center', fontSize:10 }}>{c.eot_days_claimed ? `${c.eot_days_claimed}d` : '—'}</td>
+                        <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                          <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600,
+                            background:`${PRIORITY_COLORS[c.priority] || '#6b7280'}18`,
+                            color: PRIORITY_COLORS[c.priority] || '#6b7280' }}>{c.priority || '—'}</span>
+                        </td>
+                        <td style={{ padding:'6px 8px', textAlign:'center' }}>
+                          <span style={{ padding:'2px 8px', borderRadius:9999, fontSize:10, fontWeight:600,
+                            background:`${STATUS_COLORS[c.status] || '#6b7280'}18`,
+                            color: STATUS_COLORS[c.status] || '#6b7280' }}>{(c.status || '').replace(/_/g, ' ')}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {claims.length > 10 && (
+                  <div style={{ textAlign:'center', fontSize:10, color:'var(--text-muted)', marginTop:6 }}>
+                    +{claims.length - 10} more — see Claims Register
+                  </div>
+                )}
+              </div>
+
+              {/* FIDIC compliance note */}
+              <div style={{ marginTop:12, padding:'8px 12px', background:'#eff6ff', borderRadius:'var(--radius)', borderLeft:'3px solid #3b82f6', fontSize:10, color:'#1e40af' }}>
+                📋 <strong>FIDIC 1999 Red Book:</strong> Claims must be notified within 28 days of awareness (Cl. 20.1).
+                Engineer's determination due within 42 days of receiving full particulars.
+                {totalEotClaimed > 0 && ` Total EOT exposure: ${totalEotClaimed} days.`}
+                {totalCostClaimed > 0 && ` Total financial exposure: ${fmtB(totalCostClaimed)}.`}
+              </div>
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>
+            No claims recorded — use the Claims page to detect triggers and manage contractual claims.
           </div>
         )}
       </div>
