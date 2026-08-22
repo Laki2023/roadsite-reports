@@ -641,36 +641,56 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       )}
 
       {/* ══════ S-CURVE + CHAINAGE ══════ */}
-      <div style={{ display:'grid', gridTemplateColumns:'3fr 2fr', gap:14, marginBottom:16 }}>
-        <div className="card" style={{ padding:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'3fr 2fr', gap:14, marginBottom:14, alignItems:'stretch' }}>
+        <div className="card" style={{ padding:14, display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
             <h3 style={{ margin:0, fontSize:14 }}>Progress Curve (S-Curve)</h3>
             <StatusBadge status={scheduleStatus} />
           </div>
-          <ResponsiveContainer width="100%" height={230}>
-            <AreaChart data={sCurve} margin={{ left:0, right:8, top:5 }}>
-              <defs>
-                <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6b7280" stopOpacity={0.2}/><stop offset="100%" stopColor="#6b7280" stopOpacity={0.02}/></linearGradient>
-                <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e87b35" stopOpacity={0.3}/><stop offset="100%" stopColor="#e87b35" stopOpacity={0.02}/></linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
-              <XAxis dataKey="month" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
-              <YAxis tick={{ fontSize:10, fill:'var(--text-muted)' }} domain={[0,100]} tickFormatter={v=>v+'%'} />
-              <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:12 }} formatter={v=>v+'%'} />
-              <Legend wrapperStyle={{ fontSize:11 }} />
-              <Area type="monotone" dataKey="planned" stroke="#6b7280" strokeWidth={2} fill="url(#gP)" name="Planned" dot={false} />
-              <Area type="monotone" dataKey="actual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gA)" name="Actual" dot={{ r:3 }} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div style={{ flex:1, minHeight:0 }}>
+            <ResponsiveContainer width="100%" height={230}>
+              <AreaChart data={sCurve} margin={{ left:0, right:8, top:5 }}>
+                <defs>
+                  <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6b7280" stopOpacity={0.2}/><stop offset="100%" stopColor="#6b7280" stopOpacity={0.02}/></linearGradient>
+                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e87b35" stopOpacity={0.3}/><stop offset="100%" stopColor="#e87b35" stopOpacity={0.02}/></linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                <XAxis dataKey="month" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
+                <YAxis tick={{ fontSize:10, fill:'var(--text-muted)' }} domain={[0,100]} tickFormatter={v=>v+'%'} />
+                <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:12 }} formatter={v=>v+'%'} />
+                <Legend wrapperStyle={{ fontSize:11 }} />
+                <Area type="monotone" dataKey="planned" stroke="#6b7280" strokeWidth={2} fill="url(#gP)" name="Planned" dot={false} />
+                <Area type="monotone" dataKey="actual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gA)" name="Actual" dot={{ r:3 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginTop:6, padding:'0 8px' }}>
             <span>Planned: <strong>{timePct}%</strong></span>
             <span>Actual: <strong>{physPct}%</strong></span>
             <span style={{ color:variance>=0?'#10b981':'#ef4444', fontWeight:700 }}>Variance: {variance>0?'+':''}{variance}%</span>
           </div>
+
+          {/* Monthly Variance Breakdown — fills space below S-Curve */}
+          <div style={{ marginTop:14, padding:'10px 12px', background:'var(--bg-hover)', borderRadius:'var(--radius)' }}>
+            <div style={{ fontSize:11, fontWeight:700, marginBottom:8, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>Monthly Variance Breakdown</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6 }}>
+              {sCurve.filter(m => m.planned > 0 || m.actual > 0).slice(-8).map((m, i) => {
+                const v = m.actual - m.planned;
+                const vColor = v >= 0 ? '#10b981' : v >= -10 ? '#f59e0b' : '#ef4444';
+                return (
+                  <div key={i} style={{ textAlign:'center', padding:'6px 4px', borderRadius:6, background:'var(--bg-card)', border:'1px solid var(--border)' }}>
+                    <div style={{ fontSize:10, color:'var(--text-muted)', marginBottom:2 }}>{m.month}</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:vColor }}>{v > 0 ? '+' : ''}{v}%</div>
+                    <div style={{ fontSize:9, color:'var(--text-muted)' }}>{m.actual}% of {m.planned}%</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Chainage Progress */}
-        <div className="card" style={{ padding:14 }}>
+        <div className="card" style={{ padding:14, display:'flex', flexDirection:'column' }}>
           <h3 style={{ margin:'0 0 10px', fontSize:14 }}>Chainage Progress</h3>
           {chainageBlocks.length > 0 ? (
             <>
@@ -700,53 +720,70 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
               </div>
             </>
           ) : <div className="text-sm text-muted" style={{ textAlign:'center', padding:40 }}>No chainage data — add pavement layers to see progress</div>}
+        </div>
+      </div>
 
-          {/* ══════ PROGRESS SUMMARY TABLE ══════ */}
-          <h3 style={{ margin:'16px 0 8px', fontSize:14 }}>📋 Progress Summary — Key Layers</h3>
-          {(() => {
-            // Curated list: the critical-path layers every RE tracks
-            const KEY_LAYERS = [
-              'Site Clearance', 'Topsoil Stripping', 'Compaction of OGL', 'Final Earthworks',
-              'Bottom Subgrade', 'Top Subgrade', 'Subbase', 'Base',
-              'Asphalt Concrete', 'Surface Dressing', 'Concrete Pavement',
-            ];
-            // Match against project activities (components + parents), flexible name matching
-            const matchActivity = (keyword) => {
-              const kw = keyword.toLowerCase();
-              return works.find(w => {
-                const n = (w.activity_name || '').toLowerCase();
-                // Exact or contains match
-                if (n === kw) return true;
-                if (n.includes(kw)) return true;
-                // Specific mappings
-                if (kw === 'site clearance' && n === 'bush clearing') return true;
-                if (kw === 'topsoil stripping' && (n === 'topsoil stripping' || n === 'top soil stripping')) return true;
-                if (kw === 'compaction of ogl' && n.includes('compaction') && (w.category === 'Earthworks' || (w.parent?.activity_name || '').toLowerCase().includes('ogl'))) return true;
-                if (kw === 'final earthworks' && (n.includes('formation') || n === 'excavation to formation' || n === 'shaping & trimming')) return true;
-                if (kw === 'bottom subgrade' && n.includes('bottom') && n.includes('subgrade')) return true;
-                if (kw === 'top subgrade' && n.includes('top') && n.includes('subgrade')) return true;
-                if (kw === 'subbase' && (n.includes('subbase') || n.includes('sub-base') || n.includes('cig') || n.includes('natural material'))) return true;
-                if (kw === 'base' && (n.includes('gcs base') || n.includes('graded crushed') || n.includes('cement stab') || n.includes('lime/cement'))) return true;
-                if (kw === 'asphalt concrete' && (n.includes('binder course') || n.includes('wearing course') || n.includes('asphalt laying') || n.includes('ac'))) return true;
-                if (kw === 'surface dressing' && n.includes('surface dressing')) return true;
-                if (kw === 'concrete pavement' && n.includes('concrete pavement')) return true;
-                return false;
-              });
-            };
-            const rows = KEY_LAYERS.map((name, i) => {
-              const act = matchActivity(name);
-              // If matched a component, also check the parent for planned quantities
-              const parent = act?.parent_activity_id ? works.find(w => w.id === act.parent_activity_id) : null;
-              const planned = act?.planned_quantity || parent?.planned_quantity || 0;
-              const done = act?.completed_quantity || 0;
-              const unit = act?.unit || 'Km';
-              const pctRaw = planned > 0 ? (done / planned) * 100 : 0;
-              const pctDisplay = Math.min(100, Math.round(pctRaw));
-              const isLive = act?.last_progress_date === today;
-              return { name, act, planned, done, unit, pctDisplay, isLive, itemNo: i + 1 };
+      {/* ══════ PROGRESS SUMMARY — KEY LAYERS (full width) ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <h3 style={{ margin:'0 0 10px', fontSize:15 }}>📋 Progress Summary — Key Layers</h3>
+        {(() => {
+          // Curated list: the critical-path layers every RE tracks
+          const KEY_LAYERS = [
+            'Site Clearance', 'Topsoil Stripping', 'Compaction of OGL', 'Final Earthworks',
+            'Bottom Subgrade', 'Top Subgrade', 'Subbase', 'Base',
+            'Asphalt Concrete', 'Surface Dressing', 'Concrete Pavement',
+          ];
+          // Match against project activities (components + parents), flexible name matching
+          const matchActivity = (keyword) => {
+            const kw = keyword.toLowerCase();
+            return works.find(w => {
+              const n = (w.activity_name || '').toLowerCase();
+              // Exact or contains match
+              if (n === kw) return true;
+              if (n.includes(kw)) return true;
+              // Specific mappings
+              if (kw === 'site clearance' && n === 'bush clearing') return true;
+              if (kw === 'topsoil stripping' && (n === 'topsoil stripping' || n === 'top soil stripping')) return true;
+              if (kw === 'compaction of ogl' && n.includes('compaction') && (w.category === 'Earthworks' || (w.parent?.activity_name || '').toLowerCase().includes('ogl'))) return true;
+              if (kw === 'final earthworks' && (n.includes('formation') || n === 'excavation to formation' || n === 'shaping & trimming')) return true;
+              if (kw === 'bottom subgrade' && n.includes('bottom') && n.includes('subgrade')) return true;
+              if (kw === 'top subgrade' && n.includes('top') && n.includes('subgrade')) return true;
+              if (kw === 'subbase' && (n.includes('subbase') || n.includes('sub-base') || n.includes('cig') || n.includes('natural material'))) return true;
+              if (kw === 'base' && (n.includes('gcs base') || n.includes('graded crushed') || n.includes('cement stab') || n.includes('lime/cement'))) return true;
+              if (kw === 'asphalt concrete' && (n.includes('binder course') || n.includes('wearing course') || n.includes('asphalt laying') || n.includes('ac'))) return true;
+              if (kw === 'surface dressing' && n.includes('surface dressing')) return true;
+              if (kw === 'concrete pavement' && n.includes('concrete pavement')) return true;
+              return false;
             });
+          };
+          const rows = KEY_LAYERS.map((name, i) => {
+            const act = matchActivity(name);
+            const parent = act?.parent_activity_id ? works.find(w => w.id === act.parent_activity_id) : null;
+            const planned = act?.planned_quantity || parent?.planned_quantity || 0;
+            const done = act?.completed_quantity || 0;
+            const unit = act?.unit || 'Km';
+            const pctRaw = planned > 0 ? (done / planned) * 100 : 0;
+            const pctDisplay = Math.min(100, Math.round(pctRaw));
+            const isLive = act?.last_progress_date === today;
+            return { name, act, planned, done, unit, pctDisplay, isLive, itemNo: i + 1 };
+          });
+          const layersStarted = rows.filter(r => r.pctDisplay > 0).length;
+          const layersComplete = rows.filter(r => r.pctDisplay >= 100).length;
+          const avgProgress = rows.length > 0 ? Math.round(rows.reduce((s, r) => s + r.pctDisplay, 0) / rows.length) : 0;
 
-            return (
+          return (
+            <>
+              <div style={{ display:'flex', gap:16, marginBottom:12, fontSize:11 }}>
+                <span style={{ padding:'4px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>
+                  {layersStarted} of {rows.length} layers started
+                </span>
+                <span style={{ padding:'4px 10px', borderRadius:9999, background:'#10b98118', color:'#10b981', fontWeight:600 }}>
+                  {layersComplete} completed
+                </span>
+                <span style={{ padding:'4px 10px', borderRadius:9999, background:'#e87b3518', color:'#e87b35', fontWeight:600 }}>
+                  Avg: {avgProgress}%
+                </span>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                   <thead>
@@ -756,7 +793,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                       <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:45 }}>Unit</th>
                       <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:65 }}>Billed</th>
                       <th style={{ textAlign:'right', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:75 }}>Achieved</th>
-                      <th style={{ padding:'8px 6px', width:90 }}></th>
+                      <th style={{ padding:'8px 6px', width:120 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -775,7 +812,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                         </td>
                         <td style={{ padding:'6px' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                            <div style={{ width:50, height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                            <div style={{ width:70, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
                               <div style={{ height:'100%', width:`${r.pctDisplay}%`, borderRadius:3,
                                 background: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.pctDisplay > 0 ? '#ef4444' : 'transparent' }} />
                             </div>
@@ -790,9 +827,9 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                   </tbody>
                 </table>
               </div>
-            );
-          })()}
-        </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* ══════ LIVE ACTIVITY MONITOR ══════ */}
@@ -932,7 +969,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       </div>
 
       {/* ══════ PROGRESS RATE ANALYSIS + MEETING RECOMMENDATION ══════ */}
-      <div style={{ display:'grid', gridTemplateColumns:'3fr 2fr', gap:14, marginBottom:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'3fr 2fr', gap:14, marginBottom:16, alignItems:'start' }}>
         {/* Progress Rate Chart */}
         <div className="card" style={{ padding:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
