@@ -94,10 +94,22 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
       supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
     ]);
+    // Latest site photos with signed URLs (best-effort — dashboard still loads if storage fails)
+    let photosWithUrls = [];
+    try {
+      const { data: photoRows } = await supabase.from('report_photos').select('*')
+        .eq('project_id', projectId).order('created_at', { ascending: false }).limit(8);
+      photosWithUrls = await Promise.all((photoRows || []).map(async (ph) => {
+        try {
+          const { data: signed } = await supabase.storage.from('site-photos').createSignedUrl(ph.file_path, 3600);
+          return { ...ph, url: signed?.signedUrl || null };
+        } catch { return { ...ph, url: null }; }
+      }));
+    } catch { photosWithUrls = []; }
     setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
       issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
       risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
-      instructions:instructions.data||[], obligations:obligations.data||[] });
+      instructions:instructions.data||[], obligations:obligations.data||[], photos:photosWithUrls });
   }
 
   // ── Statutory Obligations helpers ──
@@ -1658,6 +1670,38 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           </div>
           <ProgressBar label="Pass" value={testPass} max={tests.length||1} color="#10b981" />
           <ProgressBar label="Fail" value={testFail} max={tests.length||1} color="#ef4444" />
+          {tests.length > 0 && (() => {
+            const byType = {};
+            tests.forEach(t => {
+              const k = t.test_type || 'Other';
+              if (!byType[k]) byType[k] = { total:0, pass:0, fail:0 };
+              byType[k].total++;
+              if (t.result_status === 'Pass') byType[k].pass++;
+              if (t.result_status === 'Fail') byType[k].fail++;
+            });
+            const rows = Object.entries(byType).sort((a,b) => b[1].total - a[1].total).slice(0, 8);
+            return (
+              <div style={{ marginTop:10 }}>
+                <div style={{ fontSize:11, fontWeight:600, marginBottom:6 }}>By Test Type</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                  {rows.map(([type, s]) => {
+                    const pr = s.total > 0 ? Math.round((s.pass / s.total) * 100) : 0;
+                    const c = pr >= 80 ? '#10b981' : pr >= 50 ? '#f59e0b' : '#ef4444';
+                    return (
+                      <div key={type} style={{ display:'flex', alignItems:'center', gap:8, fontSize:11 }}>
+                        <span style={{ flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{type}</span>
+                        <span style={{ color:'var(--text-muted)', fontSize:10, minWidth:52, textAlign:'right' }}>{s.pass}/{s.total} pass</span>
+                        <div style={{ width:60, height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                          <div style={{ height:'100%', width:`${pr}%`, background:c, borderRadius:3 }} />
+                        </div>
+                        <span style={{ fontWeight:700, color:c, minWidth:32, textAlign:'right', fontSize:10 }}>{pr}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:11, fontWeight:600, marginBottom:4 }}>Pavement Layers</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10 }}>
@@ -1696,6 +1740,121 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             <div><strong>{miles.length}</strong> milestones tracked</div>
           </div>
         </div>
+      </div>
+
+      {/* ══════ RESOURCE SUMMARY ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12, flexWrap:'wrap', gap:8 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>🚜 Resource Summary — Plant &amp; Equipment</h3>
+          <div style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+            <span style={{ padding:'3px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>{equip.length} types registered</span>
+            <span style={{ padding:'3px 10px', borderRadius:9999, background: eqPct >= 70 ? '#10b98118' : '#ef444418', color: eqPct >= 70 ? '#10b981' : '#ef4444', fontWeight:600 }}>{eqOn}/{eqReq} units · {eqPct}% mobilized</span>
+            {mats.length > 0 && <span style={{ padding:'3px 10px', borderRadius:9999, background:'#7c3aed18', color:'#7c3aed', fontWeight:600 }}>{mats.length} materials tracked</span>}
+            <button className="btn btn-sm btn-secondary" style={{ fontSize:10 }} onClick={() => navigateTo('equipment', p)}>Manage</button>
+          </div>
+        </div>
+        {equip.length > 0 ? (() => {
+          const rows = equip.map(e => {
+            const req = e.required_quantity || 0;
+            const on = e.actual_on_site || 0;
+            const gap = Math.max(0, req - on);
+            const util = req > 0 ? Math.round((on / req) * 100) : 0;
+            return { ...e, req, on, gap, util };
+          }).sort((a, b) => (b.is_key_equipment === true) - (a.is_key_equipment === true) || b.gap - a.gap);
+          const shown = rows.slice(0, 12);
+          const keyGaps = rows.filter(r => r.is_key_equipment && r.gap > 0);
+          return (
+            <>
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ borderBottom:'2px solid var(--border)' }}>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase' }}>Equipment</th>
+                      <th style={{ textAlign:'left', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:100 }}>Type</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:70 }}>Required</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:70 }}>On Site</th>
+                      <th style={{ textAlign:'center', padding:'8px 6px', fontSize:10, color:'var(--text-muted)', textTransform:'uppercase', width:60 }}>Gap</th>
+                      <th style={{ padding:'8px 6px', width:130 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((r, i) => (
+                      <tr key={r.id || i} style={{ borderBottom:'1px solid var(--border)', background: r.is_key_equipment && r.gap > 0 ? '#ef444408' : 'transparent' }}>
+                        <td style={{ padding:'6px', fontWeight: r.is_key_equipment ? 700 : 500 }}>
+                          {r.is_key_equipment && <span style={{ color:'#e87b35', marginRight:4, fontSize:10 }} title="Key equipment">★</span>}
+                          {r.equipment_name || '—'}
+                        </td>
+                        <td style={{ padding:'6px', color:'var(--text-muted)', fontSize:11 }}>{r.equipment_type || '—'}</td>
+                        <td className="text-mono" style={{ textAlign:'center', padding:'6px' }}>{r.req}</td>
+                        <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontWeight:700, color: r.on >= r.req && r.req > 0 ? '#10b981' : r.on > 0 ? '#e87b35' : 'var(--text-muted)' }}>{r.on}</td>
+                        <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontWeight:700, color: r.gap > 0 ? '#ef4444' : '#10b981' }}>{r.gap > 0 ? r.gap : '—'}</td>
+                        <td style={{ padding:'6px' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                            <div style={{ width:80, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${Math.min(r.util, 100)}%`, borderRadius:3,
+                                background: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#e87b35' : r.util > 0 ? '#ef4444' : 'transparent' }} />
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:600, minWidth:30,
+                              color: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#e87b35' : r.util > 0 ? '#ef4444' : 'var(--text-muted)' }}>{r.req > 0 ? r.util + '%' : ''}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {rows.length > shown.length && (
+                <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:6, textAlign:'center' }}>+{rows.length - shown.length} more — see Equipment page</div>
+              )}
+              {keyGaps.length > 0 && (
+                <div style={{ marginTop:10, padding:'8px 12px', background:'#fef2f2', borderRadius:'var(--radius)', borderLeft:'3px solid #ef4444', fontSize:11, color:'#991b1b' }}>
+                  ⚠ <strong>{keyGaps.length} key equipment type{keyGaps.length > 1 ? 's' : ''} under-mobilized:</strong> {keyGaps.slice(0,4).map(r => `${r.equipment_name} (−${r.gap})`).join(' · ')}{keyGaps.length > 4 ? ` · +${keyGaps.length - 4} more` : ''}
+                </div>
+              )}
+            </>
+          );
+        })() : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:30 }}>
+            No equipment registered. <button className="btn btn-sm btn-primary" style={{ fontSize:10, marginLeft:8 }} onClick={() => navigateTo('equipment', p)}>Add Equipment</button>
+          </div>
+        )}
+      </div>
+
+      {/* ══════ LATEST SITE PHOTOS ══════ */}
+      <div className="card" style={{ padding:16, marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <h3 style={{ margin:0, fontSize:15 }}>📸 Latest Site Photos</h3>
+          <span className="text-sm text-muted">{(d.photos || []).length > 0 ? `${d.photos.length} most recent` : ''}</span>
+        </div>
+        {(d.photos || []).filter(ph => ph.url).length > 0 ? (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))', gap:10 }}>
+            {d.photos.filter(ph => ph.url).map((ph, i) => (
+              <div key={ph.id || i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)', cursor:'pointer', background:'var(--bg-hover)' }}
+                onClick={() => window.open(ph.url, '_blank', 'noopener')}
+                title={ph.caption || ph.file_name || 'Site photo'}>
+                <div style={{ height:110, overflow:'hidden' }}>
+                  <img src={ph.url} alt={ph.caption || 'Site photo'} loading="lazy"
+                    style={{ width:'100%', height:'100%', objectFit:'cover', display:'block', transition:'transform 0.3s' }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'} />
+                </div>
+                <div style={{ padding:'6px 8px' }}>
+                  <div style={{ fontSize:10, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                    {ph.caption || ph.category || ph.file_name || 'Site photo'}
+                  </div>
+                  <div style={{ fontSize:9, color:'var(--text-muted)', display:'flex', justifyContent:'space-between', marginTop:2 }}>
+                    <span>{ph.photo_date || (ph.created_at ? String(ph.created_at).slice(0,10) : '')}</span>
+                    {ph.chainage && <span>Ch. {ph.chainage}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted" style={{ textAlign:'center', padding:30 }}>
+            No site photos yet — photos attached to daily reports will appear here automatically.
+          </div>
+        )}
       </div>
 
       {/* ══════ FOOTER ACTIONS ══════ */}
