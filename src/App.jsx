@@ -135,6 +135,7 @@ export default function App() {
     setPage(pg);
     window.location.hash = pg;
     if (project !== undefined) setSelectedProject(project);
+    if (pg === 'projects') setSelectedProject(null);
     setSidebarOpen(false);
   }
 
@@ -233,7 +234,7 @@ export default function App() {
       case 'emergency': return <EmergencyPage {...ctx} />;
       case 'project-dashboard': 
         if (profile?.role === 'contractor_qs') return <TakingOffPage {...ctx} />;
-        return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('dashboard')} />;
+        return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => { setSelectedProject(null); navigateTo('dashboard'); }} />;
       case 'project-summary': return <ProjectSummary {...ctx} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
     }
@@ -282,11 +283,11 @@ export default function App() {
         </div>
 
         {/* Project Context Banner */}
-        {selectedProject && page !== 'dashboard' && page !== 'projects' && (
+        {selectedProject && page !== 'projects' && (
           <div style={{ padding: '8px 12px', margin: '0 12px 8px', background: 'rgba(232,123,53,0.15)',
             borderRadius: 'var(--radius)', borderLeft: '3px solid #e87b35', cursor: 'pointer' }}
             onClick={() => navigateTo('project-dashboard', selectedProject)}>
-            <div style={{ fontSize: 10, color: '#e87b35', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Project</div>
+            <div style={{ fontSize: 10, color: '#e87b35', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Project<span onClick={(e) => { e.stopPropagation(); setSelectedProject(null); navigateTo('dashboard'); }} style={{ float: 'right', cursor: 'pointer', fontSize: 12, opacity: 0.8 }}>✕</span></div>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedProject.name || 'Selected Project'}
             </div>
@@ -315,7 +316,7 @@ export default function App() {
               <button key={item.key}
                 className={isActive ? 'active' : ''}
                 aria-current={isActive ? 'page' : undefined}
-                onClick={() => navigateTo(item.key)}
+                onClick={() => navigateTo(item.key === 'dashboard' && selectedProject ? 'project-dashboard' : item.key)}
                 style={{ position: 'relative' }}>
                 <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
                 <span style={{ flex: 1 }}>{item.label}</span>
