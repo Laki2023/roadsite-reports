@@ -429,7 +429,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(propProject || '');
+  const [selectedProject, setSelectedProject] = useState(propProject?.id || '');
 
   // Project-specific data
   const [activities, setActivities] = useState([]);
