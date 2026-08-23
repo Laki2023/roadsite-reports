@@ -7,7 +7,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import SubmitReport from './pages/SubmitReport';
 import ReportsPage from './pages/ReportsPage';
 import PavementPage from './pages/PavementPage';
-import QualityTestsPage from './pages/QualityTestsPage';
+import QualityTestsPage from './pages/QualityhTestsPage';
 import IssuesPage from './pages/IssuesPage';
 import StaffPage from './pages/StaffPage';
 import AdminPanel from './pages/AdminPanel';
@@ -131,7 +131,7 @@ export default function App() {
     setLoading(false);
   }
 
-  function navigateTo(pg, project = null) {
+  function navigateTo(pg, project = undefined) {
     setPage(pg);
     window.location.hash = pg;
     if (project !== undefined) setSelectedProject(project);
