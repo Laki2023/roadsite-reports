@@ -7,7 +7,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import SubmitReport from './pages/SubmitReport';
 import ReportsPage from './pages/ReportsPage';
 import PavementPage from './pages/PavementPage';
-import QualityTestsPage from './pages/QualityhTestsPage';
+import QualityTestsPage from './pages/QualityTestsPage';
 import IssuesPage from './pages/IssuesPage';
 import StaffPage from './pages/StaffPage';
 import AdminPanel from './pages/AdminPanel';
