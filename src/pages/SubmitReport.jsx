@@ -1466,9 +1466,29 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </button>
         <span className="text-sm text-muted" style={{ alignSelf: 'center' }}>Step {step} of {STEPS.length}</span>
         {step < STEPS.length ? (
-          <button className="btn btn-primary" onClick={() => setStep(step + 1)} disabled={!stepComplete[step - 1]}>
-            Next →
-          </button>
+          <button className="btn btn-primary" onClick={() => {
+              if (!stepComplete[step - 1]) {
+                const missing = [];
+                if (step === 1) {
+                  if (!selectedProject) missing.push('Project');
+                  if (!form.report_date) missing.push('Report Date');
+                  if (!form.weather) missing.push('Weather Conditions');
+                }
+                if (step === 4 && !worksValid) missing.push('Complete all Works entries (activity & quantity required)');
+                if (step === 5 && !equipValid) missing.push('Complete all Equipment entries');
+                if (step === 6 && !testsValid) missing.push('Complete all Quality Test entries');
+                if (step === 7 && !structsValid) missing.push('Complete all Structure entries');
+                if (step === 8) {
+                  if (!issuesValid) missing.push('Complete all Issue entries (title & severity required)');
+                  if (!instructionsValid) missing.push('Complete all Instruction entries (subject & type required)');
+                }
+                showToast(missing.length ? 'Please fill in: ' + missing.join(', ') : 'Please complete all required fields', 'error');
+                return;
+              }
+              setStep(step + 1);
+            }} style={!stepComplete[step - 1] ? { opacity: 0.4, cursor: 'not-allowed' } : {}}>
+              Next →
+            </button>
         ) : (
           <button className="btn btn-primary" onClick={handleSubmit} disabled={saving || !selectedProject}>
             {saving ? 'Submitting...' : '✅ Submit Report'}
