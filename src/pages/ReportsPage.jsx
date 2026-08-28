@@ -7,6 +7,28 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   const [filterProject, setFilterProject] = useState(propProject?.id || 'all');
   const [filterDate, setFilterDate] = useState('');
   const [expanded, setExpanded] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+
+  async function handleDeleteReport(reportId, e) {
+    e.stopPropagation();
+    if (!window.confirm('Delete this report and all linked data? This cannot be undone.')) return;
+    setDeleting(reportId);
+    try {
+      // Delete child records first (some may not exist — ignore errors)
+      await supabase.from('works_progress').delete().eq('daily_report_id', reportId);
+      await supabase.from('daily_labour').delete().eq('daily_report_id', reportId);
+      // Delete the report itself (cascades to other FK-linked tables)
+      const { error } = await supabase.from('daily_reports').delete().eq('id', reportId);
+      if (error) throw error;
+      showToast('Report deleted');
+      setExpanded(null);
+      load();
+    } catch (err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   useEffect(() => { load(); }, []);
 
@@ -167,6 +189,18 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
                               <p style={{ marginTop: 4 }}>{r.urgent_details}</p>
                             </div>
                           )}
+
+                          {/* Delete Report Button */}
+                          <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn btn-sm"
+                              style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '4px 12px' }}
+                              onClick={(e) => handleDeleteReport(r.id, e)}
+                              disabled={deleting === r.id}
+                            >
+                              {deleting === r.id ? 'Deleting...' : '🗑 Delete Report'}
+                            </button>
+                          </div>
 
                           {/* Linked Works Activities */}
                           {actCount > 0 && (
