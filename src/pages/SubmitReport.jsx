@@ -601,7 +601,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   // ── Completeness ──
   // Steps with no entries are valid (empty is fine for a daily report).
   // When entries ARE added, their required fields must be filled.
-  const worksValid = worksEntries.every(w => (w.layer_name || w.activity_id) && w.quantity);
+  const worksValid = worksEntries.filter(w => w.layer_name || w.activity_id || w.quantity).every(w => (w.layer_name || w.activity_id) && (w.quantity !== '' && w.quantity !== undefined));
   const equipValid = equipEntries.every(e => e.equipment_name || e.equipment_id);
   const testsValid = testEntries.every(t => t.test_type);
   const structsValid = structEntries.every(s => s.structure_name || s.structure_id);
