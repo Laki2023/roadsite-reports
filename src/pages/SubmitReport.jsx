@@ -7,7 +7,7 @@ import {
   STRUCTURES_LIST, STRUCTURE_STATUS_OPTIONS, STRUCTURE_CATEGORIES,
   ACTIVITIES_LIST, ACTIVITY_CATEGORIES,
   QUALITY_TESTS_LIST, QUALITY_TEST_CATEGORIES,
-  MATERIALS_LIST,
+  MATERIALS_LIST,h
   ISSUE_CATEGORIES as REF_ISSUE_CATEGORIES,
 } from '../data/referenceData';
 import { syncWorksActivity } from '../lib/syncWorksActivity';
@@ -601,7 +601,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   // ── Completeness ──
   // Steps with no entries are valid (empty is fine for a daily report).
   // When entries ARE added, their required fields must be filled.
-  const worksValid = worksEntries.filter(w => w.layer_name || w.activity_id || w.quantity).every(w => (w.layer_name || w.activity_id) && (w.quantity !== '' && w.quantity !== undefined));
+  const worksValid = worksEntries.filter(w => w.layer_name || w.activity_id || w.quantity).every(w => (w.layer_name || w.activity_id) && ((w.quantity !== '' && w.quantity !== undefined) || (parseChainage(w.start_chainage) != null && parseChainage(w.end_chainage) != null && Math.abs(parseChainage(w.end_chainage) - parseChainage(w.start_chainage)) > 0)));
   const equipValid = equipEntries.every(e => e.equipment_name || e.equipment_id);
   const testsValid = testEntries.every(t => t.test_type);
   const structsValid = structEntries.every(s => s.structure_name || s.structure_id);
