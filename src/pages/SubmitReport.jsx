@@ -13,11 +13,11 @@ import {
 import { syncWorksActivity } from '../lib/syncWorksActivity';
 import { parseChainage, fmtChainage } from '../lib/utils';
 
-// ── Constants ──
+// ââ Constants ââ
 const ISSUE_SEVERITY = ['Low', 'Medium', 'High', 'Critical'];
 
 
-// ── Chainage overlap detection ──
+// ââ Chainage overlap detection ââ
 // Returns previous entries that overlap the given range for the same activity.
 // Sides conflict when either is 'Both' or they're equal (LHS vs RHS is legitimate).
 export function findOverlaps(recentProgress, activityId, chFrom, chTo, side) {
@@ -34,7 +34,7 @@ export function findOverlaps(recentProgress, activityId, chFrom, chTo, side) {
 }
 
 
-// ── Side factor: full-width vs side-specific activities ──
+// ââ Side factor: full-width vs side-specific activities ââ
 // Full-width (carriageway) activities: one side = half the section quantity.
 // Side-specific items (drains, kerbs, guardrails): each side counts in full.
 const FULL_WIDTH_KEYWORDS = ['clearance', 'stripping', 'topsoil', 'earthwork', 'formation', 'ogl',
@@ -55,33 +55,33 @@ export function sideFactor(activityName, side) {
   if (isFullWidthActivity(activityName)) {
     return { factor: 0.5, label: `${side} = half carriageway width` };
   }
-  return { factor: 1, label: `${side} — side item, full credit` };
+  return { factor: 1, label: `${side} â side item, full credit` };
 }
 
 const STEPS = [
-  { num: 1, label: 'Project & Weather', icon: '🌤️', short: 'Weather' },
-  { num: 2, label: 'Contractor Workforce', icon: '🏗️', short: 'Contractor' },
-  { num: 3, label: "Engineer's Team", icon: '👷', short: 'Engineer' },
-  { num: 4, label: 'Works Progress', icon: '⛏️', short: 'Works' },
-  { num: 5, label: 'Equipment', icon: '🚜', short: 'Equipment' },
-  { num: 6, label: 'Quality & Materials', icon: '🧪', short: 'Quality' },
-  { num: 7, label: 'Structures', icon: '🌉', short: 'Structures' },
-  { num: 8, label: 'Issues & Instructions', icon: '⚠️', short: 'Issues' },
-  { num: 9, label: 'Review & Submit', icon: '✅', short: 'Submit' },
+  { num: 1, label: 'Project & Weather', icon: 'ð¤ï¸', short: 'Weather' },
+  { num: 2, label: 'Contractor Workforce', icon: 'ðï¸', short: 'Contractor' },
+  { num: 3, label: "Engineer's Team", icon: 'ð·', short: 'Engineer' },
+  { num: 4, label: 'Works Progress', icon: 'âï¸', short: 'Works' },
+  { num: 5, label: 'Equipment', icon: 'ð', short: 'Equipment' },
+  { num: 6, label: 'Quality & Materials', icon: 'ð§ª', short: 'Quality' },
+  { num: 7, label: 'Structures', icon: 'ð', short: 'Structures' },
+  { num: 8, label: 'Issues & Instructions', icon: 'â ï¸', short: 'Issues' },
+  { num: 9, label: 'Review & Submit', icon: 'â', short: 'Submit' },
 ];
 
-// ── Standard Road Construction Layers/Activities ──
+// ââ Standard Road Construction Layers/Activities ââ
 const WORK_LAYERS = [
   // Earthworks & Formation
   { name: 'Site Clearance', unit: 'Km', group: 'earthworks' },
   { name: 'Top Soil Stripping', unit: 'Km', group: 'earthworks' },
   { name: 'Compaction of OGL', unit: 'Km', group: 'earthworks' },
   { name: 'Final Earthworks', unit: 'Km', group: 'earthworks' },
-  { name: 'Cut to Fill', unit: 'm³', group: 'earthworks' },
-  { name: 'Cut to Spoil', unit: 'm³', group: 'earthworks' },
-  { name: 'Fill from Borrow', unit: 'm³', group: 'earthworks' },
-  { name: 'Rock Excavation', unit: 'm³', group: 'earthworks' },
-  { name: 'Fill in Structures', unit: 'm³', group: 'earthworks' },
+  { name: 'Cut to Fill', unit: 'mÂ³', group: 'earthworks' },
+  { name: 'Cut to Spoil', unit: 'mÂ³', group: 'earthworks' },
+  { name: 'Fill from Borrow', unit: 'mÂ³', group: 'earthworks' },
+  { name: 'Rock Excavation', unit: 'mÂ³', group: 'earthworks' },
+  { name: 'Fill in Structures', unit: 'mÂ³', group: 'earthworks' },
   // Pavement Layers
   { name: 'Bottom Subgrade', unit: 'Km', group: 'pavement' },
   { name: 'Top Subgrade', unit: 'Km', group: 'pavement' },
@@ -106,7 +106,7 @@ const WORK_LAYERS = [
   { name: 'Scour Checks', unit: 'No.', group: 'drainage' },
   { name: 'Headwalls / Wingwalls', unit: 'No.', group: 'drainage' },
   { name: 'Bridge Works', unit: 'm', group: 'drainage' },
-  { name: 'Gabion / Rip-rap Protection', unit: 'm³', group: 'drainage' },
+  { name: 'Gabion / Rip-rap Protection', unit: 'mÂ³', group: 'drainage' },
   { name: 'Retaining Walls', unit: 'm', group: 'drainage' },
   // Road Furniture & Finishes
   { name: 'Guard Rails', unit: 'm', group: 'furniture' },
@@ -123,10 +123,10 @@ const WORK_LAYERS = [
   { name: 'Remedial / Defects Works', unit: 'LS', group: 'other' },
 ];
 
-// ════════════════════════════════════════════════════════
-// SearchableDropdown — inline component with type-ahead,
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// SearchableDropdown â inline component with type-ahead,
 // category grouping, and "Add custom..." option
-// ════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function SearchableDropdown({ items, value, onChange, placeholder = 'Search...', allowCustom = true, style = {} }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -164,8 +164,8 @@ function SearchableDropdown({ items, value, onChange, placeholder = 'Search...',
           {value || placeholder}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 4 }}>
-          {value && <span onClick={e => { e.stopPropagation(); onChange(''); }} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>×</span>}
-          <span style={{ color: 'var(--text-muted)', fontSize: 8 }}>{open ? '▲' : '▼'}</span>
+          {value && <span onClick={e => { e.stopPropagation(); onChange(''); }} style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>Ã</span>}
+          <span style={{ color: 'var(--text-muted)', fontSize: 8 }}>{open ? 'â²' : 'â¼'}</span>
         </span>
       </div>
 
@@ -224,7 +224,7 @@ function SearchableDropdown({ items, value, onChange, placeholder = 'Search...',
   );
 }
 
-// ── Reusable Workforce Step Component ──
+// ââ Reusable Workforce Step Component ââ
 function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPresence, labourEntries, setLabourEntries, showTooltips }) {
   const keyPersonnel = personnel || [];
   const skilledRoles = roles.filter(r => r.party === party && r.category === 'skilled');
@@ -264,18 +264,18 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
     setShowCustom(false);
   }
 
-  // ── Gender Bar ──
+  // ââ Gender Bar ââ
   const mPct = total > 0 ? Math.round(totalMale / total * 100) : 0;
 
   return (
-    <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? '🏗️' : '👷'}
+    <SectionCard title={`${partyLabel} Workforce`} icon={party === 'contractor' ? 'ðï¸' : 'ð·'}
       count={`${total} workers + ${kpPresent}/${kpTotal} KP`} color={total > 0 ? '#10b981' : 'var(--accent)'}>
 
       {/* Key Personnel Attendance */}
       {keyPersonnel.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Key Personnel — Present Today ({kpPresent}/{kpTotal})
+            Key Personnel â Present Today ({kpPresent}/{kpTotal})
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {keyPersonnel.map(t => (
@@ -304,7 +304,7 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
         return (
           <div key={cat} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{cat === 'skilled' ? '🔧 Skilled' : '👥 Unskilled'}</span>
+              <span>{cat === 'skilled' ? 'ð§ Skilled' : 'ð¥ Unskilled'}</span>
               <span>{catEntries.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0)} total</span>
             </div>
             {catEntries.map((entry, idx) => {
@@ -323,7 +323,7 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
                   <input type="number" min="0" placeholder="F" value={entry.female_count || ''}
                     onChange={e => updateEntry(globalIdx, 'female_count', e.target.value)}
                     style={{ fontSize: 12, textAlign: 'center', padding: '4px 6px' }} />
-                  <button onClick={() => removeEntry(globalIdx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+                  <button onClick={() => removeEntry(globalIdx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 0 }}>Ã</button>
                 </div>
               );
             })}
@@ -355,7 +355,7 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
           </div>
           <div style={{ display: 'flex', gap: 4, paddingBottom: 2 }}>
             <button onClick={addCustom} className="btn btn-primary" style={{ fontSize: 11, padding: '5px 10px' }}>Add</button>
-            <button onClick={() => setShowCustom(false)} style={{ fontSize: 11, padding: '5px 8px', background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            <button onClick={() => setShowCustom(false)} style={{ fontSize: 11, padding: '5px 8px', background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--text-muted)' }}>â</button>
           </div>
         </div>
       ) : (
@@ -366,9 +366,9 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
       {total > 0 && (
         <div style={{ marginTop: 12, padding: '8px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 11 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span style={{ color: '#3b82f6', fontWeight: 600 }}>♂ {totalMale} Male ({mPct}%)</span>
+            <span style={{ color: '#3b82f6', fontWeight: 600 }}>â {totalMale} Male ({mPct}%)</span>
             <span style={{ fontWeight: 700 }}>{total} Total</span>
-            <span style={{ color: '#ec4899', fontWeight: 600 }}>♀ {totalFemale} Female ({100 - mPct}%)</span>
+            <span style={{ color: '#ec4899', fontWeight: 600 }}>â {totalFemale} Female ({100 - mPct}%)</span>
           </div>
           <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
             <div style={{ width: `${mPct}%`, background: '#3b82f6', transition: 'width 0.3s' }} />
@@ -380,7 +380,7 @@ function WorkforceStep({ party, partyLabel, roles, personnel, presence, setPrese
   );
 }
 
-// ── Helper Components ──
+// ââ Helper Components ââ
 function SectionCard({ title, icon, children, count, color = 'var(--accent)' }) {
   return (
     <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 16, marginBottom: 12 }}>
@@ -402,7 +402,7 @@ function EntryRow({ children, onRemove }) {
       {children}
       <button onClick={onRemove}
         style={{ position: 'absolute', top: 6, right: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}
-        title="Remove">×</button>
+        title="Remove">Ã</button>
     </div>
   );
 }
@@ -421,9 +421,9 @@ function AddButton({ label, onClick }) {
 }
 
 
-// ════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 // MAIN COMPONENT
-// ════════════════════════════════════════════════════════
+// ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function SubmitReport({ profile, showToast, navigateTo, selectedProject: propProject }) {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -438,12 +438,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [layers, setLayers] = useState([]);
   const [recentProgress, setRecentProgress] = useState([]);
 
-  // ── Weather Auto-Detect (Open-Meteo) ──
+  // ââ Weather Auto-Detect (Open-Meteo) ââ
   const [metWeather, setMetWeather] = useState(null); // { weather, temp, min_temp, rainfall, raw }
   const [metLoading, setMetLoading] = useState(false);
   const [weatherOverride, setWeatherOverride] = useState(false); // inspector changed from suggestion
 
-  // WMO Weather Code → human-readable weather string
+  // WMO Weather Code â human-readable weather string
   function wmoToWeather(code) {
     if (code <= 1) return 'Sunny / Clear';
     if (code === 2) return 'Partly Cloudy';
@@ -502,7 +502,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const isPlatformAdmin = profile.is_platform_admin === true;
   const isRE = hasRole(profile.role, 'resident_engineer') || isPlatformAdmin;
 
-  // ── Form State (CANONICAL column names only) ──
+  // ââ Form State (CANONICAL column names only) ââ
   const [form, setForm] = useState({
     report_date: new Date().toISOString().split('T')[0],
     weather: '', max_temp_c: '', min_temp_c: '', rainfall_mm: '',
@@ -520,7 +520,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [instructionEntries, setInstructionEntries] = useState([]);
   const [materialEntries, setMaterialEntries] = useState([]);
 
-  // ── Photo State ──
+  // ââ Photo State ââ
   const [worksPhotos, setWorksPhotos] = useState([]);
   const [equipPhotos, setEquipPhotos] = useState([]);
   const [qualityPhotos, setQualityPhotos] = useState([]);
@@ -528,7 +528,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [issuePhotos, setIssuePhotos] = useState([]);
   const [generalPhotos, setGeneralPhotos] = useState([]);
 
-  // ── Workforce ──
+  // ââ Workforce ââ
   const [labourRoles, setLabourRoles] = useState([]);
   const [contractorPersonnel, setContractorPersonnel] = useState([]);
   const [supervisionPersonnel, setSupervisionPersonnel] = useState([]);
@@ -537,7 +537,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [contractorLabour, setContractorLabour] = useState([]);
   const [supervisionLabour, setSupervisionLabour] = useState([]);
 
-  // ── Data Loading ──
+  // ââ Data Loading ââ
   useEffect(() => {
     supabase.from('projects').select('id, name, category, latitude, longitude').order('name').then(({ data }) => setProjects(data || []));
     supabase.from('labour_role_reference').select('*').eq('is_active', true).order('display_order').then(({ data }) => setLabourRoles(data || []));
@@ -586,7 +586,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     setSupervisionLabour([]);
   }, [selectedProject]);
 
-  // ── Entry Helpers ──
+  // ââ Entry Helpers ââ
   function addWork() { setWorksEntries([...worksEntries, { layer_name: '', activity_id: '', component_id: '', start_chainage: '', end_chainage: '', side: 'Both', quantity: '', unit: 'Km', notes: '' }]); }
   function addEquip() { setEquipEntries([...equipEntries, { equipment_id: '', equipment_name: '', status: 'Operational', hours_worked: 0, notes: '' }]); }
   function addStruct() { setStructEntries([...structEntries, { structure_id: '', structure_name: '', stage: '', status: 'In Progress', concrete_volume_m3: '', rebar_kg: '', notes: '' }]); }
@@ -598,10 +598,17 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   function updateEntry(setter, list, i, field, val) { const copy = [...list]; copy[i][field] = val; setter(copy); }
   function removeEntry(setter, list, i) { setter(list.filter((_, idx) => idx !== i)); }
 
-  // ── Completeness ──
+  // ââ Completeness ââ
   // Steps with no entries are valid (empty is fine for a daily report).
   // When entries ARE added, their required fields must be filled.
-  const worksValid = worksEntries.filter(w => w.layer_name || w.activity_id || w.quantity).every(w => (w.layer_name || w.activity_id) && ((w.quantity !== '' && w.quantity !== undefined) || (parseChainage(w.start_chainage) != null && parseChainage(w.end_chainage) != null && Math.abs(parseChainage(w.end_chainage) - parseChainage(w.start_chainage)) > 0)));
+  const worksValid = worksEntries.filter(w => w.layer_name || w.activity_id || w.quantity).every(w => {
+      if (!(w.layer_name || w.activity_id)) return false;
+      if (w.quantity !== '' && w.quantity !== undefined) return true;
+      // Also valid if chainage produces an auto-calculated quantity
+      const chFrom = parseChainage(w.start_chainage);
+      const chTo = parseChainage(w.end_chainage);
+      return chFrom != null && chTo != null && Math.abs(chTo - chFrom) > 0;
+    });
   const equipValid = equipEntries.every(e => e.equipment_name || e.equipment_id);
   const testsValid = testEntries.every(t => t.test_type);
   const structsValid = structEntries.every(s => s.structure_name || s.structure_id);
@@ -622,14 +629,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
 
-  // ── Submit — CANONICAL column names only ──
+  // ââ Submit â CANONICAL column names only ââ
   async function handleSubmit() {
     if (!selectedProject) { showToast('Select a project first', 'error'); return; }
     setSaving(true);
 
     try {
       const warnings = [];
-      // 1. Daily Report — CANONICAL columns (no dual-write)
+      // 1. Daily Report â CANONICAL columns (no dual-write)
       const reportData = {
         project_id: selectedProject,
         submitted_by: profile.id,
@@ -658,7 +665,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
       if (repErr) throw repErr;
 
-      // 2. Works Progress — linked to project activity register where possible
+      // 2. Works Progress â linked to project activity register where possible
       // Component takes priority: if inspector selected a component, that's where progress tracks.
       for (const w of worksEntries) {
         if (!w.layer_name) continue;
@@ -676,25 +683,25 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         const rawLength = isLinear && chFrom != null && chTo != null
           ? Math.abs(chTo - chFrom) : null;
         // Side factor: half-width for carriageway activities worked one side only.
-        // Raw chainage is stored untouched — only the synced quantity carries the factor.
+        // Raw chainage is stored untouched â only the synced quantity carries the factor.
         const sf = isLinear ? sideFactor(w.layer_name, w.side || 'Both') : { factor: 1, label: null };
         const autoQty = rawLength != null
           ? rawLength * sf.factor
           : parseFloat(w.quantity) || 0;
         const sideTag = sf.label && sf.factor !== 1
-          ? ` (${sf.label}: ${rawLength?.toFixed(3)} Km × 0.5 = ${autoQty.toFixed(3)} Km eq.)`
+          ? ` (${sf.label}: ${rawLength?.toFixed(3)} Km Ã 0.5 = ${autoQty.toFixed(3)} Km eq.)`
           : '';
         // Flag overlaps in the record so the RE sees them during review/measurement
         const subOverlaps = actId ? findOverlaps(recentProgress, actId, chFrom, chTo, w.side || 'Both') : [];
         const overlapTag = subOverlaps.length > 0
-          ? ` [⚠ OVERLAPS prior entry ${fmtChainage(subOverlaps[0].start_chainage)}→${fmtChainage(subOverlaps[0].end_chainage)} of ${subOverlaps[0].work_date} — verify at measurement]`
+          ? ` [â  OVERLAPS prior entry ${fmtChainage(subOverlaps[0].start_chainage)}â${fmtChainage(subOverlaps[0].end_chainage)} of ${subOverlaps[0].work_date} â verify at measurement]`
           : '';
         const { error: wpErr } = await supabase.from('works_progress').insert({
           project_id: selectedProject, activity_id: actId,
           daily_report_id: report.id,
           work_date: form.report_date, start_chainage: chFrom || 0,
           end_chainage: chTo || 0, side: w.side || 'Both',
-          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + sideTag + overlapTag,
+          quantity: autoQty, notes: w.layer_name + (w.notes ? ' â ' + w.notes : '') + sideTag + overlapTag,
           reported_by: profile.id,
         });
         if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
@@ -704,7 +711,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         }
       }
 
-      // 3. Equipment Status — auto-register items from reference list
+      // 3. Equipment Status â auto-register items from reference list
       for (const eq of equipEntries) {
         if (!eq.equipment_id && !eq.equipment_name) continue;
         let eqId = eq.equipment_id;
@@ -733,7 +740,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         }
       }
 
-      // 4. Structures — auto-register items from reference list
+      // 4. Structures â auto-register items from reference list
       for (const s of structEntries) {
         if ((!s.structure_id && !s.structure_name) || !s.stage) continue;
         let strId = s.structure_id;
@@ -866,9 +873,9 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       setSubmitted(true);
       if (warnings.length > 0) {
         console.error('Report submitted with warnings:', warnings);
-        showToast(`⚠️ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
+        showToast(`â ï¸ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
       } else {
-        showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);
+        showToast(`â Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} â all data auto-synced!`);
       }
     } catch (err) {
       showToast(err.message, 'error');
@@ -877,7 +884,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     }
   }
 
-  // ── Summary stats ──
+  // ââ Summary stats ââ
   const contLabourTotal = contractorLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
   const supLabourTotal = supervisionLabour.reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
   const contKpPresent = Object.values(contractorPresence).filter(Boolean).length;
@@ -885,14 +892,14 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const totalLabour = contLabourTotal + supLabourTotal;
   const totalWorkforce = totalLabour + contKpPresent + supKpPresent;
 
-  // ── Submitted ──
+  // ââ Submitted ââ
   if (submitted) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>â</div>
         <h2 style={{ fontSize: 22, fontWeight: 800 }}>Report Submitted</h2>
         <p style={{ color: 'var(--text-muted)', margin: '8px 0 24px' }}>
-          {form.report_date} — {totalEntries} entries, {totalPhotos} photos, {totalWorkforce} workforce
+          {form.report_date} â {totalEntries} entries, {totalPhotos} photos, {totalWorkforce} workforce
         </p>
         <button className="btn btn-primary" onClick={() => { setSubmitted(false); setStep(1); setForm({
           report_date: new Date().toISOString().split('T')[0], weather: '', max_temp_c: '', min_temp_c: '', rainfall_mm: '',
@@ -908,7 +915,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
     );
   }
 
-  // ── RENDER ──
+  // ââ RENDER ââ
   return (
     <div>
       {/* Step Progress */}
@@ -921,17 +928,17 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       </div>
       <div style={{ textAlign: 'center', marginBottom: 8 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          Step {step}/{STEPS.length} — {STEPS[step - 1].icon} {STEPS[step - 1].label}
+          Step {step}/{STEPS.length} â {STEPS[step - 1].icon} {STEPS[step - 1].label}
         </span>
       </div>
 
-      {/* ══════ STEP 1: PROJECT & WEATHER ══════ */}
+      {/* ââââââ STEP 1: PROJECT & WEATHER ââââââ */}
       {step === 1 && (
-        <SectionCard title="Project & Weather" icon="🌤️">
+        <SectionCard title="Project & Weather" icon="ð¤ï¸">
           <div className="form-group mb-16">
             <label>Project *</label>
             <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}>
-              <option value="">— Select project —</option>
+              <option value="">â Select project â</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -950,16 +957,16 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             <label>Weather Conditions *</label>
             {/* Auto-detect badge */}
             {metLoading && (
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>🌐 Fetching weather data...</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>ð Fetching weather data...</span>
             )}
             {metWeather && !metLoading && !weatherOverride && form.weather === metWeather.weather && (
               <span style={{ fontSize: 10, color: '#3b82f6', marginLeft: 8, fontWeight: 600 }}>
-                🌐 Auto-detected from met station — confirm or change based on your site observation
+                ð Auto-detected from met station â confirm or change based on your site observation
               </span>
             )}
             {weatherOverride && metWeather && form.weather !== metWeather.weather && (
               <span style={{ fontSize: 10, color: '#f59e0b', marginLeft: 8, fontWeight: 600 }}>
-                ✏️ Inspector override (met station reported: {metWeather.weather})
+                âï¸ Inspector override (met station reported: {metWeather.weather})
               </span>
             )}
             <SearchableDropdown
@@ -976,15 +983,15 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div className="form-group mb-16">
-              <label>Max Temp (°C) {metWeather?.max_temp != null && form.max_temp_c == metWeather.max_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
+              <label>Max Temp (Â°C) {metWeather?.max_temp != null && form.max_temp_c == metWeather.max_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>ð met</span>}</label>
               <input type="number" value={form.max_temp_c} onChange={e => setForm({ ...form, max_temp_c: e.target.value })} placeholder="e.g. 28" />
             </div>
             <div className="form-group mb-16">
-              <label>Min Temp (°C) {metWeather?.min_temp != null && form.min_temp_c == metWeather.min_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
+              <label>Min Temp (Â°C) {metWeather?.min_temp != null && form.min_temp_c == metWeather.min_temp && <span style={{ fontSize: 9, color: '#3b82f6' }}>ð met</span>}</label>
               <input type="number" value={form.min_temp_c} onChange={e => setForm({ ...form, min_temp_c: e.target.value })} placeholder="e.g. 16" />
             </div>
             <div className="form-group mb-16">
-              <label>Rainfall (mm) {metWeather?.rainfall != null && form.rainfall_mm == metWeather.rainfall && <span style={{ fontSize: 9, color: '#3b82f6' }}>🌐 met</span>}</label>
+              <label>Rainfall (mm) {metWeather?.rainfall != null && form.rainfall_mm == metWeather.rainfall && <span style={{ fontSize: 9, color: '#3b82f6' }}>ð met</span>}</label>
               <input type="number" value={form.rainfall_mm} onChange={e => setForm({ ...form, rainfall_mm: e.target.value })} placeholder="0" min="0" />
             </div>
           </div>
@@ -997,12 +1004,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             const metDry = ['Sunny / Clear', 'Partly Cloudy', 'Overcast'].includes(metWeather.weather);
             if (inspectorDry && metRain) return (
               <div style={{ padding: '8px 12px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 11, marginBottom: 12 }}>
-                <span style={{ color: '#f59e0b', fontWeight: 700 }}>⚠ Cross-check:</span> Met station data indicates <b>{metWeather.weather}</b> in the project area ({metWeather.rainfall ?? 0} mm rainfall), but you selected <b>"{form.weather}"</b>. If it's genuinely dry at the active chainage, your on-site observation takes precedence — proceed as is.
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>â  Cross-check:</span> Met station data indicates <b>{metWeather.weather}</b> in the project area ({metWeather.rainfall ?? 0} mm rainfall), but you selected <b>"{form.weather}"</b>. If it's genuinely dry at the active chainage, your on-site observation takes precedence â proceed as is.
               </div>
             );
             if (inspectorRain && metDry) return (
               <div style={{ padding: '8px 12px', background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: 'var(--radius)', fontSize: 11, marginBottom: 12 }}>
-                <span style={{ color: '#3b82f6', fontWeight: 700 }}>ℹ Note:</span> Met station reports <b>{metWeather.weather}</b> for the area, but you observed <b>"{form.weather}"</b> at site. Localised rainfall is common along road corridors — your field observation is the authoritative record.
+                <span style={{ color: '#3b82f6', fontWeight: 700 }}>â¹ Note:</span> Met station reports <b>{metWeather.weather}</b> for the area, but you observed <b>"{form.weather}"</b> at site. Localised rainfall is common along road corridors â your field observation is the authoritative record.
               </div>
             );
             return null;
@@ -1011,13 +1018,13 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           {/* Attribution */}
           {metWeather && (
             <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 8, textAlign: 'right' }}>
-              Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Open-Meteo.com</a> (CC BY 4.0) · Met station forecast for project coordinates
+              Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)' }}>Open-Meteo.com</a> (CC BY 4.0) Â· Met station forecast for project coordinates
             </div>
           )}
         </SectionCard>
       )}
 
-      {/* ══════ STEP 2: CONTRACTOR WORKFORCE ══════ */}
+      {/* ââââââ STEP 2: CONTRACTOR WORKFORCE ââââââ */}
       {step === 2 && (
         <WorkforceStep party="contractor" partyLabel="Contractor" roles={labourRoles}
           personnel={contractorPersonnel} presence={contractorPresence} setPresence={setContractorPresence}
@@ -1025,7 +1032,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           showTooltips={true} />
       )}
 
-      {/* ══════ STEP 3: SUPERVISION WORKFORCE ══════ */}
+      {/* ââââââ STEP 3: SUPERVISION WORKFORCE ââââââ */}
       {step === 3 && (
         <WorkforceStep party="supervision" partyLabel="Engineer's Team" roles={labourRoles}
           personnel={supervisionPersonnel} presence={supervisionPresence} setPresence={setSupervisionPresence}
@@ -1033,7 +1040,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           showTooltips={true} />
       )}
 
-      {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
+      {/* ââââââ STEP 4: WORKS PROGRESS ââââââ */}
       {step === 4 && (() => {
         // Build hierarchy: parents with their children
         const parentActivities = activities.filter(a => !a.is_component && !a.parent_activity_id);
@@ -1041,12 +1048,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         const hasChildren = parentActivities.some(p => childrenOf(p.id).length > 0);
 
         return (
-        <SectionCard title="Works Progress" icon="⛏️" count={worksEntries.length}>
+        <SectionCard title="Works Progress" icon="âï¸" count={worksEntries.length}>
           {activities.length > 0 && (
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
               {hasChildren
-                ? '📌 Pick the activity, then select the specific operation. Progress tracks at component level and auto-rolls up.'
-                : '📌 Pick from project activities to link directly to the register, BoQ and IPC.'}
+                ? 'ð Pick the activity, then select the specific operation. Progress tracks at component level and auto-rolls up.'
+                : 'ð Pick from project activities to link directly to the register, BoQ and IPC.'}
             </p>
           )}
           {worksEntries.map((w, i) => {
@@ -1072,12 +1079,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                   <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3, display: 'block' }}>Activity</label>
                   <SearchableDropdown
                     items={[
-                      ...parentActivities.map(a => ({ name: `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}`, category: `Project — ${a.category || 'General'}` })),
+                      ...parentActivities.map(a => ({ name: `${a.activity_code ? a.activity_code + ' â ' : ''}${a.activity_name}`, category: `Project â ${a.category || 'General'}` })),
                       ...(parentActivities.length === 0 ? WORK_LAYERS.map(l => ({ name: l.name, category: ({ earthworks: 'Ref: Earthworks', pavement: 'Ref: Pavement', surfacing: 'Ref: Surfacing', drainage: 'Ref: Drainage', furniture: 'Ref: Road Furniture', other: 'Ref: Other' })[l.group] || l.group })) : []),
                     ]}
-                    value={parentAct ? `${parentAct.activity_code ? parentAct.activity_code + ' — ' : ''}${parentAct.activity_name}` : w.layer_name}
+                    value={parentAct ? `${parentAct.activity_code ? parentAct.activity_code + ' â ' : ''}${parentAct.activity_name}` : w.layer_name}
                     onChange={val => {
-                      const projAct = parentActivities.find(a => `${a.activity_code ? a.activity_code + ' — ' : ''}${a.activity_name}` === val || a.activity_name === val);
+                      const projAct = parentActivities.find(a => `${a.activity_code ? a.activity_code + ' â ' : ''}${a.activity_name}` === val || a.activity_name === val);
                       const copy = [...worksEntries];
                       if (projAct) { copy[i] = { ...copy[i], activity_id: projAct.id, component_id: '', layer_name: projAct.activity_name, unit: projAct.unit || 'Km' }; }
                       else { const def = WORK_LAYERS.find(l => l.name === val); copy[i] = { ...copy[i], activity_id: '', component_id: '', layer_name: val, unit: def?.unit || 'Km' }; }
@@ -1090,7 +1097,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 {/* Level 2: Component buttons */}
                 {components.length > 0 && (
                   <div style={{ marginBottom: 8 }}>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3, display: 'block' }}>↳ What was done today? *</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 3, display: 'block' }}>â³ What was done today? *</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                       {components.map(comp => {
                         const isSel = w.component_id === comp.id;
@@ -1099,24 +1106,24 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                           <button key={comp.id} type="button"
                             onClick={() => { const copy = [...worksEntries]; copy[i] = { ...copy[i], component_id: isSel ? '' : comp.id }; setWorksEntries(copy); }}
                             style={{ padding: '5px 10px', borderRadius: 'var(--radius)', border: `1.5px solid ${isSel ? '#3b82f6' : 'var(--border)'}`, background: isSel ? '#3b82f620' : 'transparent', color: isSel ? '#3b82f6' : 'var(--text)', fontSize: 11, fontWeight: isSel ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {isSel ? '✅ ' : ''}{comp.activity_name}
+                            {isSel ? 'â ' : ''}{comp.activity_name}
                             {comp.planned_quantity > 0 && <span style={{ fontSize: 9, color: compPct >= 100 ? '#10b981' : 'var(--text-muted)', fontWeight: 600 }}>{compPct}%</span>}
                           </button>
                         );
                       })}
                     </div>
-                    {!w.component_id && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠ Select the operation performed today</div>}
+                    {!w.component_id && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>â  Select the operation performed today</div>}
                   </div>
                 )}
 
                 {/* Context strip */}
                 {linkedAct && (
                   <div style={{ marginBottom: 8, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 10, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>🔗 {linkedAct.is_component ? linkedAct.activity_name + ' (→ ' + (parentAct?.activity_name || '') + ')' : 'Linked to register'}</span>
+                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>ð {linkedAct.is_component ? linkedAct.activity_name + ' (â ' + (parentAct?.activity_name || '') + ')' : 'Linked to register'}</span>
                     <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
                     <span>Done: <b>{Number(linkedAct.completed_quantity || 0).toFixed(2)} {unit}</b></span>
                     {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
-                    {lastEntry && <span style={{ width: '100%', color: 'var(--text-muted)' }}>📍 Last: Ch {fmtChainage(lastEntry.start_chainage)} → {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side}) on {lastEntry.work_date} — enter <b>today\'s new section</b> only</span>}
+                    {lastEntry && <span style={{ width: '100%', color: 'var(--text-muted)' }}>ð Last: Ch {fmtChainage(lastEntry.start_chainage)} â {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side}) on {lastEntry.work_date} â enter <b>today\'s new section</b> only</span>}
                   </div>
                 )}
 
@@ -1135,29 +1142,29 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                   const uiSf = sideFactor(w.layer_name, w.side || 'Both');
                   const eqKm = (parseFloat(autoKm) * uiSf.factor).toFixed(3);
                   return (<div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>
-                    ✅ {uiSf.factor !== 1 ? `${autoKm} Km on ${w.side} → ${eqKm} Km eq. (${uiSf.label})` : `${autoKm} Km — ${w.side || 'Both'} sides`}{linkedAct ? ' → auto-syncs' : ''}
+                    â {uiSf.factor !== 1 ? `${autoKm} Km on ${w.side} â ${eqKm} Km eq. (${uiSf.label})` : `${autoKm} Km â ${w.side || 'Both'} sides`}{linkedAct ? ' â auto-syncs' : ''}
                   </div>);
                 })()}
-                {!isLinear && w.quantity > 0 && (<div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>✅ {w.quantity} {unit}{linkedAct ? ' → auto-syncs' : ''}</div>)}
+                {!isLinear && w.quantity > 0 && (<div style={{ marginTop: 6, fontSize: 10, color: '#059669', fontWeight: 600 }}>â {w.quantity} {unit}{linkedAct ? ' â auto-syncs' : ''}</div>)}
                 {overlaps.length > 0 && (
                   <div style={{ marginTop: 6, padding: '8px 10px', background: '#78350f15', border: '1.5px solid #f59e0b', borderRadius: 'var(--radius)', fontSize: 10 }}>
-                    <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>⚠ OVERLAP:</div>
-                    {overlaps.slice(0, 3).map((o, oi) => (<div key={oi} style={{ color: 'var(--text-muted)' }}>• Ch {fmtChainage(o.start_chainage)} → {fmtChainage(o.end_chainage)} ({o.side}) on {o.work_date}</div>))}
+                    <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>â  OVERLAP:</div>
+                    {overlaps.slice(0, 3).map((o, oi) => (<div key={oi} style={{ color: 'var(--text-muted)' }}>â¢ Ch {fmtChainage(o.start_chainage)} â {fmtChainage(o.end_chainage)} ({o.side}) on {o.work_date}</div>))}
                     <div style={{ color: 'var(--text)', marginTop: 4 }}>Continue from Ch {fmtChainage(Math.max(...overlaps.map(o => Math.max(o.start_chainage || 0, o.end_chainage || 0))))} or proceed if legitimate repeat.</div>
                   </div>
                 )}
               </EntryRow>
             );
           })}
-          <AddButton label="＋ Add Works Progress" onClick={addWork} />
+          <AddButton label="ï¼ Add Works Progress" onClick={addWork} />
           <PhotoUploader projectId={selectedProject} category="works_progress" photos={worksPhotos} setPhotos={setWorksPhotos} maxPhotos={10} label="Works Photos" />
         </SectionCard>
         );
       })()}
 
-            {/* ══════ STEP 5: EQUIPMENT ══════ */}
+            {/* ââââââ STEP 5: EQUIPMENT ââââââ */}
       {step === 5 && (
-        <SectionCard title="Equipment Status" icon="🚜" count={equipEntries.length}>
+        <SectionCard title="Equipment Status" icon="ð" count={equipEntries.length}>
           {equipEntries.map((eq, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setEquipEntries, equipEntries, i)}>
               <div style={{ marginBottom: 8 }}>
@@ -1206,7 +1213,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
           {equipEntries.length > 0 && (
             <div style={{ marginTop: 10, padding: '6px 10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 11, color: '#059669' }}>
-              {equipEntries.length} items — {equipEntries.filter(e => e.status === 'Operational' || e.status === 'Working').length} working,
+              {equipEntries.length} items â {equipEntries.filter(e => e.status === 'Operational' || e.status === 'Working').length} working,
               {' '}{equipEntries.filter(e => e.status === 'Idle' || e.status === 'Standby').length} idle,
               {' '}{equipEntries.filter(e => e.status === 'Breakdown').length} breakdown
             </div>
@@ -1214,10 +1221,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 6: QUALITY & MATERIALS ══════ */}
+      {/* ââââââ STEP 6: QUALITY & MATERIALS ââââââ */}
       {step === 6 && (
         <>
-          <SectionCard title="Quality Tests" icon="🧪" count={testEntries.length}>
+          <SectionCard title="Quality Tests" icon="ð§ª" count={testEntries.length}>
             {testEntries.map((t, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setTestEntries, testEntries, i)}>
                 <div style={{ marginBottom: 8 }}>
@@ -1238,7 +1245,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <input type="text" placeholder="Result Value (e.g. 97% MDD)" value={t.result_value} onChange={e => updateEntry(setTestEntries, testEntries, i, 'result_value', e.target.value)} style={{ fontSize: 12 }} />
-                  <input type="text" placeholder="Spec Limit (e.g. ≥95% MDD)" value={t.spec_limit} onChange={e => updateEntry(setTestEntries, testEntries, i, 'spec_limit', e.target.value)} style={{ fontSize: 12 }} />
+                  <input type="text" placeholder="Spec Limit (e.g. â¥95% MDD)" value={t.spec_limit} onChange={e => updateEntry(setTestEntries, testEntries, i, 'spec_limit', e.target.value)} style={{ fontSize: 12 }} />
                 </div>
               </EntryRow>
             ))}
@@ -1246,7 +1253,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             <PhotoUploader projectId={selectedProject} category="quality_test" photos={qualityPhotos} setPhotos={setQualityPhotos} maxPhotos={10} label="Test / Material Photos" />
           </SectionCard>
 
-          <SectionCard title="Materials Received" icon="📦" count={materialEntries.length}>
+          <SectionCard title="Materials Received" icon="ð¦" count={materialEntries.length}>
             {materialEntries.map((m, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setMaterialEntries, materialEntries, i)}>
                 <div style={{ marginBottom: 8 }}>
@@ -1269,11 +1276,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </>
       )}
 
-      {/* ══════ STEP 7: STRUCTURES ══════ */}
+      {/* ââââââ STEP 7: STRUCTURES ââââââ */}
       {step === 7 && (
-        <SectionCard title="Structures Progress" icon="🌉" count={structEntries.length}>
+        <SectionCard title="Structures Progress" icon="ð" count={structEntries.length}>
           <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
-            Culverts, bridges, drainage structures, retaining walls, road furniture — anything under construction or inspected today.
+            Culverts, bridges, drainage structures, retaining walls, road furniture â anything under construction or inspected today.
           </p>
           {structEntries.map((s, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setStructEntries, structEntries, i)}>
@@ -1282,12 +1289,12 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 {structures.length > 0 ? (
                   <SearchableDropdown
                     items={[
-                      ...structures.map(st => ({ name: `${st.structure_ref} — ${st.structure_type} (Ch. ${st.chainage})`, category: 'Project Structures', _id: st.id })),
+                      ...structures.map(st => ({ name: `${st.structure_ref} â ${st.structure_type} (Ch. ${st.chainage})`, category: 'Project Structures', _id: st.id })),
                       ...STRUCTURES_LIST.map(st => ({ name: st.name, category: st.category })),
                     ]}
                     value={s.structure_name || (s.structure_id ? structures.find(st => st.id === s.structure_id)?.structure_ref : '')}
                     onChange={val => {
-                      const projItem = structures.find(st => `${st.structure_ref} — ${st.structure_type} (Ch. ${st.chainage})` === val);
+                      const projItem = structures.find(st => `${st.structure_ref} â ${st.structure_type} (Ch. ${st.chainage})` === val);
                       if (projItem) {
                         updateEntry(setStructEntries, structEntries, i, 'structure_id', projItem.id);
                         updateEntry(setStructEntries, structEntries, i, 'structure_name', projItem.structure_ref);
@@ -1315,7 +1322,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                 <input type="text" placeholder="Notes" value={s.notes} onChange={e => updateEntry(setStructEntries, structEntries, i, 'notes', e.target.value)} style={{ fontSize: 12 }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <input type="number" placeholder="Concrete (m³)" value={s.concrete_volume_m3} onChange={e => updateEntry(setStructEntries, structEntries, i, 'concrete_volume_m3', e.target.value)} style={{ fontSize: 12 }} />
+                <input type="number" placeholder="Concrete (mÂ³)" value={s.concrete_volume_m3} onChange={e => updateEntry(setStructEntries, structEntries, i, 'concrete_volume_m3', e.target.value)} style={{ fontSize: 12 }} />
                 <input type="number" placeholder="Rebar (kg)" value={s.rebar_kg} onChange={e => updateEntry(setStructEntries, structEntries, i, 'rebar_kg', e.target.value)} style={{ fontSize: 12 }} />
               </div>
             </EntryRow>
@@ -1325,10 +1332,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </SectionCard>
       )}
 
-      {/* ══════ STEP 8: ISSUES & INSTRUCTIONS ══════ */}
+      {/* ââââââ STEP 8: ISSUES & INSTRUCTIONS ââââââ */}
       {step === 8 && (
         <>
-          <SectionCard title="Site Issues" icon="⚠️" count={issueEntries.length} color="#ef4444">
+          <SectionCard title="Site Issues" icon="â ï¸" count={issueEntries.length} color="#ef4444">
             {issueEntries.map((iss, i) => (
               <EntryRow key={i} onRemove={() => removeEntry(setIssueEntries, issueEntries, i)}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 8 }}>
@@ -1354,7 +1361,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           </SectionCard>
 
           {isRE && (
-            <SectionCard title="Site Instructions" icon="📋" count={instructionEntries.length} color="#2563eb">
+            <SectionCard title="Site Instructions" icon="ð" count={instructionEntries.length} color="#2563eb">
               {instructionEntries.map((instr, i) => (
                 <EntryRow key={i} onRemove={() => removeEntry(setInstructionEntries, instructionEntries, i)}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, marginBottom: 8 }}>
@@ -1374,10 +1381,10 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         </>
       )}
 
-      {/* ══════ STEP 9: REVIEW & SUBMIT ══════ */}
+      {/* ââââââ STEP 9: REVIEW & SUBMIT ââââââ */}
       {step === 9 && (
         <div>
-          <SectionCard title="General Observations" icon="📝">
+          <SectionCard title="General Observations" icon="ð">
             <div className="form-group mb-16">
               <label>Work Description / Summary</label>
               <textarea rows={3} value={form.work_done} onChange={e => setForm({ ...form, work_done: e.target.value })}
@@ -1409,37 +1416,37 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             </div>
           </SectionCard>
 
-          <SectionCard title="Site Photos" icon="📸" count={totalPhotos} color="#8b5cf6">
+          <SectionCard title="Site Photos" icon="ð¸" count={totalPhotos} color="#8b5cf6">
             <PhotoUploader projectId={selectedProject} category="general" photos={generalPhotos} setPhotos={setGeneralPhotos} maxPhotos={10} label="General Site Photos" />
             {totalPhotos > 0 && (
               <div style={{ marginTop: 12, padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>📷 Photos attached to this report:</div>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>ð· Photos attached to this report:</div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', color: 'var(--text-muted)' }}>
-                  {worksPhotos.length > 0 && <span>⛏️ Works: {worksPhotos.length}</span>}
-                  {equipPhotos.length > 0 && <span>🚜 Equipment: {equipPhotos.length}</span>}
-                  {qualityPhotos.length > 0 && <span>🧪 Quality: {qualityPhotos.length}</span>}
-                  {structPhotos.length > 0 && <span>🌉 Structures: {structPhotos.length}</span>}
-                  {issuePhotos.length > 0 && <span>⚠️ Issues: {issuePhotos.length}</span>}
-                  {generalPhotos.length > 0 && <span>📸 General: {generalPhotos.length}</span>}
+                  {worksPhotos.length > 0 && <span>âï¸ Works: {worksPhotos.length}</span>}
+                  {equipPhotos.length > 0 && <span>ð Equipment: {equipPhotos.length}</span>}
+                  {qualityPhotos.length > 0 && <span>ð§ª Quality: {qualityPhotos.length}</span>}
+                  {structPhotos.length > 0 && <span>ð Structures: {structPhotos.length}</span>}
+                  {issuePhotos.length > 0 && <span>â ï¸ Issues: {issuePhotos.length}</span>}
+                  {generalPhotos.length > 0 && <span>ð¸ General: {generalPhotos.length}</span>}
                 </div>
               </div>
             )}
           </SectionCard>
 
-          <SectionCard title="Report Summary" icon="✅">
+          <SectionCard title="Report Summary" icon="â">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
               {[
-                { icon: '🌤️', label: 'Weather', value: form.weather },
-                { icon: '🏗️', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
-                { icon: '👷', label: "Engineer's Team", value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
-                { icon: '⛏️', label: 'Activities', value: worksEntries.length },
-                { icon: '🚜', label: 'Equipment', value: equipEntries.length },
-                { icon: '🧪', label: 'Tests', value: testEntries.length },
-                { icon: '🌉', label: 'Structures', value: structEntries.length },
-                { icon: '📦', label: 'Materials', value: materialEntries.length },
-                { icon: '⚠️', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
-                { icon: '📋', label: 'Instructions', value: instructionEntries.length },
-                { icon: '📷', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
+                { icon: 'ð¤ï¸', label: 'Weather', value: form.weather },
+                { icon: 'ðï¸', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
+                { icon: 'ð·', label: "Engineer's Team", value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
+                { icon: 'âï¸', label: 'Activities', value: worksEntries.length },
+                { icon: 'ð', label: 'Equipment', value: equipEntries.length },
+                { icon: 'ð§ª', label: 'Tests', value: testEntries.length },
+                { icon: 'ð', label: 'Structures', value: structEntries.length },
+                { icon: 'ð¦', label: 'Materials', value: materialEntries.length },
+                { icon: 'â ï¸', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
+                { icon: 'ð', label: 'Instructions', value: instructionEntries.length },
+                { icon: 'ð·', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
                   <div style={{ fontSize: 20 }}>{s.icon}</div>
@@ -1453,7 +1460,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800, borderRadius: 'var(--radius)',
                 background: saving ? '#93c5fd' : 'var(--accent)', color: '#fff', border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {saving ? '⏳ Submitting Report...' : '✅ Submit Daily Report'}
+              {saving ? 'â³ Submitting Report...' : 'â Submit Daily Report'}
             </button>
           </SectionCard>
         </div>
@@ -1462,7 +1469,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       {/* Navigation Buttons */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
         <button className="btn btn-secondary" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1}>
-          ← Previous
+          â Previous
         </button>
         <span className="text-sm text-muted" style={{ alignSelf: 'center' }}>Step {step} of {STEPS.length}</span>
         {step < STEPS.length ? (
@@ -1487,11 +1494,11 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
               }
               setStep(step + 1);
             }} style={!stepComplete[step - 1] ? { opacity: 0.4, cursor: 'not-allowed' } : {}}>
-              Next →
+              Next â
             </button>
         ) : (
           <button className="btn btn-primary" onClick={handleSubmit} disabled={saving || !selectedProject}>
-            {saving ? 'Submitting...' : '✅ Submit Report'}
+            {saving ? 'Submitting...' : 'â Submit Report'}
           </button>
         )}
       </div>
