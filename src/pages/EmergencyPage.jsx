@@ -145,7 +145,7 @@ export default function EmergencyPage({ profile, showToast }) {
                     <span style={{ fontSize: 22 }}>
                       {em.emergency_type === 'Accident/Injury' ? '🤕' : em.emergency_type === 'Fire' ? '🔥' :
                        em.emergency_type === 'Medical Emergency' ? '🏥' : em.emergency_type === 'Equipment Failure' ? '⚙️' :
-                       em.emergency_type === 'Structural Collapse' ? '🏗️' : em.emergency_type === 'Environmental Spill' ? '☣️' :
+                       em.emergency_type === 'Structural Collapse' ? '🔨' : em.emergency_type === 'Environmental Spill' ? '☣️' :
                        em.emergency_type === 'Flooding' ? '🌊' : em.emergency_type === 'Landslide' ? '⛰️' :
                        em.emergency_type === 'Security Threat' ? '🔒' : '⚠️'}
                     </span>

@@ -171,7 +171,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
     <div>
       <div className="page-header">
         <div>
-          <h2>⛏️ Work Activities</h2>
+          <h2>⚒️ Work Activities</h2>
           <div className="subtitle">Log daily construction activities by chainage</div>
         </div>
       </div>

@@ -81,7 +81,7 @@ CREATE POLICY "activity_tests_write" ON activity_tests FOR ALL TO authenticated
 INSERT INTO construction_phases (phase_number, phase_name, phase_category, description, icon) VALUES
 (1, 'Site Establishment & Preliminary Works', 'new_construction',
  'Mobilization, site office setup, survey control establishment, traffic management, environmental baseline. The foundation for all subsequent construction activities.',
- '🏗️');
+ '🔨');
 
 -- Phase 2: Setting Out & Survey
 INSERT INTO construction_phases (phase_number, phase_name, phase_category, description, icon) VALUES
@@ -99,7 +99,7 @@ INSERT INTO construction_phases (phase_number, phase_name, phase_category, descr
 INSERT INTO construction_phases (phase_number, phase_name, phase_category, description, icon) VALUES
 (4, 'Earthworks — Cut & Excavation', 'new_construction',
  'Excavation to design formation level, removal of unsuitable material, cut slope formation. Material classification determines disposal or reuse as fill.',
- '⛏️');
+ '⚒️');
 
 -- Phase 5: Earthworks - Fill
 INSERT INTO construction_phases (phase_number, phase_name, phase_category, description, icon) VALUES

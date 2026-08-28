@@ -196,7 +196,7 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
   const tabs = [
     { id: 'overview', label: '📊 Overview' },
     { id: 'narratives', label: '📝 Narratives' },
-    { id: 'works', label: '⛏️ Works' },
+    { id: 'works', label: '⚒️ Works' },
     { id: 'financial', label: '💰 Financial' },
     { id: 'equipment', label: '🚜 Equipment' },
     { id: 'quality', label: '🧪 Quality' },
@@ -392,7 +392,7 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
             {/* WORKS TAB */}
             {activeTab === 'works' && (
               <div>
-                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>⛏️ Works Progress This Month</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 800, marginBottom: 14 }}>⚒️ Works Progress This Month</h3>
                 <DataTable
                   headers={['Activity', 'Code', 'Unit', 'This Month Qty', 'Planned Total']}
                   rows={reportData.physical.monthWorks.map(w => [

@@ -58,7 +58,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
   const canSeeContractor = myParty === null || myParty === 'contractor'; // RE/admin or contractor
   const canSeeEngineer = myParty === null || myParty === 'engineer'; // RE/admin or engineer
   const canHarmonise = myParty === null; // Only RE/admin
-  const myLabel = myParty === 'contractor' ? '🏗️ Contractor' : myParty === 'engineer' ? '👷 Engineer' : '👔 Resident Engineer';
+  const myLabel = myParty === 'contractor' ? '🔨 Contractor' : myParty === 'engineer' ? '👷 Engineer' : '👔 Resident Engineer';
 
   const emptyForm = {
     boq_item_id: '', entry_date: new Date().toISOString().split('T')[0],
@@ -254,7 +254,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
           {/* ══════ Quantity Comparison ══════ */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: '#e87b35', fontWeight: 600 }}>🏗️ Contractor total</div>
+              <div style={{ fontSize: 11, color: '#e87b35', fontWeight: 600 }}>🔨 Contractor total</div>
               <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#e87b35', marginTop: 6 }}>{fmt(stats.totalContractor)}</div>
             </div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
@@ -288,7 +288,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                 <thead>
                   <tr style={{ background: 'var(--bg-hover)' }}>
                     {['Date', 'BoQ Item', 'Location',
-                      ...(canSeeContractor ? ['🏗️ Contractor'] : []),
+                      ...(canSeeContractor ? ['🔨 Contractor'] : []),
                       ...(canSeeEngineer ? ['👷 Engineer'] : []),
                       ...(canHarmonise ? ['✅ Agreed'] : []),
                       'Status', 'Actions'].map(h => (
@@ -449,7 +449,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
               <div style={{ display: 'grid', gridTemplateColumns: canHarmonise ? '1fr 1fr 1fr' : '1fr', gap: 10 }}>
                 {canSeeContractor && (
                   <div>
-                    <label style={{ ...ls, color: '#e87b35' }}>🏗️ Contractor qty</label>
+                    <label style={{ ...ls, color: '#e87b35' }}>🔨 Contractor qty</label>
                     <input type="number" step="0.01" value={form.contractor_qty}
                       onChange={e => set('contractor_qty', e.target.value)}
                       disabled={myParty === 'engineer'}

@@ -4,7 +4,7 @@ import { supabase, ROLE_LABELS, ROLE_COLORS } from '../lib/supabase';
 const ORG_TYPES = [
   { key: 'agency', label: 'Government Agency', icon: '🏛' },
   { key: 'consultant', label: 'Consulting Firm', icon: '📐' },
-  { key: 'contractor', label: 'Contractor', icon: '🏗' },
+  { key: 'contractor', label: 'Contractor', icon: '🔨' },
   { key: 'other', label: 'Other', icon: '🏢' },
 ];
 

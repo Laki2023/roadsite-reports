@@ -8,7 +8,7 @@ const PARTY_OPTIONS = [
   { value: 'engineer', label: 'Engineer (Consulting Firm)', icon: '📐', desc: 'Supervision consultant', color: '#6366f1' },
   { value: 'project_manager', label: 'Project Manager', icon: '👔', desc: 'PM overseeing the project', color: '#0891b2' },
   { value: 'engineer_rep', label: "Engineer's Representative", icon: '👷', desc: 'RE & site supervision team', color: '#059669' },
-  { value: 'contractor', label: 'Contractor', icon: '🏗️', desc: 'Main contractor', color: '#e87b35' },
+  { value: 'contractor', label: 'Contractor', icon: '🔨', desc: 'Main contractor', color: '#e87b35' },
   { value: 'subcontractor', label: 'Subcontractor', icon: '🔧', desc: 'Nominated or domestic sub', color: '#8b5cf6' },
 ];
 

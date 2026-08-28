@@ -23,7 +23,7 @@ function getStages(type) {
 
 const TYPE_ICONS = {
   'Box Culvert': '🔲', 'Pipe Culvert': '⭕', 'Slab Culvert': '▬', 'Bridge': '🌉', 'Footbridge': '🚶',
-  'Gabion Wall': '🧱', 'Gabion Mattress': '🧱', 'Retaining Wall (Masonry)': '🏗️', 'Retaining Wall (RC)': '🏗️',
+  'Gabion Wall': '🧱', 'Gabion Mattress': '🧱', 'Retaining Wall (Masonry)': '🔨', 'Retaining Wall (RC)': '🔨',
   'Drift/Causeway': '🌊', 'Headwall': '▐', 'Wingwall': '◣', 'Apron': '▤', 'Scour Protection': '🛡️',
 };
 

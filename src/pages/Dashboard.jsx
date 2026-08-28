@@ -267,7 +267,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     return (
       <div className="fade-in">
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🏗️</div>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🔨</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Contractor Portal</h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Submit your measurements for assigned projects</p>
         </div>

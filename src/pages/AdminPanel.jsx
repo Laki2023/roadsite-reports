@@ -6,7 +6,7 @@ const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engi
 const PAGE_MODULES = [
   { key: 'submit-report', label: 'Submit Report', icon: '📝' },
   { key: 'reports', label: 'Daily Reports', icon: '📄' },
-  { key: 'works', label: 'Works Activities', icon: '⛏️' },
+  { key: 'works', label: 'Works Activities', icon: '⚒️' },
   { key: 'issues', label: 'Site Issues', icon: '⚠️' },
   { key: 'emergency', label: 'Emergency', icon: '🚨' },
   { key: 'pavement', label: 'Pavement Layers', icon: '🛣️' },
@@ -342,7 +342,7 @@ export default function AdminPanel({ profile, showToast }) {
                     <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600,
                       background: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b3520' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
                       color: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b35' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
-                      {u.party === 'contractor' ? '🏗️' : u.party === 'engineer' ? '📐' : u.party === 'engineer_rep' ? '👷' : u.party === 'client' ? '🏛️' : '🔧'} {u.party}
+                      {u.party === 'contractor' ? '🔨' : u.party === 'engineer' ? '📐' : u.party === 'engineer_rep' ? '👷' : u.party === 'client' ? '🏛️' : '🔧'} {u.party}
                     </span>
                   ) : <span className="text-muted">—</span>}</td>
                   <td className="text-sm">{u.designation || '—'}</td>
@@ -439,7 +439,7 @@ export default function AdminPanel({ profile, showToast }) {
                     <option value="engineer">📐 Engineer (Consulting Firm)</option>
                     <option value="project_manager">👔 Project Manager</option>
                     <option value="engineer_rep">👷 Engineer's Representative</option>
-                    <option value="contractor">🏗️ Contractor</option>
+                    <option value="contractor">🔨 Contractor</option>
                     <option value="subcontractor">🔧 Subcontractor</option>
                   </select>
                 </div>

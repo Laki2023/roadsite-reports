@@ -540,7 +540,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
             { label:'Contract Sum', value: fmtB(contractSum), sub: hasRevisions ? `Original: ${fmtB(originalContractSum)}` : null, icon:'💰' },
             { label:'Certified to Date', value: fmtB(certified), sub: `${pct(certified, contractSum)}% of contract`, icon:'📜', color: certified > 0 ? '#4ade80' : '#94a3b8' },
             { label:'Amount Paid', value: fmtB(paid), sub: certified > 0 ? `${pct(paid, certified)}% of certified` : '—', icon:'🏦', color: paid > 0 ? '#4ade80' : '#94a3b8' },
-            { label:'Physical Progress', value: `${physPct}%`, sub: `${variance > 0 ? '+' : ''}${variance}% vs time`, icon:'🏗️', color: variance >= 0 ? '#4ade80' : variance > -10 ? '#fbbf24' : '#f87171' },
+            { label:'Physical Progress', value: `${physPct}%`, sub: `${variance > 0 ? '+' : ''}${variance}% vs time`, icon:'🔨', color: variance >= 0 ? '#4ade80' : variance > -10 ? '#fbbf24' : '#f87171' },
             { label:'Time Elapsed', value: `${timePct}%`, sub: `${remainingDays > 0 ? remainingDays + ' days left' : Math.abs(totalDays - elapsedDays) + ' days overrun'}`, icon:'⏱️', color: remainingDays > 0 ? '#4ade80' : '#f87171' },
             { label:'Completion Date', value: endDt ? new Date(endDt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—', sub: totalEOT > 0 ? `EOT: ${totalEOT} days` : 'No EOT', icon:'📅' },
           ].map((item, i) => (
@@ -2424,7 +2424,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
                     {weatherEntries.slice(0, 8).map(([weather, count]) => (
                       <div key={weather} style={{ padding:'5px 10px', borderRadius:8, background:'var(--bg)', textAlign:'center', minWidth:60 }}>
-                        <div style={{ fontSize:14 }}>{WEATHER_ICONS[weather] || '🌤️'}</div>
+                        <div style={{ fontSize:14 }}>{WEATHER_ICONS[weather] || '☀️'}</div>
                         <div style={{ fontSize:9, color:'var(--text-muted)' }}>{weather}</div>
                         <div style={{ fontSize:14, fontWeight:800 }}>{count}</div>
                       </div>
@@ -2970,7 +2970,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
       {/* ══════ FOOTER ACTIONS ══════ */}
       <div className="card" style={{ padding:14, display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
         <button className="btn btn-secondary" onClick={() => navigateTo('reports', p)}>📋 View Reports</button>
-        <button className="btn btn-secondary" onClick={() => navigateTo('works', p)}>⛏ Works Activities</button>
+        <button className="btn btn-secondary" onClick={() => navigateTo('works', p)}>⚒️ Works Activities</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('quality', p)}>🧪 Quality Tests</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('equipment', p)}>⚙ Equipment</button>
         <button className="btn btn-secondary" onClick={() => navigateTo('boq', p)}>📊 Bill of Quantities</button>

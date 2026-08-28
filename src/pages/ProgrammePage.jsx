@@ -360,7 +360,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
         <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
         <div style={{ display: 'flex', gap: 4 }}>
           {[
-            { key: 'engineer', label: '🏗️ Engineer', count: engineerItems.length },
+            { key: 'engineer', label: '🔨 Engineer', count: engineerItems.length },
             { key: 'contractor', label: '📋 Contractor', count: contractorItems.length },
             { key: 'compare', label: '⚖️ Compare', count: null },
           ].map(v => (

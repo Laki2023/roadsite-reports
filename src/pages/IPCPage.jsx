@@ -282,7 +282,7 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
                   {[
                     { label: 'Original Contract Sum', value: fmt(originalContractSum), icon: '📋', color: '#6366f1' },
                     { label: 'Revised Contract Sum', value: fmt(revisedContractSum), icon: '📝', color: revisedContractSum !== originalContractSum ? '#f59e0b' : '#6366f1' },
-                    { label: 'Value of Works Done', value: fmt(currentWorksValue), icon: '⛏️', color: '#3b82f6' },
+                    { label: 'Value of Works Done', value: fmt(currentWorksValue), icon: '⚒️', color: '#3b82f6' },
                     { label: 'Total Certified', value: fmt(totalCertified), icon: '✅', color: '#10b981' },
                     { label: 'Total Paid', value: fmt(totalPaid), icon: '💵', color: '#059669' },
                     { label: 'Outstanding (Unpaid)', value: fmt(outstanding), icon: '⏳', color: outstanding > 0 ? '#ef4444' : '#10b981' },

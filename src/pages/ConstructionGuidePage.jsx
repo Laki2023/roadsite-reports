@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 
 const PHASE_ICONS = {
-  'Site Establishment': '🏗️',
+  'Site Establishment': '🔨',
   'Setting Out & Survey': '📐',
   'Site Clearance': '🌿',
-  'Earthworks – Cut': '⛏️',
+  'Earthworks – Cut': '⚒️',
   'Earthworks – Fill': '🚛',
   'Subgrade Preparation': '🔧',
   'Sub-base Construction': '🪨',
@@ -163,7 +163,7 @@ export default function ConstructionGuidePage({ profile, showToast }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'Phases', value: stats.phases, icon: '🔢', color: '#6366f1' },
-          { label: 'Activities', value: stats.activities, icon: '⛏️', color: '#0891b2' },
+          { label: 'Activities', value: stats.activities, icon: '⚒️', color: '#0891b2' },
           { label: 'Total Tests', value: stats.tests, icon: '🧪', color: '#059669' },
           { label: 'Hold Points', value: stats.holdPoints, icon: '🛑', color: '#dc2626' },
           { label: 'Field Tests', value: stats.fieldTests, icon: '📍', color: '#d97706' },

@@ -6,7 +6,7 @@ const PARTIES = {
   engineer: '📐 Engineer',
   project_manager: '👔 Project Manager',
   engineer_rep: "👷 Engineer's Representative",
-  contractor: '🏗️ Contractor',
+  contractor: '🔨 Contractor',
   subcontractor: '🔧 Subcontractor',
 };
 const PARTY_COLORS = {
@@ -241,7 +241,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
             <KPI icon="📐" label="Engineer" value={stats.byParty.engineer || 0} color={PARTY_COLORS.engineer} />
             <KPI icon="👔" label="Project Mgr" value={stats.byParty.project_manager || 0} color={PARTY_COLORS.project_manager} />
             <KPI icon="👷" label="Eng. Rep" value={stats.byParty.engineer_rep || 0} color={PARTY_COLORS.engineer_rep} />
-            <KPI icon="🏗️" label="Contractor" value={stats.byParty.contractor || 0} color={PARTY_COLORS.contractor} />
+            <KPI icon="🔨" label="Contractor" value={stats.byParty.contractor || 0} color={PARTY_COLORS.contractor} />
             <KPI icon="🔧" label="Subcontractor" value={stats.byParty.subcontractor || 0} color={PARTY_COLORS.subcontractor} />
             <KPI icon="✅" label="On Site" value={stats.onSite} color="#059669" />
             <KPI icon="⏳" label="Pending" value={stats.pendingConsent} color={stats.pendingConsent > 0 ? '#f59e0b' : '#059669'} />

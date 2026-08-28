@@ -396,7 +396,7 @@ function InviteModal({ projects, profile, roles, onClose, onSuccess, showToast }
 const PAGE_MODULES = [
   { key: 'submit-report', label: 'Submit Report', icon: '📝' },
   { key: 'reports', label: 'Daily Reports', icon: '📄' },
-  { key: 'works', label: 'Works Activities', icon: '⛏️' },
+  { key: 'works', label: 'Works Activities', icon: '⚒️' },
   { key: 'issues', label: 'Site Issues', icon: '⚠️' },
   { key: 'emergency', label: 'Emergency', icon: '🚨' },
   { key: 'pavement', label: 'Pavement Layers', icon: '🛣️' },
