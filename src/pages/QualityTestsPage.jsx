@@ -24,6 +24,8 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
   const [tab, setTab] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     supabase.from('projects').select('id, name').order('name')
@@ -166,6 +168,11 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
     return true;
   });
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setCurrentPage(1); }, [filterType, filterStatus, tab, projectId]);
+
   const statusBadge = (s) => {
     const m = { Pass: 'pass', Fail: 'fail', Pending: 'pending', Marginal: 'warning', 'Retest Required': 'danger' };
     return <span className={`badge badge-${m[s] || 'muted'}`}>{s}</span>;
@@ -270,7 +277,7 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(t => (
+                {paginated.map(t => (
                   <tr key={t.id}>
                     <td style={{ fontWeight: 500 }}>{t.test_type}</td>
                     <td className="text-sm">
@@ -301,6 +308,17 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <span>Showing {(currentPage-1)*PAGE_SIZE + 1}–{Math.min(currentPage*PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
+                <span style={{ padding: '5px 10px', fontSize: 12 }}>Page {currentPage} of {totalPages}</span>
+                <button className="btn btn-secondary btn-sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+              </div>
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <div className="card empty-state mt-16"><p>No tests match your filters</p></div>

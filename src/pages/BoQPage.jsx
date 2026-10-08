@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import { ConfirmDialog } from '../components/SharedUI';
 import * as XLSX from 'xlsx';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -46,6 +47,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [expandedSections, setExpandedSections] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [localQty, setLocalQty] = useState({});
+  const [confirmAction, setConfirmAction] = useState(null);
   const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
@@ -357,13 +359,18 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
             </label>
             <button className="btn btn-secondary" onClick={() => setShowAddItem(true)}>+ Add Item</button>
             {items.length > 0 && (
-              <button className="btn btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={async () => {
-                if (!window.confirm(`Delete all ${items.length} BoQ items and ${sections.length} sections for this project?`)) return;
-                await supabase.from('boq_items').delete().eq('project_id', selectedProject);
-                await supabase.from('boq_sections').delete().eq('project_id', selectedProject);
-                showToast('🗑️ All BoQ data cleared');
-                loadData();
-              }}>🗑️ Clear All BoQ</button>
+              <button className="btn btn-secondary" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={() => setConfirmAction({
+                title: 'Clear All BoQ Data?',
+                message: `This will permanently delete all ${items.length} BoQ items and ${sections.length} sections for this project. This cannot be undone.`,
+                confirmLabel: 'Clear All',
+                variant: 'danger',
+                action: async () => {
+                  await supabase.from('boq_items').delete().eq('project_id', selectedProject);
+                  await supabase.from('boq_sections').delete().eq('project_id', selectedProject);
+                  showToast('All BoQ data cleared');
+                  loadData();
+                },
+              })}>🗑️ Clear All BoQ</button>
             )}
           </div>
         )}
@@ -832,6 +839,16 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
         </div>
       )}
 
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        variant={confirmAction?.variant || 'danger'}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
+
       {/* Bulk Import Modal */}
       {showBulkImport && (
         <div className="modal-overlay" onClick={() => setShowBulkImport(false)}>
@@ -901,7 +918,13 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
                       <span style={{ fontSize: 10 }}>{pct.toFixed(0)}</span>
                     </div>
                   </td>
-                  {canManage && <td><button className="btn btn-sm btn-danger" onClick={() => deleteItem(i.id)} style={{ fontSize: 10, padding: '2px 6px' }}>×</button></td>}
+                  {canManage && <td><button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                    title: 'Delete BoQ Item?',
+                    message: `Are you sure you want to delete item ${i.item_no}: ${i.description}?`,
+                    confirmLabel: 'Delete',
+                    variant: 'danger',
+                    action: () => deleteItem(i.id),
+                  })} style={{ fontSize: 10, padding: '2px 6px' }}>×</button></td>}
                 </tr>
               );
             })}

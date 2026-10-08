@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, hasRole, ROLE_LABELS, ROLE_LEVELS, ROLE_COLORS, APPROVAL_AUTHORITY,
   canApproveItem, canIssueItem, getEscalationTarget, INSTRUCTION_TYPES, APPROVAL_TYPES } from '../lib/supabase';
+import { ConfirmDialog } from '../components/SharedUI';
 
 const STATUS_COLORS = {
   pending: '#f59e0b', approved: '#10b981', rejected: '#ef4444',
@@ -22,6 +23,7 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
   const [instructionModal, setInstructionModal] = useState(false);
   const [actionNotes, setActionNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const userRole = profile.role;
@@ -200,9 +202,21 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button className="btn btn-sm btn-success" onClick={() => setActionModal({ item: q, action: 'approve' })}>Approve</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => setActionModal({ item: q, action: 'reject' })}>Reject</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                      title: 'Reject Item?',
+                      message: `Are you sure you want to reject "${q.title}"?`,
+                      confirmLabel: 'Reject',
+                      variant: 'danger',
+                      action: () => setActionModal({ item: q, action: 'reject' }),
+                    })}>Reject</button>
                     {getEscalationTarget(userRole) && (
-                      <button className="btn btn-sm btn-secondary" onClick={() => setActionModal({ item: q, action: 'escalate' })}>
+                      <button className="btn btn-sm btn-secondary" onClick={() => setConfirmAction({
+                        title: 'Escalate Item?',
+                        message: `Are you sure you want to escalate "${q.title}" to a higher authority?`,
+                        confirmLabel: 'Escalate',
+                        variant: 'danger',
+                        action: () => setActionModal({ item: q, action: 'escalate' }),
+                      })}>
                         Escalate ↑
                       </button>
                     )}
@@ -289,9 +303,21 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
                           {canAct && (
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button className="btn btn-sm btn-success" onClick={() => setActionModal({ item: q, action: 'approve' })}>✓</button>
-                              <button className="btn btn-sm btn-danger" onClick={() => setActionModal({ item: q, action: 'reject' })}>✗</button>
+                              <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                                title: 'Reject Item?',
+                                message: `Are you sure you want to reject "${q.title}"?`,
+                                confirmLabel: 'Reject',
+                                variant: 'danger',
+                                action: () => setActionModal({ item: q, action: 'reject' }),
+                              })}>✗</button>
                               {getEscalationTarget(q.current_approver_role) && (
-                                <button className="btn btn-sm btn-secondary" onClick={() => setActionModal({ item: q, action: 'escalate' })}>↑</button>
+                                <button className="btn btn-sm btn-secondary" onClick={() => setConfirmAction({
+                                  title: 'Escalate Item?',
+                                  message: `Are you sure you want to escalate "${q.title}" to a higher authority?`,
+                                  confirmLabel: 'Escalate',
+                                  variant: 'danger',
+                                  action: () => setActionModal({ item: q, action: 'escalate' }),
+                                })}>↑</button>
                               )}
                               {isPlatformAdmin && (
                                 <button className="btn btn-sm" style={{ background: '#2563eb', color: '#fff', fontSize: 10 }}
@@ -425,6 +451,16 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        variant={confirmAction?.variant || 'danger'}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
 
       {/* ── ISSUE INSTRUCTION MODAL ── */}
       {instructionModal && (

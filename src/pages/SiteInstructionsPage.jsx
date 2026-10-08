@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ROLE_LABELS, ROLE_LEVELS } from '../lib/supabase';
+import { ConfirmDialog } from '../components/SharedUI';
 
 const INSTRUCTION_TYPES = [
   'Site Instruction', 'Variation Order', 'Day Work Order',
@@ -26,6 +27,7 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
   const [escalateModal, setEscalateModal] = useState(null);
   const [escalateReason, setEscalateReason] = useState('');
   const [approvalNotes, setApprovalNotes] = useState({});
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const canIssue = isPlatformAdmin || hasRole(profile.role, 'resident_engineer');
@@ -305,7 +307,13 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
                         <button className="btn btn-sm btn-success" onClick={() => handleApprove(si.id)}>
                           {isPlatformAdmin ? '⚡ Override & Approve' : '✓ Approve'}
                         </button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleReject(si.id)}>✗ Reject</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                          title: 'Reject Instruction?',
+                          message: `Are you sure you want to reject instruction ${si.instruction_no}: ${si.subject}?`,
+                          confirmLabel: 'Reject',
+                          variant: 'danger',
+                          action: () => handleReject(si.id),
+                        })}>✗ Reject</button>
                       </>
                     )}
                     {canUserEscalate(si) && (
@@ -391,6 +399,16 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        variant={confirmAction?.variant || 'danger'}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
 
       {/* ── ESCALATE MODAL ── */}
       {escalateModal && (

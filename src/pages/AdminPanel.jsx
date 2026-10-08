@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS, hasRole, assignableRoles } from '../lib/supabase';
+import { ConfirmDialog } from '../components/SharedUI';
 
 const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_officer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
 
@@ -35,6 +36,7 @@ export default function AdminPanel({ profile, showToast }) {
   const [projects, setProjects] = useState([]);
   const [tab, setTab] = useState('pending');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [approveModal, setApproveModal] = useState(null);
   const [approveForm, setApproveForm] = useState({ role: 'inspector', designation: '', project_id: '', project_role: 'Inspector' });
 
@@ -290,11 +292,29 @@ export default function AdminPanel({ profile, showToast }) {
                       {u.id !== profile.id && (
                         <div className="btn-group">
                           {u.is_super_admin && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, true)}>Revoke Super</button>
+                            <button className="btn btn-sm btn-secondary" onClick={() => setConfirmAction({
+                              title: 'Revoke Super Admin?',
+                              message: `Are you sure you want to revoke Super Admin access for ${u.full_name}?`,
+                              confirmLabel: 'Revoke',
+                              variant: 'danger',
+                              action: () => toggleSuperAdmin(u.id, true),
+                            })}>Revoke Super</button>
                           )}
                           <button className="btn btn-sm" style={{ background: '#dc2626', color: '#fff' }}
-                            onClick={() => updateRole(u.id, 'viewer')}>Demote</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(u.id)}>Remove</button>
+                            onClick={() => setConfirmAction({
+                              title: 'Demote User?',
+                              message: `Are you sure you want to demote ${u.full_name} to Viewer? They will lose all current privileges.`,
+                              confirmLabel: 'Demote',
+                              variant: 'danger',
+                              action: () => updateRole(u.id, 'viewer'),
+                            })}>Demote</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                              title: 'Remove User?',
+                              message: `Are you sure you want to remove ${u.full_name}? Their role will be reset to Pending.`,
+                              confirmLabel: 'Remove',
+                              variant: 'danger',
+                              action: () => deleteUser(u.id),
+                            })}>Remove</button>
                         </div>
                       )}
                     </td>
@@ -362,7 +382,13 @@ export default function AdminPanel({ profile, showToast }) {
                   {isSuperAdmin && (
                     <td>
                       {u.id !== profile.id && (
-                        <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(u.id)}>Remove</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
+                          title: 'Remove User?',
+                          message: `Are you sure you want to remove ${u.full_name}? Their role will be reset to Pending.`,
+                          confirmLabel: 'Remove',
+                          variant: 'danger',
+                          action: () => deleteUser(u.id),
+                        })}>Remove</button>
                       )}
                     </td>
                   )}
@@ -528,19 +554,15 @@ export default function AdminPanel({ profile, showToast }) {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <h3>Remove User<button onClick={() => setConfirmDelete(null)}>×</button></h3>
-            <p>Are you sure you want to remove <strong>{users.find(u => u.id === confirmDelete)?.full_name}</strong>?</p>
-            <div className="btn-group" style={{ marginTop: 16 }}>
-              <button className="btn btn-danger" onClick={() => deleteUser(confirmDelete)}>Yes, Remove</button>
-              <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        variant={confirmAction?.variant || 'danger'}
+        onConfirm={() => { confirmAction?.action(); setConfirmAction(null); }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

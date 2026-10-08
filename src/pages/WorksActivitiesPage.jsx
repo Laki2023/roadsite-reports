@@ -40,12 +40,16 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   const [pickerSearch, setPickerSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
   }, []);
 
   useEffect(() => { if (selectedProject) { loadEntries(); loadActivities(); } }, [selectedProject]);
+
+  useEffect(() => { setCurrentPage(1); }, [selectedProject, tab]);
 
   async function loadEntries() {
     setLoading(true);
@@ -166,6 +170,12 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   });
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
+  // ── Pagination for summary and daily tabs ──
+  const summaryTotalPages = Math.ceil(activities.length / PAGE_SIZE);
+  const paginatedActivities = activities.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const dailyTotalPages = Math.ceil(sortedDates.length / PAGE_SIZE);
+  const paginatedDates = sortedDates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   // ── Activity picker — filter by search ──
   const groupedActivities = groupByCategory(ACTIVITIES_LIST);
   const filteredActivities = pickerSearch.trim()
@@ -233,7 +243,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                   <p className="text-sm text-muted">Activities are automatically created when you log work in daily reports or the Log Activity tab</p>
                 </div>
               ) : (
-                activities.map(act => {
+                paginatedActivities.map(act => {
                   const pct = act.planned_quantity > 0
                     ? Math.min(100, Math.round((act.completed_quantity || 0) / act.planned_quantity * 100))
                     : 0;
@@ -349,6 +359,16 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                     </div>
                   );
                 })
+              )}
+              {summaryTotalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <span>Showing {(currentPage-1)*PAGE_SIZE + 1}–{Math.min(currentPage*PAGE_SIZE, activities.length)} of {activities.length}</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
+                    <span style={{ padding: '5px 10px', fontSize: 12 }}>Page {currentPage} of {summaryTotalPages}</span>
+                    <button className="btn btn-secondary btn-sm" disabled={currentPage === summaryTotalPages} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -553,7 +573,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                   <p className="text-sm text-muted">Switch to "Log Activity" tab to start recording</p>
                 </div>
               ) : (
-                sortedDates.map(date => {
+                paginatedDates.map(date => {
                   const dayEntries = grouped[date];
                   // Group this day's entries by activity category
                   const byCat = {};
@@ -615,6 +635,16 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                     </details>
                   );
                 })
+              )}
+              {dailyTotalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <span>Showing {(currentPage-1)*PAGE_SIZE + 1}–{Math.min(currentPage*PAGE_SIZE, sortedDates.length)} of {sortedDates.length} days</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
+                    <span style={{ padding: '5px 10px', fontSize: 12 }}>Page {currentPage} of {dailyTotalPages}</span>
+                    <button className="btn btn-secondary btn-sm" disabled={currentPage === dailyTotalPages} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+                  </div>
+                </div>
               )}
             </div>
           )}

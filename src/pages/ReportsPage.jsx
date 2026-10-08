@@ -11,6 +11,8 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   const [deleting, setDeleting] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   async function handleDeleteReport(reportId, e) {
     e.stopPropagation();
@@ -85,6 +87,11 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
     return true;
   });
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setCurrentPage(1); }, [filterProject, filterDate]);
+
   function exportCSV() {
     const headers = ['Date', 'Project', 'Weather', 'Work Done', 'Progress %', 'Labour', 'Activities', 'Challenges', 'Urgent'];
     const rows = filtered.map(r => [
@@ -140,7 +147,7 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
             </tr>
           </thead>
           <tbody>
-            {filtered.map(r => {
+            {paginated.map(r => {
               const totalLabour = (r.contractor_labour_skilled || 0) + (r.contractor_labour_unskilled || 0) + (r.subcontractor_labour || 0);
               const actCount = r.linkedActivities?.length || 0;
               const totalQty = r.linkedActivities?.reduce((sum, a) => sum + (parseFloat(a.quantity) || 0), 0) || 0;
@@ -264,6 +271,17 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
+          <span>Showing {(currentPage-1)*PAGE_SIZE + 1}–{Math.min(currentPage*PAGE_SIZE, filtered.length)} of {filtered.length}</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
+            <span style={{ padding: '5px 10px', fontSize: 12 }}>Page {currentPage} of {totalPages}</span>
+            <button className="btn btn-secondary btn-sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="card empty-state mt-16">
