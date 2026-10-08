@@ -97,9 +97,6 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
           assigned_to: null,
         }).eq('id', item.id);
 
-        // Reset to pending for next level
-        await supabase.from('approval_queue').update({ status: 'pending' }).eq('id', item.id);
-
         await supabase.from('approval_history').insert({
           queue_id: item.id,
           action: 'escalated',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 import {
   ACTIVITIES_LIST, ACTIVITY_CATEGORIES,
   groupByCategory,
@@ -37,6 +38,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   });
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     supabase.from('projects').select('id, name, category').order('name').then(({ data }) => setProjects(data || []));
@@ -45,21 +48,37 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
   useEffect(() => { if (selectedProject) { loadEntries(); loadActivities(); } }, [selectedProject]);
 
   async function loadEntries() {
-    const { data } = await supabase.from('works_progress')
-      .select('*, reporter:reported_by(full_name)')
-      .eq('project_id', selectedProject)
-      .order('work_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(500);
-    setEntries(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('works_progress')
+        .select('*, reporter:reported_by(full_name)')
+        .eq('project_id', selectedProject)
+        .order('work_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (err) throw err;
+      setEntries(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load work entries: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadActivities() {
-    const { data } = await supabase.from('works_activities')
-      .select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity, status, last_progress_date')
-      .eq('project_id', selectedProject)
-      .order('sort_order');
-    setActivities(data || []);
+    try {
+      const { data, error: err } = await supabase.from('works_activities')
+        .select('id, activity_name, activity_code, category, unit, planned_quantity, completed_quantity, status, last_progress_date')
+        .eq('project_id', selectedProject)
+        .order('sort_order');
+      if (err) throw err;
+      setActivities(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load activities: ' + err.message);
+    }
   }
 
   // ── Save a single activity entry ──
@@ -167,8 +186,15 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
 
   const todayEntries = entries.filter(e => e.work_date === logForm.work_date);
 
+  if (loading) return <LoadingSpinner message="Loading work activities..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>⚒️ Work Activities</h2>

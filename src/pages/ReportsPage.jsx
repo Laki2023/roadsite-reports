@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 export default function ReportsPage({ profile, showToast, selectedProject: propProject }) {
   const [reports, setReports] = useState([]);
@@ -8,6 +9,8 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   const [filterDate, setFilterDate] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   async function handleDeleteReport(reportId, e) {
     e.stopPropagation();
@@ -33,37 +36,47 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
   useEffect(() => { load(); }, []);
 
   async function load() {
-    const [repRes, projRes] = await Promise.all([
-      supabase.from('daily_reports')
-        .select('*, projects(name, category), profiles:submitted_by(full_name)')
-        .order('report_date', { ascending: false }).limit(100),
-      supabase.from('projects').select('id, name'),
-    ]);
-    const reportsData = repRes.data || [];
+    setLoading(true);
+    setError(null);
+    try {
+      const [repRes, projRes] = await Promise.all([
+        supabase.from('daily_reports')
+          .select('*, projects(name, category), profiles:submitted_by(full_name)')
+          .order('report_date', { ascending: false }).limit(100),
+        supabase.from('projects').select('id, name'),
+      ]);
+      if (repRes.error) throw repRes.error;
+      const reportsData = repRes.data || [];
 
-    // Fetch linked works_progress entries for each report
-    const reportIds = reportsData.map(r => r.id).filter(Boolean);
-    let progressMap = {};
-    if (reportIds.length > 0) {
-      const { data: progressData } = await supabase.from('works_progress')
-        .select('id, daily_report_id, activity_id, quantity, start_chainage, end_chainage, notes')
-        .in('daily_report_id', reportIds);
-      if (progressData) {
-        progressData.forEach(p => {
-          if (!progressMap[p.daily_report_id]) progressMap[p.daily_report_id] = [];
-          progressMap[p.daily_report_id].push(p);
-        });
+      // Fetch linked works_progress entries for each report
+      const reportIds = reportsData.map(r => r.id).filter(Boolean);
+      let progressMap = {};
+      if (reportIds.length > 0) {
+        const { data: progressData } = await supabase.from('works_progress')
+          .select('id, daily_report_id, activity_id, quantity, start_chainage, end_chainage, notes')
+          .in('daily_report_id', reportIds);
+        if (progressData) {
+          progressData.forEach(p => {
+            if (!progressMap[p.daily_report_id]) progressMap[p.daily_report_id] = [];
+            progressMap[p.daily_report_id].push(p);
+          });
+        }
       }
+
+      // Attach linked activities to each report
+      const enriched = reportsData.map(r => ({
+        ...r,
+        linkedActivities: progressMap[r.id] || [],
+      }));
+
+      setReports(enriched);
+      setProjects(projRes.data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load reports: ' + err.message);
+    } finally {
+      setLoading(false);
     }
-
-    // Attach linked activities to each report
-    const enriched = reportsData.map(r => ({
-      ...r,
-      linkedActivities: progressMap[r.id] || [],
-    }));
-
-    setReports(enriched);
-    setProjects(projRes.data || []);
   }
 
   const filtered = reports.filter(r => {
@@ -92,8 +105,15 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
     showToast('CSV exported');
   }
 
+  if (loading) return <LoadingSpinner message="Loading reports..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Daily Reports</h2>

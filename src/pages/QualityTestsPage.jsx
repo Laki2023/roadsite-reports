@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, TEST_TYPES, SPEC_LIMITS } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const EMPTY_TEST = {
   test_type: 'MDD', layer_id: '', test_standard: '', sample_location_chainage: '',
@@ -21,6 +22,8 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [tab, setTab] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     supabase.from('projects').select('id, name').order('name')
@@ -37,11 +40,21 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
   }, [projectId]);
 
   async function loadTests() {
-    const { data } = await supabase.from('quality_tests')
-      .select('*, tested_by_profile:tested_by(full_name), reviewed_by_profile:reviewed_by(full_name), pavement_layers(layer_type, start_chainage, end_chainage)')
-      .eq('project_id', projectId)
-      .order('date_sampled', { ascending: false });
-    setTests(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('quality_tests')
+        .select('*, tested_by_profile:tested_by(full_name), reviewed_by_profile:reviewed_by(full_name), pavement_layers(layer_type, start_chainage, end_chainage)')
+        .eq('project_id', projectId)
+        .order('date_sampled', { ascending: false });
+      if (err) throw err;
+      setTests(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load quality tests: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Auto-fill spec limits when layer and test type change
@@ -161,10 +174,18 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
   // Summary
   const counts = { total: tests.length, Pass: 0, Fail: 0, Pending: 0, Marginal: 0 };
   tests.forEach(t => { if (counts[t.result_status] !== undefined) counts[t.result_status]++; });
-  const passRate = counts.total > 0 ? ((counts.Pass / (counts.total - counts.Pending)) * 100) : 0;
+  const denom = counts.total - (counts.Pending || 0);
+  const passRate = denom > 0 ? Math.round(counts.Pass / denom * 100) : 0;
+
+  if (loading) return <LoadingSpinner message="Loading quality tests..." />;
 
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Quality Tests</h2>

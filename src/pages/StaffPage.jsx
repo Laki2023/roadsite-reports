@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ROLE_LABELS } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const DESIGNATIONS = [
   'Project Manager', 'Engineer', 'Resident Engineer', 'Inspector',
@@ -18,21 +19,33 @@ export default function StaffPage({ profile, showToast }) {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignForm, setAssignForm] = useState({ project_id: '', staff_id: '', role_on_project: 'Inspector' });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [staffRes, projRes, assignRes] = await Promise.all([
-      supabase.from('profiles').select('*').neq('role', 'pending').order('full_name'),
-      supabase.from('projects').select('id, name').order('name'),
-      supabase.from('staff_assignments')
-        .select('*, profiles(full_name, designation, role), projects(name)')
-        .eq('is_active', true)
-        .order('assigned_at', { ascending: false }),
-    ]);
-    setStaff(staffRes.data || []);
-    setProjects(projRes.data || []);
-    setAssignments(assignRes.data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const [staffRes, projRes, assignRes] = await Promise.all([
+        supabase.from('profiles').select('*').neq('role', 'pending').order('full_name'),
+        supabase.from('projects').select('id, name').order('name'),
+        supabase.from('staff_assignments')
+          .select('*, profiles(full_name, designation, role), projects(name)')
+          .eq('is_active', true)
+          .order('assigned_at', { ascending: false }),
+      ]);
+      if (staffRes.error) throw staffRes.error;
+      setStaff(staffRes.data || []);
+      setProjects(projRes.data || []);
+      setAssignments(assignRes.data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load staff data: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleAssign(e) {
@@ -109,8 +122,15 @@ export default function StaffPage({ profile, showToast }) {
     </div>
   );
 
+  if (loading) return <LoadingSpinner message="Loading staff data..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Staff & Teams</h2>

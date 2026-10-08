@@ -80,9 +80,9 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
     setForm({
       name: p.name || '', category: p.category || 'Construction',
       contract_no: p.contract_no || '', contractor_name: p.contractor_name || '',
-      contract_sum: p.contract_sum || '', fidic_edition: p.fidic_edition || 'Red Book 1999',
-      employer: p.employer || 'KeNHA', start_chainage: p.start_chainage || '',
-      end_chainage: p.end_chainage || '', road_class: p.road_class || '',
+      contract_sum: p.contract_sum ?? '', fidic_edition: p.fidic_edition || 'Red Book 1999',
+      employer: p.employer || 'KeNHA', start_chainage: p.start_chainage ?? '',
+      end_chainage: p.end_chainage ?? '', road_class: p.road_class || '',
       region: p.region || '', county: p.county || '', sub_county: p.sub_county || '', constituency: p.constituency || '',
       commencement_date: p.commencement_date || '', original_completion_date: p.original_completion_date || '',
       current_phase: p.current_phase || 'Construction', status: p.status || 'active',
@@ -90,9 +90,9 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
       contract_award_date: p.contract_award_date || '', contract_signing_date: p.contract_signing_date || '',
       order_to_commence_date: p.order_to_commence_date || '',
       original_contract_sum: p.original_contract_sum || '', revised_contract_sum: p.revised_contract_sum || '',
-      defects_liability_months: p.defects_liability_months || 12,
+      defects_liability_months: p.defects_liability_months ?? 12,
       performance_guarantee_expiry: p.performance_guarantee_expiry || '',
-      addendums: p.addendums || '', latitude: p.latitude || '', longitude: p.longitude || '',
+      addendums: p.addendums || '', latitude: p.latitude ?? '', longitude: p.longitude ?? '',
     });
     setEditId(p.id);
     setShowModal(true);

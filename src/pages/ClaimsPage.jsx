@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, hasRole, ROLE_LEVELS } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 import { detectClaimTriggers, createClaimFromTrigger, sendClaimNotifications } from '../lib/claimsEngine';
 import CITAssessment from '../components/CITAssessment';
 
@@ -18,6 +19,7 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
   const [clauses, setClauses] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('register');
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState([]);
@@ -41,11 +43,21 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
   }
 
   async function loadClaims() {
-    const { data } = await supabase.from('claims')
-      .select('*, prepared:prepared_by(full_name)')
-      .eq('project_id', selectedProject)
-      .order('created_at', { ascending: false });
-    setClaims(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('claims')
+        .select('*, prepared:prepared_by(full_name)')
+        .eq('project_id', selectedProject)
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      setClaims(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load claims: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadClauses() {
@@ -157,8 +169,15 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
     { id: 'clauses', label: '📖 FIDIC Clauses' },
   ];
 
+  if (loading) return <LoadingSpinner message="Loading claims..." />;
+
   return (
     <div className="fade-in">
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>⚖️ Claims Management</h1>

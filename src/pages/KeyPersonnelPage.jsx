@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const PARTIES = {
   client: '🏛️ Client',
@@ -79,6 +80,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
   const [selectedProject, setSelectedProject] = useState(contextProject?.id || '');
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -96,12 +98,20 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
 
   async function loadPersonnel() {
     setLoading(true);
-    const { data } = await supabase.from('key_personnel')
-      .select('*')
-      .eq('project_id', selectedProject)
-      .order('party').order('position_title');
-    setPersonnel(data || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('key_personnel')
+        .select('*')
+        .eq('project_id', selectedProject)
+        .order('party').order('position_title');
+      if (err) throw err;
+      setPersonnel(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load personnel: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function savePersonnel(formData) {
@@ -202,8 +212,15 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     replacement_consent_status: 'n/a', fidic_clause: 'Cl. 6.9', notes: '',
   };
 
+  if (loading) return <LoadingSpinner message="Loading personnel..." />;
+
   return (
     <div className="fade-in">
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>👥 Key Personnel</h1>

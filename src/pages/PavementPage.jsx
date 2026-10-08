@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, LAYER_TYPES, LAYER_STATUSES } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const EMPTY_LAYER = {
   layer_type: 'Subgrade', material_type: '', design_thickness_mm: '',
@@ -19,6 +20,8 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
   const [viewMode, setViewMode] = useState('table'); // table | stack
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     supabase.from('projects').select('id, name, category, start_chainage, end_chainage')
@@ -28,11 +31,21 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
   useEffect(() => { if (projectId) loadLayers(); }, [projectId]);
 
   async function loadLayers() {
-    const { data } = await supabase.from('pavement_layers')
-      .select('*, approved_by_profile:approved_by(full_name)')
-      .eq('project_id', projectId)
-      .order('start_chainage');
-    setLayers(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('pavement_layers')
+        .select('*, approved_by_profile:approved_by(full_name)')
+        .eq('project_id', projectId)
+        .order('start_chainage');
+      if (err) throw err;
+      setLayers(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load pavement layers: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSave(e) {
@@ -117,8 +130,15 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
   const statusCounts = {};
   layers.forEach(l => { statusCounts[l.layer_status] = (statusCounts[l.layer_status] || 0) + 1; });
 
+  if (loading) return <LoadingSpinner message="Loading pavement layers..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Pavement Layers</h2>

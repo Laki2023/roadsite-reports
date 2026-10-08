@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const CATEGORIES = { financial: '💰', technical: '🔧', contractual: '📜', quality: '🧪', safety: '🦺', environmental: '🌿', general: '📋' };
 const CAT_COLORS = { financial: '#059669', technical: '#0284c7', contractual: '#8b5cf6', quality: '#e87b35', safety: '#dc2626', environmental: '#16a34a', general: '#64748b' };
@@ -28,6 +29,7 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
   const [selectedProject, setSelectedProject] = useState(contextProject?.id || '');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [filterCat, setFilterCat] = useState('all');
@@ -42,10 +44,18 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
 
   async function loadItems() {
     setLoading(true);
-    const { data } = await supabase.from('approvals_matrix')
-      .select('*').eq('project_id', selectedProject).order('category').order('approval_item');
-    setItems(data || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('approvals_matrix')
+        .select('*').eq('project_id', selectedProject).order('category').order('approval_item');
+      if (err) throw err;
+      setItems(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load approvals matrix: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function seedStandard() {
@@ -96,8 +106,15 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
     response_days: 14, notes: '',
   };
 
+  if (loading) return <LoadingSpinner message="Loading approvals matrix..." />;
+
   return (
     <div className="fade-in">
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>✅ Approvals Matrix</h1>

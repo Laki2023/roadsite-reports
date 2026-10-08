@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ISSUE_CATEGORIES } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const EMPTY_ISSUE = {
   title: '', description: '', category: 'General', severity: 'Medium',
@@ -18,6 +19,8 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
   const [filterStatus, setFilterStatus] = useState('all');
   const [staff, setStaff] = useState([]);
   const [assignTo, setAssignTo] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     supabase.from('projects').select('id, name').order('name')
@@ -29,11 +32,21 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
   useEffect(() => { if (projectId) loadIssues(); }, [projectId]);
 
   async function loadIssues() {
-    const { data } = await supabase.from('site_issues')
-      .select('*, raised_by_profile:raised_by(full_name), assigned_to_profile:assigned_to(full_name)')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
-    setIssues(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('site_issues')
+        .select('*, raised_by_profile:raised_by(full_name), assigned_to_profile:assigned_to(full_name)')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      setIssues(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load issues: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSave(e) {
@@ -101,8 +114,15 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
   const sevBadge = { Critical: 'danger', High: 'warning', Medium: 'info', Low: 'muted' };
   const statusBadge = { Open: 'warning', 'In Progress': 'accent', Resolved: 'success', Closed: 'muted', Escalated: 'danger' };
 
+  if (loading) return <LoadingSpinner message="Loading issues..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Site Issues</h2>

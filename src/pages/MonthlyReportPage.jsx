@@ -40,10 +40,6 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
     }
   }, [selectedProject, autoLoaded]);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
   async function loadProjects() {
     const { data } = await supabase.from('projects').select('id, name, contract_number').order('name');
     setProjects(data || []);

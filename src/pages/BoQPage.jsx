@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 import * as XLSX from 'xlsx';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -45,6 +45,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [uploadPreview, setUploadPreview] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [localQty, setLocalQty] = useState({});
   const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
@@ -116,8 +117,15 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
     } finally { setSaving(false); }
   }
 
-  async function updateCompletedQty(itemId, qty) {
+  function updateLocalQty(itemId, qty) {
+    setLocalQty(prev => ({ ...prev, [itemId]: qty }));
+  }
+
+  async function flushQtyUpdate(itemId) {
+    const qty = localQty[itemId];
+    if (qty === undefined) return;
     await supabase.from('boq_items').update({ completed_quantity: parseFloat(qty) || 0 }).eq('id', itemId);
+    setLocalQty(prev => { const next = { ...prev }; delete next[itemId]; return next; });
     loadData();
   }
 
@@ -877,8 +885,9 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
                   <td className="text-mono" style={{ fontSize: 12 }}>{Number(i.boq_amount || 0).toLocaleString()}</td>
                   <td>
                     {canManage && !i.linked_activity_id ? (
-                      <input type="number" step="0.001" value={i.completed_quantity || ''} style={{ width: 80, padding: '3px 6px', fontSize: 11 }}
-                        onChange={e => updateCompletedQty(i.id, e.target.value)} />
+                      <input type="number" step="0.001" value={localQty[i.id] !== undefined ? localQty[i.id] : (i.completed_quantity || '')} style={{ width: 80, padding: '3px 6px', fontSize: 11 }}
+                        onChange={e => updateLocalQty(i.id, e.target.value)}
+                        onBlur={() => flushQtyUpdate(i.id)} />
                     ) : (
                       <span className="text-mono" style={{ fontSize: 12, fontWeight: 600 }}>{Number(i.completed_quantity || 0).toLocaleString()}</span>
                     )}

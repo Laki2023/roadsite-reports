@@ -137,7 +137,7 @@ export default function ConstructionGuidePage({ profile, showToast }) {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
-        <div style={{ fontSize: 18, color: '#6b7280' }}>Loading Construction Guide...</div>
+        <div style={{ fontSize: 18, color: 'var(--text-muted)' }}>Loading Construction Guide...</div>
       </div>
     );
   }
@@ -149,10 +149,10 @@ export default function ConstructionGuidePage({ profile, showToast }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
           <span style={{ fontSize: 32 }}>📚</span>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#111827' }}>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>
               Construction Guide
             </h1>
-            <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--text-muted)' }}>
               Kenya Road Construction Standards &bull; FIDIC Red/Yellow/Silver Book References
             </p>
           </div>
@@ -170,22 +170,22 @@ export default function ConstructionGuidePage({ profile, showToast }) {
           { label: 'Lab Tests', value: stats.labTests, icon: '🔬', color: '#7c3aed' },
         ].map(s => (
           <div key={s.label} style={{
-            background: '#fff', borderRadius: 10, padding: '14px 16px',
-            border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            background: 'var(--bg-card)', borderRadius: 10, padding: '14px 16px',
+            border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 20 }}>{s.icon}</span>
               <span style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</span>
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Filters Bar */}
       <div style={{
-        background: '#fff', borderRadius: 10, padding: 16, marginBottom: 20,
-        border: '1px solid #e5e7eb', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center'
+        background: 'var(--bg-card)', borderRadius: 10, padding: 16, marginBottom: 20,
+        border: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center'
       }}>
         {/* Search */}
         <div style={{ flex: '1 1 250px', position: 'relative' }}>
@@ -196,18 +196,18 @@ export default function ConstructionGuidePage({ profile, showToast }) {
             onChange={e => setSearch(e.target.value)}
             style={{
               width: '100%', padding: '8px 12px 8px 36px', borderRadius: 8,
-              border: '1px solid #d1d5db', fontSize: 14, outline: 'none',
+              border: '1px solid var(--border)', fontSize: 14, outline: 'none',
               boxSizing: 'border-box'
             }}
           />
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: '#9ca3af' }}>🔍</span>
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'var(--text-muted)' }}>🔍</span>
         </div>
 
         {/* Phase Filter */}
         <select
           value={selectedPhase || ''}
           onChange={e => setSelectedPhase(e.target.value || null)}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', cursor: 'pointer' }}
         >
           <option value="">All Phases</option>
           {phases.map(p => (
@@ -221,7 +221,7 @@ export default function ConstructionGuidePage({ profile, showToast }) {
         <select
           value={filterTestType}
           onChange={e => setFilterTestType(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', cursor: 'pointer' }}
         >
           <option value="all">All Test Types</option>
           <option value="field">Field Tests</option>
@@ -233,7 +233,7 @@ export default function ConstructionGuidePage({ profile, showToast }) {
         <select
           value={filterFidic}
           onChange={e => setFilterFidic(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', cursor: 'pointer' }}
         >
           <option value="all">All FIDIC Forms</option>
           <option value="red">Red Book (Employer-Designed)</option>
@@ -242,7 +242,7 @@ export default function ConstructionGuidePage({ profile, showToast }) {
         </select>
 
         {/* Hold Points Toggle */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-primary)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
           <input
             type="checkbox"
             checked={showHoldPointsOnly}
@@ -253,15 +253,15 @@ export default function ConstructionGuidePage({ profile, showToast }) {
         </label>
 
         {/* View Toggle */}
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #d1d5db' }}>
+        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
           {['phases', 'matrix'].map(v => (
             <button
               key={v}
               onClick={() => setViewMode(v)}
               style={{
                 padding: '6px 14px', fontSize: 13, border: 'none', cursor: 'pointer',
-                background: viewMode === v ? '#1f2937' : '#fff',
-                color: viewMode === v ? '#fff' : '#374151',
+                background: viewMode === v ? 'var(--accent)' : 'var(--bg-card)',
+                color: viewMode === v ? '#fff' : 'var(--text-primary)',
               }}
             >
               {v === 'phases' ? '📋 Phases' : '📊 Matrix'}
@@ -319,7 +319,7 @@ function PhasesView({ phases, actsByPhase, testsByActivity, matchesFilters, expa
 
         return (
           <div key={phase.id} style={{
-            background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb',
+            background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden'
           }}>
             {/* Phase Header */}
@@ -327,7 +327,7 @@ function PhasesView({ phases, actsByPhase, testsByActivity, matchesFilters, expa
               onClick={() => setExpandedPhase(isExpanded ? null : phase.id)}
               style={{
                 width: '100%', padding: '16px 20px', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 12, background: isExpanded ? '#f9fafb' : '#fff',
+                display: 'flex', alignItems: 'center', gap: 12, background: isExpanded ? 'var(--bg-hover)' : 'var(--bg-card)',
                 textAlign: 'left', transition: 'background 0.15s'
               }}
             >
@@ -340,14 +340,14 @@ function PhasesView({ phases, actsByPhase, testsByActivity, matchesFilters, expa
                   }}>
                     Phase {phase.phase_number}
                   </span>
-                  <span style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{phase.phase_name}</span>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{phase.phase_name}</span>
                 </div>
-                <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
                   {filteredActs.length} activities &bull; {totalTests} tests
                   {holdPoints > 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>🛑 {holdPoints} hold points</span>}
                 </div>
               </div>
-              <span style={{ fontSize: 18, color: '#9ca3af', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+              <span style={{ fontSize: 18, color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
             </button>
 
             {/* Phase Content */}
@@ -383,8 +383,8 @@ function ActivityCard({ activity, tests, isExpanded, onToggle, filterFidic }) {
 
   return (
     <div style={{
-      marginTop: 12, borderRadius: 10, border: '1px solid #e5e7eb',
-      overflow: 'hidden', background: '#fafafa'
+      marginTop: 12, borderRadius: 10, border: '1px solid var(--border)',
+      overflow: 'hidden', background: 'var(--bg-surface)'
     }}>
       {/* Activity Header */}
       <button
@@ -396,14 +396,14 @@ function ActivityCard({ activity, tests, isExpanded, onToggle, filterFidic }) {
         }}
       >
         <span style={{
-          fontSize: 11, fontWeight: 700, color: '#6b7280', background: '#e5e7eb',
+          fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-hover)',
           padding: '2px 8px', borderRadius: 8, flexShrink: 0, marginTop: 2
         }}>
           {activity.activity_number}
         </span>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{activity.activity_name}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{activity.activity_name}</span>
             {activity.hold_point && (
               <span style={{
                 fontSize: 10, fontWeight: 700, color: '#dc2626', background: '#fee2e2',
@@ -413,7 +413,7 @@ function ActivityCard({ activity, tests, isExpanded, onToggle, filterFidic }) {
               </span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>
             {activity.description}
           </div>
           {/* FIDIC + Kenya refs */}
@@ -438,8 +438,8 @@ function ActivityCard({ activity, tests, isExpanded, onToggle, filterFidic }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>{tests.length} tests</span>
-          <span style={{ fontSize: 14, color: '#9ca3af', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{tests.length} tests</span>
+          <span style={{ fontSize: 14, color: 'var(--text-muted)', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
         </div>
       </button>
 
@@ -465,12 +465,12 @@ function TestCard({ test }) {
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 8, padding: 14, border: '1px solid #e5e7eb',
+      background: 'var(--bg-card)', borderRadius: 8, padding: 14, border: '1px solid var(--border)',
       fontSize: 13
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 600, color: '#1f2937' }}>{test.test_name}</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{test.test_name}</span>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
             background: badge.bg, color: badge.color, border: `1px solid ${badge.border}`
@@ -486,7 +486,7 @@ function TestCard({ test }) {
             </span>
           )}
         </div>
-        <span style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '2px 8px', borderRadius: 6 }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 6 }}>
           {test.standard_reference}
         </span>
       </div>
@@ -494,22 +494,22 @@ function TestCard({ test }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 10 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#059669', marginBottom: 2 }}>Acceptance Criteria</div>
-          <div style={{ color: '#374151', lineHeight: 1.4 }}>{test.acceptance_criteria}</div>
+          <div style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>{test.acceptance_criteria}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#0891b2', marginBottom: 2 }}>Frequency</div>
-          <div style={{ color: '#374151' }}>{test.test_frequency}</div>
+          <div style={{ color: 'var(--text-primary)' }}>{test.test_frequency}</div>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 10, marginTop: 8 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', marginBottom: 2 }}>Equipment Required</div>
-          <div style={{ color: '#374151' }}>{test.equipment_required}</div>
+          <div style={{ color: 'var(--text-primary)' }}>{test.equipment_required}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', marginBottom: 2 }}>Failure Action</div>
-          <div style={{ color: '#374151', lineHeight: 1.4 }}>{test.failure_action}</div>
+          <div style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>{test.failure_action}</div>
         </div>
       </div>
     </div>
@@ -556,11 +556,11 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
   }, [phases, actsByPhase, testsByActivity, matchesFilters]);
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+            <tr style={{ background: 'var(--bg-surface)', borderBottom: '2px solid var(--border)' }}>
               <th style={thStyle}>Phase</th>
               <th style={thStyle}>Activity</th>
               <th style={thStyle}>Hold</th>
@@ -573,7 +573,7 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
                 <>
                   <th style={{ ...thStyle, ...fidTh, background: '#fee2e2' }}>Red</th>
                   <th style={{ ...thStyle, ...fidTh, background: '#fef9c3' }}>Yellow</th>
-                  <th style={{ ...thStyle, ...fidTh, background: '#e5e7eb' }}>Silver</th>
+                  <th style={{ ...thStyle, ...fidTh, background: 'var(--bg-hover)' }}>Silver</th>
                 </>
               ) : (
                 <th style={thStyle}>FIDIC Ref</th>
@@ -585,7 +585,7 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
             {allRows.map((row, i) => {
               const badge = row.test ? (TEST_TYPE_BADGES[row.test.test_type] || TEST_TYPE_BADGES.field) : null;
               return (
-                <tr key={i} style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-surface)' }}>
                   <td style={tdStyle}>
                     <span style={{ fontWeight: 500 }}>{row.phase.phase_number}. {row.phase.phase_name}</span>
                   </td>
@@ -596,7 +596,7 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
                     {row.activity.hold_point && <span style={{ color: '#dc2626' }}>🛑</span>}
                   </td>
                   <td style={tdStyle}>
-                    {row.test ? <span style={{ fontWeight: 500 }}>{row.test.test_name}</span> : <span style={{ color: '#9ca3af' }}>—</span>}
+                    {row.test ? <span style={{ fontWeight: 500 }}>{row.test.test_name}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     {badge && (
@@ -640,7 +640,7 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
         </table>
       </div>
       {allRows.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
           No matching records found. Try adjusting your filters.
         </div>
       )}
@@ -649,12 +649,12 @@ function MatrixView({ phases, actsByPhase, testsByActivity, matchesFilters, filt
 }
 
 const thStyle = {
-  padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151',
+  padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)',
   fontSize: 12, whiteSpace: 'nowrap', position: 'sticky', top: 0
 };
 
 const fidTh = { fontSize: 11, textAlign: 'center', minWidth: 60 };
 
 const tdStyle = {
-  padding: '10px 12px', verticalAlign: 'top', color: '#374151', lineHeight: 1.4
+  padding: '10px 12px', verticalAlign: 'top', color: 'var(--text-primary)', lineHeight: 1.4
 };

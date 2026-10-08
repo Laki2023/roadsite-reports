@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { ResponsiveContainer } from 'recharts';
 
 const STATUS_CONFIG = {
   submitted: { label: 'Submitted', color: '#6366f1', bg: '#6366f120' },

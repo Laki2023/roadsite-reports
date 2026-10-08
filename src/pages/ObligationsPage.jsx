@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
+import { LoadingSpinner } from '../components/SharedUI';
 
 const OB_TYPES = [
   'Performance Guarantee', 'Advance Payment Guarantee', 'Retention Guarantee',
@@ -20,6 +21,8 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
     obligation_type: 'Performance Guarantee', provider: '', amount: '',
     reference_no: '', expiry_date: '', issue_date: '', notes: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const canManage = profile?.is_platform_admin || hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => {
@@ -29,11 +32,21 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
 
   async function loadData() {
-    const { data } = await supabase.from('project_obligations')
-      .select('*')
-      .eq('project_id', selectedProject)
-      .order('display_order');
-    setObligations(data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase.from('project_obligations')
+        .select('*')
+        .eq('project_id', selectedProject)
+        .order('display_order');
+      if (err) throw err;
+      setObligations(data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load obligations: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSave() {
@@ -94,8 +107,15 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
   const warningCount = obligations.filter(o => { const d = daysUntil(o.expiry_date); return d !== null && d >= 0 && d <= 90; }).length;
   const validCount = obligations.filter(o => { const d = daysUntil(o.expiry_date); return d === null || d > 90; }).length;
 
+  if (loading) return <LoadingSpinner message="Loading obligations..." />;
+
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>🔒 Statutory Obligations</h2>

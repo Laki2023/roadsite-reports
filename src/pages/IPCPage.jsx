@@ -153,6 +153,10 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
   // ── Print / PDF ──
   function printIPC() {
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      showToast('Please allow popups for this site', 'error');
+      return;
+    }
     const ipc = selectedIpc; const p = projectData;
     const prevIpc = ipcs.find(i => i.ipc_no === ipc.ipc_no - 1);
     const previousGross = prevIpc ? prevIpc.gross_value : 0;

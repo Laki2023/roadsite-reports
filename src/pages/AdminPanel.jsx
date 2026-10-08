@@ -293,7 +293,7 @@ export default function AdminPanel({ profile, showToast }) {
                             <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, true)}>Revoke Super</button>
                           )}
                           <button className="btn btn-sm" style={{ background: '#dc2626', color: '#fff' }}
-                            onClick={() => updateRole(u.id, 'pm')}>Demote</button>
+                            onClick={() => updateRole(u.id, 'viewer')}>Demote</button>
                           <button className="btn btn-sm btn-danger" onClick={() => setConfirmDelete(u.id)}>Remove</button>
                         </div>
                       )}

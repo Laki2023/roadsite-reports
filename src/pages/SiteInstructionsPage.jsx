@@ -25,7 +25,7 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
   const [filter, setFilter] = useState('all');
   const [escalateModal, setEscalateModal] = useState(null);
   const [escalateReason, setEscalateReason] = useState('');
-  const [approvalNotes, setApprovalNotes] = useState('');
+  const [approvalNotes, setApprovalNotes] = useState({});
 
   const isPlatformAdmin = profile.is_platform_admin === true;
   const canIssue = isPlatformAdmin || hasRole(profile.role, 'resident_engineer');
@@ -82,12 +82,12 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
       status: isPlatformAdmin ? 'Overridden' : 'Approved',
       approved_by: profile.id,
       approved_at: new Date().toISOString(),
-      approval_notes: approvalNotes,
-      ...(isPlatformAdmin ? { overridden_by: profile.id, overridden_at: new Date().toISOString(), override_notes: approvalNotes } : {}),
+      approval_notes: approvalNotes[id] || '',
+      ...(isPlatformAdmin ? { overridden_by: profile.id, overridden_at: new Date().toISOString(), override_notes: approvalNotes[id] || '' } : {}),
     }).eq('id', id);
     if (error) { showToast(error.message, 'error'); return; }
     showToast(isPlatformAdmin ? 'Instruction overridden & approved' : 'Instruction approved');
-    setApprovalNotes('');
+    setApprovalNotes(prev => { const next = { ...prev }; delete next[id]; return next; });
     loadInstructions();
   }
 
@@ -96,11 +96,11 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
       status: 'Rejected',
       approved_by: profile.id,
       approved_at: new Date().toISOString(),
-      approval_notes: approvalNotes || 'Rejected',
+      approval_notes: approvalNotes[id] || 'Rejected',
     }).eq('id', id);
     if (error) { showToast(error.message, 'error'); return; }
     showToast('Instruction rejected');
-    setApprovalNotes('');
+    setApprovalNotes(prev => { const next = { ...prev }; delete next[id]; return next; });
     loadInstructions();
   }
 
@@ -299,8 +299,8 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {canUserApprove(si) && (
                       <>
-                        <input type="text" placeholder="Approval notes..." value={approvalNotes}
-                          onChange={e => setApprovalNotes(e.target.value)}
+                        <input type="text" placeholder="Approval notes..." value={approvalNotes[si.id] || ''}
+                          onChange={e => setApprovalNotes(prev => ({...prev, [si.id]: e.target.value}))}
                           style={{ padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 12, flex: 1, minWidth: 160 }} />
                         <button className="btn btn-sm btn-success" onClick={() => handleApprove(si.id)}>
                           {isPlatformAdmin ? '⚡ Override & Approve' : '✓ Approve'}
