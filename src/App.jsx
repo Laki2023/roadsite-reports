@@ -31,9 +31,12 @@ import TakingOffPage from './pages/TakingOffPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import ObligationsPage from './pages/ObligationsPage';
 import ConstructionGuidePage from './pages/ConstructionGuidePage';
+import SiteInstructionsPage from './pages/SiteInstructionsPage';
+import MegaDashboard from './pages/MegaDashboard';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
+  { key: 'mega-dashboard', label: 'Portfolio Analytics', icon: '📈', minRole: 'project_engineer' },
   { section: 'Projects' },
   { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'contractor_qs' },
   { section: 'Field Operations' },
@@ -53,6 +56,7 @@ const NAV_ITEMS = [
   { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'contractor_qs' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
+  { key: 'site-instructions', label: 'Site Instructions', icon: '📜', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
   { key: 'claims', label: 'Claims Management', icon: '⚖️', minRole: 'resident_engineer' },
   { key: 'key-personnel', label: 'Key Personnel', icon: '👥', minRole: 'inspector' },
@@ -206,6 +210,7 @@ export default function App() {
     const ctx = { profile, showToast, navigateTo, selectedProject, setSelectedProject };
     switch (page) {
       case 'dashboard': return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;
+      case 'mega-dashboard': return <MegaDashboard {...ctx} />;
       case 'projects': return <ProjectsPage {...ctx} />;
       case 'project-detail': return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => navigateTo('projects')} />;
       case 'submit-report': return <SubmitReport {...ctx} />;
@@ -222,6 +227,7 @@ export default function App() {
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;
+      case 'site-instructions': return <SiteInstructionsPage {...ctx} />;
       case 'monthly-report': return <MonthlyReportPage {...ctx} />;
       case 'programme': return <ProgrammePage {...ctx} />;
       case 'claims': return <ClaimsPage {...ctx} />;

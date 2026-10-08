@@ -2,12 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, hasRole, ROLE_LABELS } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, Legend } from 'recharts';
-
-const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
-const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
-const fmtB = (n) => { if (!n) return 'KES 0'; if (n>=1e9) return 'KES '+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return 'KES '+(n/1e6).toFixed(1)+'M'; return fmt(n); };
-const pct = (a,b) => b > 0 ? Math.round((a/b)*100) : 0;
-const daysBetween = (a,b) => { if(!a||!b) return 0; return Math.ceil((new Date(b)-new Date(a))/(86400000)); };
+import { COLORS, fmt, fmtB, pct, daysBetween } from '../components/SharedUI';
 
 function ScoreRing({ value, size=80, stroke=7, color, label, sublabel, grade }) {
   const r=(size-stroke)/2, c=2*Math.PI*r, p=Math.min(value,100)/100*c;

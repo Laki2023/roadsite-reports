@@ -139,7 +139,6 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     const { error } = await supabase.from('key_personnel').delete().eq('id', id);
     if (error) {
       showToast?.('❌ Delete failed: ' + error.message);
-      console.error('Delete error:', error);
       return;
     }
     showToast?.('🗑️ Removed');

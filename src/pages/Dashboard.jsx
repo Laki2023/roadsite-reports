@@ -3,113 +3,7 @@ import { supabase, hasRole, ROLE_LABELS } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, AreaChart, Area, RadialBarChart, RadialBar } from 'recharts';
 import ProjectDashboard from './ProjectDashboard';
-
-const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
-const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
-const fmtB = (n) => {
-  if (!n) return 'KES 0';
-  if (n >= 1e9) return 'KES ' + (n/1e9).toFixed(2) + ' B';
-  if (n >= 1e6) return 'KES ' + (n/1e6).toFixed(1) + ' M';
-  return 'KES ' + Number(n).toLocaleString();
-};
-const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
-const daysBetween = (a, b) => {
-  if (!a || !b) return 0;
-  return Math.ceil((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24));
-};
-
-// Health grade calculator
-function getHealthGrade(score) {
-  if (score >= 85) return { grade: 'A', label: 'Excellent', color: '#10b981' };
-  if (score >= 70) return { grade: 'B', label: 'Good', color: '#16a34a' };
-  if (score >= 55) return { grade: 'C', label: 'Fair', color: '#f59e0b' };
-  if (score >= 40) return { grade: 'D', label: 'At Risk', color: '#f97316' };
-  return { grade: 'F', label: 'Critical', color: '#ef4444' };
-}
-
-// Score ring component
-function ScoreRing({ value, max = 100, size = 72, stroke = 6, color, label, sublabel }) {
-  const radius = (size - stroke) / 2;
-  const circ = 2 * Math.PI * radius;
-  const progress = max > 0 ? (value / max) * circ : 0;
-  const autoColor = color || (value >= 80 ? '#10b981' : value >= 60 ? '#f59e0b' : '#ef4444');
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="var(--border)" strokeWidth={stroke} opacity={0.3} />
-          <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={autoColor} strokeWidth={stroke}
-            strokeDasharray={`${progress} ${circ - progress}`} strokeLinecap="round" style={{ transition: 'stroke-dasharray 1s ease' }} />
-        </svg>
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-          <div style={{ fontSize: size * 0.22, fontWeight: 800, color: autoColor }}>{value}</div>
-          {max !== 100 && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>/{max}</div>}
-        </div>
-      </div>
-      {label && <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>{label}</div>}
-      {sublabel && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sublabel}</div>}
-    </div>
-  );
-}
-
-// KPI Card
-function KPICard({ title, value, subtitle, icon, trend, trendLabel, color, onClick, borderColor }) {
-  const trendColor = trend > 0 ? '#10b981' : trend < 0 ? '#ef4444' : '#6b7280';
-  return (
-    <div className="card" onClick={onClick}
-      style={{ padding: '16px 18px', cursor: onClick ? 'pointer' : 'default', borderTop: `3px solid ${borderColor || '#e87b35'}`,
-        transition: 'transform 0.15s', position: 'relative', overflow: 'hidden' }}
-      onMouseEnter={e => onClick && (e.currentTarget.style.transform = 'translateY(-2px)')}
-      onMouseLeave={e => (e.currentTarget.style.transform = '')}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: color || 'var(--text)', marginTop: 4 }}>{value}</div>
-          {subtitle && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>}
-        </div>
-        {icon && <div style={{ fontSize: 28, opacity: 0.15, position: 'absolute', right: 14, top: 14 }}>{icon}</div>}
-      </div>
-      {trend != null && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11 }}>
-          <span style={{ color: trendColor, fontWeight: 700 }}>{trend > 0 ? '▲' : trend < 0 ? '▼' : '●'} {Math.abs(trend)}%</span>
-          {trendLabel && <span style={{ color: 'var(--text-muted)' }}>{trendLabel}</span>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Progress bar with label
-function ProgressRow({ label, value, max = 100, color = '#e87b35' }) {
-  const p = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-        <span style={{ fontWeight: 500 }}>{label}</span>
-        <span style={{ fontWeight: 700, color }}>{p.toFixed(0)}%</span>
-      </div>
-      <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${p}%`, background: color, borderRadius: 3, transition: 'width 1s ease' }} />
-      </div>
-    </div>
-  );
-}
-
-// Status badge
-function StatusBadge({ status, size = 'sm' }) {
-  const colors = {
-    'On Track': '#10b981', 'Behind': '#f59e0b', 'Critical': '#ef4444', 'Ahead': '#2563eb',
-    'Active': '#10b981', 'Completed': '#6b7280', 'Suspended': '#ef4444',
-  };
-  const c = colors[status] || '#6b7280';
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 9999,
-      fontSize: size === 'sm' ? 10 : 12, fontWeight: 700, background: c + '18', color: c, border: `1px solid ${c}40` }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: c }} />
-      {status}
-    </span>
-  );
-}
+import { COLORS, fmt, fmtB, pct, daysBetween, getHealthGrade, ScoreRing, KPICard, ProgressRow, StatusBadge } from '../components/SharedUI';
 
 export default function Dashboard({ profile, navigateTo, activeEmergencies = [] }) {
   const [stats, setStats] = useState({});
@@ -156,7 +50,6 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     const errors = [];
     Object.entries(resultMap).forEach(([table, res]) => {
       if (res.error) {
-        console.error(`Dashboard query failed [${table}]:`, res.error.message);
         errors.push(`${table}: ${res.error.message}`);
       }
     });

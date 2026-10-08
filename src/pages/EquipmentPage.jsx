@@ -21,21 +21,36 @@ export default function EquipmentPage({ profile, showToast, selectedProject: pro
   const [addForm, setAddForm] = useState({ equipment_name: '', equipment_type: 'Excavator', specification: '', required_quantity: 1, actual_on_site: 0, is_key_equipment: false, notes: '' });
   const [statusForm, setStatusForm] = useState({ status_date: new Date().toISOString().split('T')[0], status: 'Operational', hours_worked: 0, location_chainage: '', operator: '', fuel_litres: '', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const canManage = hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => {
-    supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || []));
+    supabase.from('projects').select('id, name').order('name')
+      .then(({ data }) => setProjects(data || []))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
 
   async function loadData() {
-    const [eqRes, dsRes] = await Promise.all([
-      supabase.from('equipment_register').select('*').eq('project_id', selectedProject).order('equipment_type'),
-      supabase.from('equipment_daily_status').select('*, equip:equipment_id(equipment_name, equipment_type), reporter:reported_by(full_name)')
-        .eq('project_id', selectedProject).order('status_date', { ascending: false }).limit(50),
-    ]);
-    setEquipment(eqRes.data || []);
-    setDailyStatus(dsRes.data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const [eqRes, dsRes] = await Promise.all([
+        supabase.from('equipment_register').select('*').eq('project_id', selectedProject).order('equipment_type'),
+        supabase.from('equipment_daily_status').select('*, equip:equipment_id(equipment_name, equipment_type), reporter:reported_by(full_name)')
+          .eq('project_id', selectedProject).order('status_date', { ascending: false }).limit(50),
+      ]);
+      if (eqRes.error) throw eqRes.error;
+      if (dsRes.error) throw dsRes.error;
+      setEquipment(eqRes.data || []);
+      setDailyStatus(dsRes.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load equipment data');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addEquipment(e) {
@@ -71,12 +86,23 @@ export default function EquipmentPage({ profile, showToast, selectedProject: pro
   const keyEquipment = equipment.filter(e => e.is_key_equipment);
   const deficient = equipment.filter(e => e.actual_on_site < e.required_quantity);
 
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+      <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>◈</div>
+      <div>Loading...</div>
+    </div>
+  );
+
   return (
     <div>
       <div className="page-header">
         <div><h2>Equipment Register</h2><div className="subtitle">Contract requirements vs actual deployment</div></div>
         {selectedProject && canManage && <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add Equipment</button>}
       </div>
+
+      {error && (
+        <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', marginBottom: 16 }}>⚠️ Failed to load data: {error}</div>
+      )}
 
       <div className="form-group mb-16" style={{ maxWidth: 400 }}>
         <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} style={{ fontSize: 14 }}>

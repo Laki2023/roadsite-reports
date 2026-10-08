@@ -160,7 +160,6 @@ export async function autoGenerateProgramme(projectId, project, activities, prof
   // 4. Insert all items
   const { error } = await supabase.from('programme_items').insert(items);
   if (error) {
-    console.error('Auto-generate error:', error);
     throw error;
   }
 

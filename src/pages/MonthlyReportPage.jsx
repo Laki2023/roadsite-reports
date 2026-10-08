@@ -68,7 +68,6 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
         recommendations: data.narrative.recommendations || '',
       });
     } catch (err) {
-      console.error(err);
       showToast?.('Error loading report data');
     }
     setLoading(false);
@@ -100,7 +99,6 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
     }
 
     if (error) {
-      console.error(error);
       showToast?.('Error saving narratives');
     } else {
       showToast?.('✅ Narratives saved');
@@ -125,7 +123,6 @@ export default function MonthlyReportPage({ profile, showToast, selectedProject:
         showToast?.(`✅ Word document downloaded: ${fileName}`);
       }
     } catch (err) {
-      console.error('Export error:', err);
       showToast?.(`Export failed: ${err.message}`);
     }
     setGenerating('');

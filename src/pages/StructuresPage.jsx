@@ -39,24 +39,41 @@ export default function StructuresPage({ profile, showToast, selectedProject: pr
   const [addForm, setAddForm] = useState({ structure_type: 'Box Culvert', structure_ref: '', chainage: '', side: 'CL', dimensions: '', span_m: '', height_m: '', width_m: '', length_m: '', no_of_cells: 1, drawing_ref: '', concrete_grade: 'C25/30', foundation_type: '', notes: '' });
   const [progressForm, setProgressForm] = useState({ stage: '', status: 'Completed', work_date: new Date().toISOString().split('T')[0], quantity: '', unit: '', concrete_volume_m3: '', rebar_kg: '', gang_size: 0, materials_used: '', equipment_used: '', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const canManage = hasRole(profile?.role, 'resident_engineer');
 
-  useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
+  useEffect(() => {
+    supabase.from('projects').select('id, name').order('name')
+      .then(({ data }) => setProjects(data || []))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
 
   async function loadData() {
-    const [strRes, progRes] = await Promise.all([
-      supabase.from('structures').select('*').eq('project_id', selectedProject).order('chainage'),
-      supabase.from('structure_progress').select('*, reporter:reported_by(full_name)')
-        .eq('project_id', selectedProject).order('work_date', { ascending: false }),
-    ]);
-    setStructures(strRes.data || []);
-    const grouped = {};
-    (progRes.data || []).forEach(p => {
-      if (!grouped[p.structure_id]) grouped[p.structure_id] = [];
-      grouped[p.structure_id].push(p);
-    });
-    setProgressData(grouped);
+    setLoading(true);
+    setError(null);
+    try {
+      const [strRes, progRes] = await Promise.all([
+        supabase.from('structures').select('*').eq('project_id', selectedProject).order('chainage'),
+        supabase.from('structure_progress').select('*, reporter:reported_by(full_name)')
+          .eq('project_id', selectedProject).order('work_date', { ascending: false }),
+      ]);
+      if (strRes.error) throw strRes.error;
+      if (progRes.error) throw progRes.error;
+      setStructures(strRes.data || []);
+      const grouped = {};
+      (progRes.data || []).forEach(p => {
+        if (!grouped[p.structure_id]) grouped[p.structure_id] = [];
+        grouped[p.structure_id].push(p);
+      });
+      setProgressData(grouped);
+    } catch (err) {
+      setError(err.message || 'Failed to load structures data');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addStructure(e) {
@@ -111,12 +128,23 @@ export default function StructuresPage({ profile, showToast, selectedProject: pr
   const typeSummary = {};
   structures.forEach(s => { typeSummary[s.structure_type] = (typeSummary[s.structure_type] || 0) + 1; });
 
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+      <div style={{ fontSize: 28, color: 'var(--accent)', marginBottom: 12 }}>◈</div>
+      <div>Loading...</div>
+    </div>
+  );
+
   return (
     <div>
       <div className="page-header">
         <div><h2>🌉 Structures</h2><div className="subtitle">Culverts, bridges, gabions, retaining walls & drainage structures</div></div>
         {selectedProject && canManage && <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add Structure</button>}
       </div>
+
+      {error && (
+        <div style={{ padding: '12px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#991b1b', marginBottom: 16 }}>⚠️ Failed to load data: {error}</div>
+      )}
 
       <div className="form-group mb-16" style={{ maxWidth: 400 }}>
         <select value={selectedProject} onChange={e => { setSelectedProject(e.target.value); setSelectedStructure(null); setTab('list'); }} style={{ fontSize: 14 }}>

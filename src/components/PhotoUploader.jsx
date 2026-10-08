@@ -257,7 +257,6 @@ export async function uploadReportPhotos(photos, projectId, reportId, profile, r
         });
 
       if (uploadError) {
-        console.error('Photo upload error:', uploadError);
         continue;
       }
 
@@ -277,13 +276,11 @@ export async function uploadReportPhotos(photos, projectId, reportId, profile, r
       });
 
       if (insertError) {
-        console.error('Photo record error:', insertError);
         continue;
       }
 
       uploaded++;
     } catch (err) {
-      console.error('Photo processing error:', err);
     }
   }
 
@@ -301,7 +298,6 @@ export async function getPhotoUrl(filePath) {
     .createSignedUrl(filePath, 3600);
   
   if (error) {
-    console.error('Signed URL error:', error);
     return null;
   }
   return data.signedUrl;

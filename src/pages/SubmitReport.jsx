@@ -493,7 +493,6 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         }));
       }
     } catch (err) {
-      console.warn('Weather auto-detect failed (non-critical):', err.message);
     } finally {
       setMetLoading(false);
     }
@@ -872,7 +871,6 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
       setSubmitted(true);
       if (warnings.length > 0) {
-        console.error('Report submitted with warnings:', warnings);
         showToast(`⚠️ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
       } else {
         showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);

@@ -45,7 +45,6 @@ export async function syncWorksActivity(projectId, activityId, activityName, cat
         .single();
 
       if (createErr) {
-        console.error('syncWorksActivity: failed to create activity:', createErr.message);
         return null;
       }
       activityId = created.id;
@@ -62,7 +61,6 @@ export async function syncWorksActivity(projectId, activityId, activityName, cat
     .eq('activity_id', activityId);
 
   if (fetchErr) {
-    console.error('syncWorksActivity: failed to fetch progress:', fetchErr.message);
     return activityId;
   }
 
@@ -98,7 +96,6 @@ export async function syncWorksActivity(projectId, activityId, activityName, cat
     .eq('id', activityId);
 
   if (updateErr) {
-    console.error('syncWorksActivity: failed to update activity:', updateErr.message);
   }
 
   return activityId;

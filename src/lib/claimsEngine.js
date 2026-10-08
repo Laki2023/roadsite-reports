@@ -278,7 +278,6 @@ export async function detectClaimTriggers(projectId, month) {
         });
       }
     } catch (err) {
-      console.error(`Detection rule ${rule.id} failed:`, err);
     }
   }
 
