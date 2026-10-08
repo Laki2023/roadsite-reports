@@ -29,6 +29,7 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
   });
   const [showClaimDetail, setShowClaimDetail] = useState(null);
   const [detailTab, setDetailTab] = useState('overview');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Access control
   const isPlatformAdmin = profile?.is_platform_admin === true;
@@ -235,6 +236,15 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
             {/* CLAIMS REGISTER */}
             {activeTab === 'register' && (
               <div>
+                <div style={{ marginBottom: 14 }}>
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ flex: 1, minWidth: 200 }}
+                  />
+                </div>
                 {claims.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>⚖️</div>
@@ -250,7 +260,11 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
                         ))}</tr>
                       </thead>
                       <tbody>
-                        {claims.map((c, ri) => (
+                        {claims.filter(c => {
+                          if (!searchTerm) return true;
+                          const s = searchTerm.toLowerCase();
+                          return (c.title || '').toLowerCase().includes(s) || (c.claim_number || '').toLowerCase().includes(s);
+                        }).map((c, ri) => (
                           <tr key={c.id} style={{ background: ri % 2 ? 'var(--bg-hover)' : 'transparent', cursor: 'pointer' }}
                             onClick={() => setShowClaimDetail(c)}>
                             <td style={{ padding: '6px 8px', fontWeight: 700 }}>{c.claim_number}</td>

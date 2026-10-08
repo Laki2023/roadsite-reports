@@ -45,6 +45,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html { scroll-behavior: smooth; }
+
 /* ─── Layout Shell ─── */
 .app-shell { display: flex; min-height: 100vh; }
 
@@ -147,6 +149,14 @@ body {
   .sidebar-overlay.open { display: block; }
   .mobile-header { display: flex; }
   .main-content { margin-left: 0; padding: 72px 16px 24px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .filter-bar { flex-direction: column; }
+  .filter-bar input, .filter-bar select { min-width: 100%; }
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .btn-group { width: 100%; }
+  .modal { max-height: 90vh; margin: 10px; }
+  .modal-overlay { padding: 10px; }
 }
 
 /* ─── Page Headers ─── */
@@ -277,6 +287,12 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 textarea { resize: vertical; min-height: 80px; }
 select option { background: var(--bg-card); }
 
@@ -304,6 +320,13 @@ select option { background: var(--bg-card); }
 .btn-success { background: var(--success-dim); color: var(--success); }
 .btn-success:hover { background: var(--success); color: #fff; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.btn:disabled, .btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ─── Badges ─── */
@@ -513,6 +536,9 @@ select option { background: var(--bg-card); }
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
 
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
 /* ═══ EMERGENCY SYSTEM ═══ */
 @keyframes emergencyPulse {
   0%, 100% { opacity: 1; }
@@ -602,6 +628,12 @@ select option { background: var(--bg-card); }
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ─── Print styles ─── */
 @media print {

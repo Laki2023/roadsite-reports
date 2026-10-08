@@ -245,6 +245,7 @@ export default function AuthPage({ showToast }) {
                   <div style={{ background: '#ef444415', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 16, border: '1px solid #ef444430' }}>{error}</div>
                 )}
 
+                <form onSubmit={(e) => { e.preventDefault(); handleResetPassword(); }}>
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>New password</label>
                   <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inputStyle} placeholder="Min 6 characters" />
@@ -271,10 +272,11 @@ export default function AuthPage({ showToast }) {
                   )}
                 </div>
 
-                <button className="btn btn-primary" onClick={handleResetPassword} disabled={loading || !newPassword || newPassword !== confirmPassword}
+                <button type="submit" className="btn btn-primary" disabled={loading || !newPassword || newPassword !== confirmPassword}
                   style={{ width: '100%', padding: 12, fontSize: 14, opacity: (!newPassword || newPassword !== confirmPassword) ? 0.5 : 1 }}>
                   {loading ? '⏳ Updating...' : '🔐 Update password'}
                 </button>
+                </form>
               </>
             )}
           </div>
@@ -306,6 +308,7 @@ export default function AuthPage({ showToast }) {
                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#3b82f615', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24 }}>🔐</div>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Secure sign in</h2>
               </div>
+              <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} placeholder="you@example.com" required />
@@ -318,9 +321,10 @@ export default function AuthPage({ showToast }) {
                 <span onClick={() => { setShowForgotPassword(true); setResetEmail(email); setError(''); }}
                   style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontWeight: 500 }}>Forgot password?</span>
               </div>
-              <button className="btn btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: '100%', padding: 12, fontSize: 14 }}>
+              <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', padding: 12, fontSize: 14 }}>
                 {loading ? '⏳ Signing in...' : 'Sign in'}
               </button>
+              </form>
 
               {/* Security badges */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 16, padding: '10px 0', borderTop: '1px solid var(--border)' }}>
@@ -350,15 +354,17 @@ export default function AuthPage({ showToast }) {
                 </div>
               ) : (
                 <>
+                  <form onSubmit={(e) => { e.preventDefault(); handleForgotPassword(); }}>
                   <div style={{ marginBottom: 16 }}>
                     <label style={labelStyle}>Email address</label>
                     <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} style={inputStyle} placeholder="you@example.com" />
                   </div>
-                  <button className="btn btn-primary" onClick={handleForgotPassword} disabled={loading}
+                  <button type="submit" className="btn btn-primary" disabled={loading}
                     style={{ width: '100%', padding: 12, fontSize: 14, marginBottom: 12 }}>
                     {loading ? '⏳ Sending...' : '📧 Send reset link'}
                   </button>
-                  <button className="btn btn-secondary" onClick={() => { setShowForgotPassword(false); setError(''); }}
+                  </form>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setShowForgotPassword(false); setError(''); }}
                     style={{ width: '100%', padding: 10 }}>← Back to sign in</button>
                 </>
               )}
@@ -382,6 +388,7 @@ export default function AuthPage({ showToast }) {
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', textAlign: 'center' }}>Create your account</h2>
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', margin: '0 0 20px' }}>Step 1 of 3 — Login credentials</p>
 
+                  <form onSubmit={(e) => { e.preventDefault(); if (!fullName || !email || !password) { setError('Name, email and password are required'); return; } setError(''); setStep(2); }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 10, marginBottom: 14 }}>
                     <div>
                       <label style={labelStyle}>Title</label>
@@ -419,8 +426,9 @@ export default function AuthPage({ showToast }) {
                     <label style={labelStyle}>Phone number</label>
                     <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} placeholder="+254 7XX XXX XXX" />
                   </div>
-                  <button className="btn btn-primary" onClick={() => { if (!fullName || !email || !password) { setError('Name, email and password are required'); return; } setError(''); setStep(2); }}
+                  <button type="submit" className="btn btn-primary"
                     style={{ width: '100%', padding: 12, fontSize: 14 }}>Next — Select your party →</button>
+                  </form>
                 </div>
               )}
 

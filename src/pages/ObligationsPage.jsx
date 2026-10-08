@@ -23,6 +23,7 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const canManage = profile?.is_platform_admin || hasRole(profile?.role, 'resident_engineer');
 
   useEffect(() => {
@@ -139,6 +140,16 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
 
       {selectedProject && (
         <>
+          <div className="filter-bar" style={{ marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ flex: 1, minWidth: 200 }}
+            />
+          </div>
+
           {/* Summary strip */}
           {obligations.length > 0 && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -189,7 +200,11 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
                   </tr>
                 </thead>
                 <tbody>
-                  {obligations.map(ob => {
+                  {obligations.filter(ob => {
+                    if (!searchTerm) return true;
+                    const s = searchTerm.toLowerCase();
+                    return (ob.obligation_type || '').toLowerCase().includes(s) || (ob.notes || '').toLowerCase().includes(s) || (ob.provider || '').toLowerCase().includes(s);
+                  }).map(ob => {
                     const days = daysUntil(ob.expiry_date);
                     const isExpired = days !== null && days < 0;
                     const isWarning = days !== null && days >= 0 && days <= 90;

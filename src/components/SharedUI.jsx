@@ -191,3 +191,27 @@ export function Grid({ cols = 4, gap = 16, children, style = {} }) {
     </div>
   );
 }
+
+// ── Confirm Dialog ──
+export function ConfirmDialog({ open, title = 'Confirm', message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', variant = 'danger', onConfirm, onCancel }) {
+  if (!open) return null;
+  const colors = { danger: 'var(--danger)', warning: 'var(--warning)', info: 'var(--info)' };
+  const bgColors = { danger: 'var(--danger-dim)', warning: 'var(--warning-dim)', info: 'var(--info-dim)' };
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, padding: 24 }}>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: bgColors[variant] || bgColors.danger, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22 }}>
+            {variant === 'danger' ? '⚠️' : variant === 'warning' ? '⚡' : 'ℹ️'}
+          </div>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>{title}</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>{message}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={onCancel} style={{ flex: 1, justifyContent: 'center' }}>{cancelLabel}</button>
+          <button className={`btn ${variant === 'danger' ? 'btn-danger' : 'btn-primary'}`} onClick={onConfirm} style={{ flex: 1, justifyContent: 'center' }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

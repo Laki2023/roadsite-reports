@@ -21,6 +21,7 @@ export default function StaffPage({ profile, showToast }) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => { loadAll(); }, []);
 
@@ -156,13 +157,27 @@ export default function StaffPage({ profile, showToast }) {
       </div>
 
       {tab === 'staff' && (
+        <>
+        <div className="filter-bar">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ flex: 1, minWidth: 200 }}
+          />
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr><th>Name</th><th>Email</th><th>Designation</th><th>System Role</th><th>Reports To</th><th></th></tr>
             </thead>
             <tbody>
-              {staff.map(s => (
+              {staff.filter(s => {
+                if (!searchTerm) return true;
+                const q = searchTerm.toLowerCase();
+                return (s.full_name || '').toLowerCase().includes(q) || (s.designation || '').toLowerCase().includes(q);
+              }).map(s => (
                 <tr key={s.id}>
                   <td style={{ fontWeight: 500 }}>{s.full_name}</td>
                   <td className="text-sm">{s.email}</td>
@@ -197,6 +212,7 @@ export default function StaffPage({ profile, showToast }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {tab === 'hierarchy' && (

@@ -87,6 +87,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
   const [showAttendance, setShowAttendance] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendance, setAttendance] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => { loadProjects(); }, []);
   useEffect(() => { if (selectedProject) loadPersonnel(); }, [selectedProject]);
@@ -203,7 +204,11 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
     return { total: personnel.length, active: active.length, byParty, pendingConsent, onSite };
   }, [personnel]);
 
-  const filtered = activeTab === 'all' ? personnel : personnel.filter(p => p.party === activeTab);
+  const filtered = (activeTab === 'all' ? personnel : personnel.filter(p => p.party === activeTab)).filter(p => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    return (p.name || '').toLowerCase().includes(s) || (p.position_title || '').toLowerCase().includes(s);
+  });
 
   const emptyItem = {
     name: '', title_prefix: '', party: 'contractor', position_title: '', qualifications: '',
@@ -294,6 +299,17 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
             </div>
           ) : (
             <>
+              {/* Search */}
+              <div style={{ marginBottom: 14 }}>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  style={{ flex: 1, minWidth: 200 }}
+                />
+              </div>
+
               {/* Party Filter Tabs */}
               <div style={{ display: 'flex', gap: 2, marginBottom: 14, overflowX: 'auto', borderBottom: '2px solid var(--border)' }}>
                 <TabBtn label="All" count={personnel.length} active={activeTab === 'all'} onClick={() => setActiveTab('all')} />

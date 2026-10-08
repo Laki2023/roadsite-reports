@@ -17,6 +17,7 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
   const [saving, setSaving] = useState(false);
   const [filterSev, setFilterSev] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [staff, setStaff] = useState([]);
   const [assignTo, setAssignTo] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,6 +109,14 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
   const filtered = issues.filter(iss => {
     if (filterSev !== 'all' && iss.severity !== filterSev) return false;
     if (filterStatus !== 'all' && iss.status !== filterStatus) return false;
+    if (searchTerm) {
+      const s = searchTerm.toLowerCase();
+      const matchDesc = (iss.description || '').toLowerCase().includes(s);
+      const matchTitle = (iss.title || '').toLowerCase().includes(s);
+      const matchChainage = (iss.chainage_from != null ? String(iss.chainage_from) : '').includes(s)
+        || (iss.chainage_to != null ? String(iss.chainage_to) : '').includes(s);
+      if (!matchDesc && !matchTitle && !matchChainage) return false;
+    }
     return true;
   });
 
@@ -142,6 +151,13 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
         </select>
         {projectId && (
           <>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ flex: 1, minWidth: 200 }}
+            />
             <select value={filterSev} onChange={e => setFilterSev(e.target.value)}>
               <option value="all">All Severities</option>
               {['Critical', 'High', 'Medium', 'Low'].map(s => <option key={s}>{s}</option>)}
