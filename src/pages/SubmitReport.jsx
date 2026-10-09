@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, hasRole, ROLE_LABELS, INSTRUCTION_TYPES } from '../lib/supabase';
-import PhotoUploader, { uploadReportPhotos } from '../components/PhotoUploader';
+import PhotoUploader from '../components/PhotoUploader';
 import {
   WEATHER_OPTIONS,
   EQUIPMENT_LIST, EQUIPMENT_STATUS_OPTIONS, EQUIPMENT_CATEGORIES,
@@ -10,12 +10,12 @@ import {
   MATERIALS_LIST,
   ISSUE_CATEGORIES as REF_ISSUE_CATEGORIES,
 } from '../data/referenceData';
-import { syncWorksActivity } from '../lib/syncWorksActivity';
 import { parseChainage, fmtChainage } from '../lib/utils';
 import {
   saveToLocalStorage, loadFromLocalStorage, clearLocalStorage,
   saveServerDraft, recoverDraft, clearAllDrafts,
 } from '../lib/autosave';
+import { submitDailyReport } from '../lib/submitReport';
 import NilReturnToggle, { NilSummaryBadge } from '../components/NilReturnToggle';
 
 // ── Constants ──
@@ -741,255 +741,57 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
 
-  // ── Submit — CANONICAL column names only ──
+  // ── Submit — delegates to submitDailyReport fan-out module ──
   async function handleSubmit() {
     if (!selectedProject) { showToast('Select a project first', 'error'); return; }
     setSaving(true);
 
     try {
-      const warnings = [];
-      // 1. Daily Report — CANONICAL columns (no dual-write)
-      const reportData = {
-        project_id: selectedProject,
-        submitted_by: profile.id,
-        report_date: form.report_date,
-        weather: form.weather,
-        max_temp_c: form.max_temp_c ? parseFloat(form.max_temp_c) : null,
-        min_temp_c: form.min_temp_c ? parseFloat(form.min_temp_c) : null,
-        rainfall_mm: form.rainfall_mm ? parseFloat(form.rainfall_mm) : null,
-        working_hours: parseFloat(form.working_hours) || 0,
-        contractor_labour_skilled: parseInt(form.contractor_labour_skilled) || 0,
-        contractor_labour_unskilled: parseInt(form.contractor_labour_unskilled) || 0,
-        subcontractor_labour: parseInt(form.subcontractor_labour) || 0,
-        work_done: form.work_done || null,
-        quality_observations: form.quality_observations || null,
-        challenges: form.challenges || null,
-        visitors: form.visitors || null,
-        safety_incidents: form.safety_incidents || null,
-        urgent_flag: form.urgent_flag || false,
-        progress_pct: 0,
-        // Met station data stored for cross-reference (claims analysis, audit trail)
-        met_weather: metWeather?.weather || null,
-        met_temp_c: metWeather?.temp || null,
-        met_rainfall_mm: metWeather?.rainfall || null,
-        weather_source: weatherOverride ? 'inspector_override' : metWeather ? 'met_prefill_confirmed' : 'manual',
-      };
-      const { data: report, error: repErr } = await supabase.from('daily_reports').insert(reportData).select().single();
-      if (repErr) throw repErr;
-
-      // 2. Works Progress — linked to project activity register where possible
-      // Component takes priority: if inspector selected a component, that's where progress tracks.
-      for (const w of worksEntries) {
-        if (!w.layer_name) continue;
-        // Resolve: component_id > activity_id > name-match
-        let actId = w.component_id || w.activity_id || null;
-        if (!actId) {
-          const match = activities.find(a => a.activity_name.toLowerCase() === w.layer_name.toLowerCase());
-          if (match) actId = match.id;
-        }
-        const linkedAct = actId ? activities.find(a => a.id === actId) : null;
-        const unit = linkedAct?.unit || (WORK_LAYERS.find(l => l.name === w.layer_name)?.unit) || 'Km';
-        const isLinear = unit === 'Km' || unit === 'km';
-        const chFrom = parseChainage(w.start_chainage);
-        const chTo = parseChainage(w.end_chainage);
-        const rawLength = isLinear && chFrom != null && chTo != null
-          ? Math.abs(chTo - chFrom) : null;
-        // Side factor: half-width for carriageway activities worked one side only.
-        // Raw chainage is stored untouched — only the synced quantity carries the factor.
-        const sf = isLinear ? sideFactor(w.layer_name, w.side || 'Both') : { factor: 1, label: null };
-        const autoQty = rawLength != null
-          ? rawLength * sf.factor
-          : parseFloat(w.quantity) || 0;
-        const sideTag = sf.label && sf.factor !== 1
-          ? ` (${sf.label}: ${rawLength?.toFixed(3)} Km × 0.5 = ${autoQty.toFixed(3)} Km eq.)`
-          : '';
-        // Flag overlaps in the record so the RE sees them during review/measurement
-        const subOverlaps = actId ? findOverlaps(recentProgress, actId, chFrom, chTo, w.side || 'Both') : [];
-        const overlapTag = subOverlaps.length > 0
-          ? ` [⚠ OVERLAPS prior entry ${fmtChainage(subOverlaps[0].start_chainage)}→${fmtChainage(subOverlaps[0].end_chainage)} of ${subOverlaps[0].work_date} — verify at measurement]`
-          : '';
-        const { error: wpErr } = await supabase.from('works_progress').insert({
-          project_id: selectedProject, activity_id: actId,
-          daily_report_id: report.id,
-          work_date: form.report_date, start_chainage: chFrom || 0,
-          end_chainage: chTo || 0, side: w.side || 'Both',
-          quantity: autoQty, notes: w.layer_name + (w.notes ? ' — ' + w.notes : '') + sideTag + overlapTag,
-          reported_by: profile.id,
-        });
-        if (wpErr) warnings.push(`Works "${w.layer_name}": ${wpErr.message}`);
-        // Sync works_activities so Dashboard Physical Progress updates
-        if (!wpErr && actId) {
-          await syncWorksActivity(selectedProject, actId);
-        }
-      }
-
-      // 3. Equipment Status — auto-register items from reference list
-      for (const eq of equipEntries) {
-        if (!eq.equipment_id && !eq.equipment_name) continue;
-        let eqId = eq.equipment_id;
-        // If picked from reference list (no project equipment_id), auto-register it
-        if (!eqId && eq.equipment_name) {
-          const existing = equipment.find(e => e.equipment_name === eq.equipment_name);
-          if (existing) {
-            eqId = existing.id;
-          } else {
-            const { data: newEq, error: eqErr } = await supabase.from('equipment_register').insert({
-              project_id: selectedProject, equipment_name: eq.equipment_name,
-              equipment_type: eq.equipment_name, actual_on_site: 1, required_quantity: 1,
-            }).select('id').single();
-            if (eqErr) { warnings.push(`Equipment "${eq.equipment_name}": ${eqErr.message}`); continue; }
-            if (newEq) eqId = newEq.id;
-          }
-        }
-        if (eqId) {
-          const { error: esErr } = await supabase.from('equipment_daily_status').upsert({
-            equipment_id: eqId, project_id: selectedProject,
-            status_date: form.report_date, status: eq.status,
-            hours_worked: parseFloat(eq.hours_worked) || 0,
-            notes: eq.notes || null, reported_by: profile.id,
-          }, { onConflict: 'equipment_id,status_date' });
-          if (esErr) warnings.push(`Equipment status: ${esErr.message}`);
-        }
-      }
-
-      // 4. Structures — auto-register items from reference list
-      for (const s of structEntries) {
-        if ((!s.structure_id && !s.structure_name) || !s.stage) continue;
-        let strId = s.structure_id;
-        // If picked from reference list (no project structure_id), auto-register it
-        if (!strId && s.structure_name) {
-          const existing = structures.find(st => st.structure_type === s.structure_name);
-          if (existing) {
-            strId = existing.id;
-          } else {
-            const strRef = s.structure_name.substring(0, 15).replace(/[^a-zA-Z0-9]/g, '') + '-' + Date.now().toString().slice(-4);
-            const { data: newStr, error: strErr } = await supabase.from('structures').insert({
-              project_id: selectedProject, structure_ref: strRef,
-              structure_type: s.structure_name, chainage: 0,
-              overall_status: 'In Progress', percent_complete: 0,
-            }).select('id').single();
-            if (strErr) { warnings.push(`Structure "${s.structure_name}": ${strErr.message}`); continue; }
-            if (newStr) strId = newStr.id;
-          }
-        }
-        if (strId) {
-          const { error: spErr } = await supabase.from('structure_progress').insert({
-            structure_id: strId, project_id: selectedProject,
-            stage: s.stage, status: s.status, work_date: form.report_date,
-            concrete_volume_m3: s.concrete_volume_m3 ? parseFloat(s.concrete_volume_m3) : null,
-            rebar_kg: s.rebar_kg ? parseFloat(s.rebar_kg) : null,
-            notes: s.notes || null, reported_by: profile.id,
-          });
-          if (spErr) warnings.push(`Structure progress: ${spErr.message}`);
-        }
-      }
-
-      // 5. Quality Tests
-      for (const t of testEntries) {
-        if (!t.test_type) continue;
-        const { error: qtErr } = await supabase.from('quality_tests').insert({
-          project_id: selectedProject, test_type: t.test_type,
-          test_date: form.report_date, location: t.location || null,
-          chainage: t.chainage || null, sample_id: t.sample_id || null,
-          result_value: t.result_value || null, spec_limit: t.spec_limit || null,
-          result_status: t.result_status, notes: t.notes || null,
-          tested_by: profile.id,
-        });
-        if (qtErr) warnings.push(`Test "${t.test_type}": ${qtErr.message}`);
-      }
-
-      // 6. Site Issues
-      for (const iss of issueEntries) {
-        if (!iss.title) continue;
-        const { error: issErr } = await supabase.from('site_issues').insert({
-          project_id: selectedProject, title: iss.title,
-          category: iss.category, severity: iss.severity,
-          description: iss.description || null, action_required: iss.action_required || null,
-          status: 'Open', raised_by: profile.id, date_raised: form.report_date,
-        });
-        if (issErr) warnings.push(`Issue "${iss.title}": ${issErr.message}`);
-      }
-
-      // 7. Site Instructions
-      for (const instr of instructionEntries) {
-        if (!instr.subject) continue;
-        const { data: instrNo } = await supabase.rpc('next_instruction_no', { p_project_id: selectedProject });
-        const { error: siErr } = await supabase.from('site_instructions').insert({
-          project_id: selectedProject, instruction_no: instrNo,
-          instruction_type: instr.instruction_type, subject: instr.subject,
-          description: instr.description || null, chainage_from: instr.chainage || null,
-          issued_by: profile.id, issued_by_role: profile.role,
-          response_required: instr.response_required, status: 'issued',
-        });
-        if (siErr) warnings.push(`Instruction "${instr.subject}": ${siErr.message}`);
-      }
-
-      // 8. Materials Received
-      for (const m of materialEntries) {
-        if (!m.material_type || !m.quantity) continue;
-        const { error: matErr } = await supabase.from('project_materials').insert({
-          project_id: selectedProject, material_type: m.material_type,
-          description: m.description || null, quantity: parseFloat(m.quantity) || 0,
-          unit: m.unit, source: m.source || null, delivery_note: m.delivery_note || null,
-          received_date: form.report_date, received_by: profile.id,
-        });
-        if (matErr) warnings.push(`Material "${m.material_type}": ${matErr.message}`);
-      }
-
-      // 9. Upload Photos
-      const allPhotos = [...worksPhotos, ...equipPhotos, ...qualityPhotos, ...structPhotos, ...issuePhotos, ...generalPhotos];
-      let photoCount = 0;
-      if (allPhotos.length > 0) {
-        photoCount = await uploadReportPhotos(allPhotos, selectedProject, report.id, profile, form.report_date);
-      }
-
-      // 10. Key Personnel Attendance
-      const allPersonnel = [
-        ...contractorPersonnel.map(t => ({ ...t, presenceMap: contractorPresence })),
-        ...supervisionPersonnel.map(t => ({ ...t, presenceMap: supervisionPresence })),
-      ];
-      if (allPersonnel.length > 0) {
-        const attendanceRecords = allPersonnel.map(t => ({
-          project_id: selectedProject, personnel_id: t.id,
-          attendance_date: form.report_date, is_present: !!t.presenceMap[t.id],
-          recorded_by: profile.id,
-        }));
-        await supabase.from('personnel_attendance').upsert(attendanceRecords, { onConflict: 'personnel_id,attendance_date' });
-      }
-
-      // 11. Daily Labour
-      const allLabour = [
-        ...contractorLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'contractor' })),
-        ...supervisionLabour.filter(e => (e.male_count || 0) + (e.female_count || 0) > 0).map(e => ({ ...e, party: 'supervision' })),
-      ];
-      if (allLabour.length > 0) {
-        const labourRecords = allLabour.map(e => ({
-          daily_report_id: report.id, project_id: selectedProject,
-          report_date: form.report_date, party: e.party, category: e.category,
-          role_title: e.role_title, male_count: e.male_count || 0,
-          female_count: e.female_count || 0, key_personnel_id: null, is_present: true,
-        }));
-        const { error: labErr } = await supabase.from('daily_labour').insert(labourRecords);
-        if (labErr) warnings.push(`Labour records: ${labErr.message}`);
-      }
-
-      // Update legacy labour columns
-      const contSkilled = contractorLabour.filter(e => e.category === 'skilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
-      const contUnskilled = contractorLabour.filter(e => e.category === 'unskilled').reduce((s, e) => s + (e.male_count || 0) + (e.female_count || 0), 0);
-      if (contSkilled > 0 || contUnskilled > 0) {
-        await supabase.from('daily_reports').update({
-          contractor_labour_skilled: contSkilled, contractor_labour_unskilled: contUnskilled,
-        }).eq('id', report.id);
-      }
-
-      // Clear autosave drafts on successful submit
-      await clearAllDrafts(profile.id);
+      const result = await submitDailyReport({
+        projectId: selectedProject,
+        profile,
+        form,
+        metWeather,
+        weatherOverride,
+        worksEntries,
+        equipEntries,
+        structEntries,
+        testEntries,
+        issueEntries,
+        instructionEntries,
+        materialEntries,
+        photos: {
+          works: worksPhotos, equip: equipPhotos, quality: qualityPhotos,
+          struct: structPhotos, issue: issuePhotos, general: generalPhotos,
+        },
+        contractorPersonnel,
+        supervisionPersonnel,
+        contractorPresence,
+        supervisionPresence,
+        contractorLabour,
+        supervisionLabour,
+        activities,
+        equipment,
+        structures,
+        nilSections,
+        findOverlaps,
+        sideFactor,
+        recentProgress,
+        WORK_LAYERS,
+      });
 
       setSubmitted(true);
-      if (warnings.length > 0) {
-        showToast(`⚠️ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
+
+      if (result.warnings.length > 0) {
+        showToast(`⚠️ Report saved but ${result.warnings.length} section(s) had issues: ${result.warnings[0]}`, 'error');
       } else {
-        showToast(`✅ Report submitted${photoCount > 0 ? ` with ${photoCount} photos` : ''} — all data auto-synced!`);
+        const { counts } = result;
+        const parts = [];
+        if (counts.works > 0) parts.push(`${counts.works} works`);
+        if (counts.equipment > 0) parts.push(`${counts.equipment} equipment`);
+        if (counts.photos > 0) parts.push(`${counts.photos} photos`);
+        const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+        showToast(`✅ Report submitted${detail} — all data auto-synced!`);
       }
     } catch (err) {
       showToast(err.message, 'error');
