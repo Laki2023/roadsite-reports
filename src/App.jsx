@@ -35,6 +35,9 @@ import SiteInstructionsPage from './pages/SiteInstructionsPage';
 import MegaDashboard from './pages/MegaDashboard';
 import GuaranteeRegisterPage from './pages/GuaranteeRegisterPage';
 import EoTTrackerPage from './pages/EoTTrackerPage';
+import MPRReconciliationPage from './pages/MPRReconciliationPage';
+import DocumentRegisterPage from './pages/DocumentRegisterPage';
+import QualityMatrixPage from './pages/QualityMatrixPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
@@ -59,6 +62,9 @@ const NAV_ITEMS = [
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
   { key: 'guarantees', label: 'Guarantee Register', icon: '🔐', minRole: 'resident_engineer' },
   { key: 'eot', label: 'Extension of Time', icon: '⏱️', minRole: 'resident_engineer' },
+  { key: 'mpr', label: 'MPR Reconciliation', icon: '📊', minRole: 'resident_engineer' },
+  { key: 'doc-register', label: 'Document Register', icon: '✉️', minRole: 'resident_engineer' },
+  { key: 'quality-matrix', label: 'Quality Matrix', icon: '🔬', minRole: 'resident_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'site-instructions', label: 'Site Instructions', icon: '📜', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
@@ -230,6 +236,9 @@ export default function App() {
       case 'ipc': return <IPCPage {...ctx} />;
       case 'guarantees': return <GuaranteeRegisterPage {...ctx} />;
       case 'eot': return <EoTTrackerPage {...ctx} />;
+      case 'mpr': return <MPRReconciliationPage {...ctx} />;
+      case 'doc-register': return <DocumentRegisterPage {...ctx} />;
+      case 'quality-matrix': return <QualityMatrixPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;
