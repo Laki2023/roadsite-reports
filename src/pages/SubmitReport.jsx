@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, hasRole, ROLE_LABELS, INSTRUCTION_TYPES } from '../lib/supabase';
 import PhotoUploader, { uploadReportPhotos } from '../components/PhotoUploader';
 import {
@@ -12,6 +12,11 @@ import {
 } from '../data/referenceData';
 import { syncWorksActivity } from '../lib/syncWorksActivity';
 import { parseChainage, fmtChainage } from '../lib/utils';
+import {
+  saveToLocalStorage, loadFromLocalStorage, clearLocalStorage,
+  saveServerDraft, recoverDraft, clearAllDrafts,
+} from '../lib/autosave';
+import NilReturnToggle, { NilSummaryBadge } from '../components/NilReturnToggle';
 
 // ── Constants ──
 const ISSUE_SEVERITY = ['Low', 'Medium', 'High', 'Critical'];
@@ -537,6 +542,113 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const [contractorLabour, setContractorLabour] = useState([]);
   const [supervisionLabour, setSupervisionLabour] = useState([]);
 
+  // ── "Nothing to Report" Nil Sections ──
+  // Keys match step numbers 2-8; true = RE explicitly marked as Nil
+  const [nilSections, setNilSections] = useState({
+    2: false, // Contractor Workforce
+    3: false, // Engineer's Team
+    4: false, // Works Progress
+    5: false, // Equipment
+    6: false, // Quality & Materials
+    7: false, // Structures
+    8: false, // Issues & Instructions
+  });
+
+  function handleNilToggle(stepKey, isNil) {
+    setNilSections(prev => ({ ...prev, [stepKey]: isNil }));
+  }
+
+  // ── Autosave State ──
+  const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveredDraft, setRecoveredDraft] = useState(null);
+  const dirtyRef = useRef(false);
+  const saveTimerRef = useRef(null);
+  const serverSaveRef = useRef(null);
+
+  // Gather all serializable state into one object
+  const gatherState = useCallback(() => ({
+    form, step, selectedProject,
+    worksEntries, equipEntries, structEntries, testEntries,
+    issueEntries, instructionEntries, materialEntries,
+    contractorPresence, supervisionPresence,
+    contractorLabour, supervisionLabour,
+    nilSections,
+  }), [form, step, selectedProject, worksEntries, equipEntries, structEntries,
+    testEntries, issueEntries, instructionEntries, materialEntries,
+    contractorPresence, supervisionPresence, contractorLabour, supervisionLabour, nilSections]);
+
+  // ── Autosave: localStorage on change (debounced 500ms) ──
+  useEffect(() => {
+    if (!profile?.id || submitted) return;
+    dirtyRef.current = true;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const state = gatherState();
+      saveToLocalStorage(profile.id, state);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [form, step, selectedProject, worksEntries, equipEntries, structEntries,
+    testEntries, issueEntries, instructionEntries, materialEntries,
+    contractorPresence, supervisionPresence, contractorLabour, supervisionLabour,
+    nilSections, profile?.id, submitted, gatherState]);
+
+  // ── Autosave: Server draft every 30s when dirty ──
+  useEffect(() => {
+    if (!profile?.id || submitted) return;
+    serverSaveRef.current = setInterval(async () => {
+      if (!dirtyRef.current) return;
+      dirtyRef.current = false;
+      setSaveStatus('saving');
+      const ok = await saveServerDraft(profile.id, gatherState());
+      setSaveStatus(ok ? 'saved' : 'error');
+      if (ok) setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 30000);
+    return () => { if (serverSaveRef.current) clearInterval(serverSaveRef.current); };
+  }, [profile?.id, submitted, gatherState]);
+
+  // ── Draft Recovery on mount ──
+  useEffect(() => {
+    if (!profile?.id) return;
+    (async () => {
+      const draft = await recoverDraft(profile.id);
+      if (draft && draft.selectedProject) {
+        setRecoveredDraft(draft);
+        setShowRecovery(true);
+      }
+    })();
+  }, [profile?.id]);
+
+  function applyRecoveredDraft(draft) {
+    if (draft.form) setForm(prev => ({ ...prev, ...draft.form }));
+    if (draft.step) setStep(draft.step);
+    if (draft.selectedProject) setSelectedProject(draft.selectedProject);
+    if (draft.worksEntries) setWorksEntries(draft.worksEntries);
+    if (draft.equipEntries) setEquipEntries(draft.equipEntries);
+    if (draft.structEntries) setStructEntries(draft.structEntries);
+    if (draft.testEntries) setTestEntries(draft.testEntries);
+    if (draft.issueEntries) setIssueEntries(draft.issueEntries);
+    if (draft.instructionEntries) setInstructionEntries(draft.instructionEntries);
+    if (draft.materialEntries) setMaterialEntries(draft.materialEntries);
+    if (draft.contractorPresence) setContractorPresence(draft.contractorPresence);
+    if (draft.supervisionPresence) setSupervisionPresence(draft.supervisionPresence);
+    if (draft.contractorLabour) setContractorLabour(draft.contractorLabour);
+    if (draft.supervisionLabour) setSupervisionLabour(draft.supervisionLabour);
+    if (draft.nilSections) setNilSections(draft.nilSections);
+    setShowRecovery(false);
+    setRecoveredDraft(null);
+    showToast('✅ Draft restored successfully');
+  }
+
+  function discardRecoveredDraft() {
+    setShowRecovery(false);
+    setRecoveredDraft(null);
+    clearAllDrafts(profile.id);
+    showToast('Draft discarded — starting fresh');
+  }
+
   // ── Data Loading ──
   useEffect(() => {
     supabase.from('projects').select('id, name, category, latitude, longitude').order('name').then(({ data }) => setProjects(data || []));
@@ -616,15 +728,15 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   const instructionsValid = instructionEntries.every(i => i.subject && i.instruction_type);
 
   const stepComplete = [
-    selectedProject && form.report_date && form.weather,  // 1: Project & Weather
-    true,                                                  // 2: Contractor Workforce (counts can be 0)
-    true,                                                  // 3: Engineer Team (counts can be 0)
-    worksValid,                                            // 4: Works Progress
-    equipValid,                                            // 5: Equipment
-    testsValid,                                            // 6: Quality & Materials
-    structsValid,                                          // 7: Structures
-    issuesValid && instructionsValid,                      // 8: Issues & Instructions
-    true,                                                  // 9: Review & Submit
+    selectedProject && form.report_date && form.weather,          // 1: Project & Weather
+    nilSections[2] || true,                                       // 2: Contractor Workforce (counts can be 0)
+    nilSections[3] || true,                                       // 3: Engineer Team (counts can be 0)
+    nilSections[4] || worksValid,                                 // 4: Works Progress
+    nilSections[5] || equipValid,                                 // 5: Equipment
+    nilSections[6] || testsValid,                                 // 6: Quality & Materials
+    nilSections[7] || structsValid,                               // 7: Structures
+    nilSections[8] || (issuesValid && instructionsValid),          // 8: Issues & Instructions
+    true,                                                         // 9: Review & Submit
   ];
   const totalEntries = worksEntries.length + equipEntries.length + structEntries.length + testEntries.length + issueEntries.length + instructionEntries.length + materialEntries.length;
   const totalPhotos = worksPhotos.length + equipPhotos.length + qualityPhotos.length + structPhotos.length + issuePhotos.length + generalPhotos.length;
@@ -870,6 +982,9 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         }).eq('id', report.id);
       }
 
+      // Clear autosave drafts on successful submit
+      await clearAllDrafts(profile.id);
+
       setSubmitted(true);
       if (warnings.length > 0) {
         showToast(`⚠️ Report saved but ${warnings.length} section(s) failed: ${warnings[0]}`, 'error');
@@ -907,7 +1022,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
           quality_observations: '', challenges: '', instructions_issued: '', visitors: '', urgent_flag: false, safety_incidents: '',
         }); setWorksEntries([]); setEquipEntries([]); setStructEntries([]); setTestEntries([]); setIssueEntries([]); setInstructionEntries([]); setMaterialEntries([]);
           setWorksPhotos([]); setEquipPhotos([]); setQualityPhotos([]); setStructPhotos([]); setIssuePhotos([]); setGeneralPhotos([]);
-          setContractorLabour([]); setSupervisionLabour([]); }}>
+          setContractorLabour([]); setSupervisionLabour([]);
+          setNilSections({ 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false }); }}>
           Submit Another Report
         </button>
       </div>
@@ -917,18 +1033,63 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
   // ── RENDER ──
   return (
     <div>
+      {/* Draft Recovery Banner */}
+      {showRecovery && recoveredDraft && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 12, background: '#eff6ff',
+          border: '1.5px solid #93c5fd', borderRadius: 'var(--radius)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>📝</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e40af' }}>Unsaved draft found</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {recoveredDraft._source === 'server' ? 'Recovered from server' : 'Recovered from browser'}
+                {' · '}Step {recoveredDraft.step || 1}
+                {recoveredDraft.form?.report_date ? ` · ${recoveredDraft.form.report_date}` : ''}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => applyRecoveredDraft(recoveredDraft)}
+              className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px' }}>
+              Restore Draft
+            </button>
+            <button onClick={discardRecoveredDraft}
+              style={{ fontSize: 12, padding: '6px 14px', background: 'none', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Step Progress */}
       <div style={{ display: 'flex', gap: 3, marginBottom: 8 }}>
         {STEPS.map(s => (
           <div key={s.num} onClick={() => { if (stepComplete[0] || s.num === 1) setStep(s.num); }}
             style={{ flex: 1, height: 4, borderRadius: 2, cursor: stepComplete[0] || s.num === 1 ? 'pointer' : 'default',
-              background: s.num < step ? 'var(--accent)' : s.num === step ? '#93c5fd' : 'var(--border)', transition: 'background 0.2s' }} />
+              background: s.num < step
+                ? (nilSections[s.num] ? '#86efac' : 'var(--accent)')
+                : s.num === step ? '#93c5fd' : 'var(--border)',
+              transition: 'background 0.2s' }} />
         ))}
       </div>
-      <div style={{ textAlign: 'center', marginBottom: 8 }}>
+      <div style={{ textAlign: 'center', marginBottom: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
           Step {step}/{STEPS.length} — {STEPS[step - 1].icon} {STEPS[step - 1].label}
         </span>
+        {/* Autosave indicator */}
+        {saveStatus === 'saving' && (
+          <span style={{ fontSize: 10, color: '#93c5fd', fontWeight: 600 }}>⏳ Saving...</span>
+        )}
+        {saveStatus === 'saved' && (
+          <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>✓ Saved</span>
+        )}
+        {saveStatus === 'error' && (
+          <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>⚠ Save failed</span>
+        )}
       </div>
 
       {/* ══════ STEP 1: PROJECT & WEATHER ══════ */}
@@ -1025,22 +1186,33 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
 
       {/* ══════ STEP 2: CONTRACTOR WORKFORCE ══════ */}
       {step === 2 && (
-        <WorkforceStep party="contractor" partyLabel="Contractor" roles={labourRoles}
-          personnel={contractorPersonnel} presence={contractorPresence} setPresence={setContractorPresence}
-          labourEntries={contractorLabour} setLabourEntries={setContractorLabour}
-          showTooltips={true} />
+        <>
+          <NilReturnToggle stepKey={2} label="Contractor Workforce" isNil={nilSections[2]} onToggle={handleNilToggle} />
+          {!nilSections[2] && (
+            <WorkforceStep party="contractor" partyLabel="Contractor" roles={labourRoles}
+              personnel={contractorPersonnel} presence={contractorPresence} setPresence={setContractorPresence}
+              labourEntries={contractorLabour} setLabourEntries={setContractorLabour}
+              showTooltips={true} />
+          )}
+        </>
       )}
 
       {/* ══════ STEP 3: SUPERVISION WORKFORCE ══════ */}
       {step === 3 && (
-        <WorkforceStep party="supervision" partyLabel="Engineer's Team" roles={labourRoles}
-          personnel={supervisionPersonnel} presence={supervisionPresence} setPresence={setSupervisionPresence}
-          labourEntries={supervisionLabour} setLabourEntries={setSupervisionLabour}
-          showTooltips={true} />
+        <>
+          <NilReturnToggle stepKey={3} label="Engineer's Team" isNil={nilSections[3]} onToggle={handleNilToggle} />
+          {!nilSections[3] && (
+            <WorkforceStep party="supervision" partyLabel="Engineer's Team" roles={labourRoles}
+              personnel={supervisionPersonnel} presence={supervisionPresence} setPresence={setSupervisionPresence}
+              labourEntries={supervisionLabour} setLabourEntries={setSupervisionLabour}
+              showTooltips={true} />
+          )}
+        </>
       )}
 
       {/* ══════ STEP 4: WORKS PROGRESS ══════ */}
-      {step === 4 && (() => {
+      {step === 4 && <NilReturnToggle stepKey={4} label="Works Progress" isNil={nilSections[4]} onToggle={handleNilToggle} />}
+      {step === 4 && !nilSections[4] && (() => {
         // Build hierarchy: parents with their children
         const parentActivities = activities.filter(a => !a.is_component && !a.parent_activity_id);
         const childrenOf = (parentId) => activities.filter(a => a.parent_activity_id === parentId).sort((a, b) => (a.component_order || 0) - (b.component_order || 0));
@@ -1162,7 +1334,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       })()}
 
             {/* ══════ STEP 5: EQUIPMENT ══════ */}
-      {step === 5 && (
+      {step === 5 && <NilReturnToggle stepKey={5} label="Equipment" isNil={nilSections[5]} onToggle={handleNilToggle} />}
+      {step === 5 && !nilSections[5] && (
         <SectionCard title="Equipment Status" icon="🚜" count={equipEntries.length}>
           {equipEntries.map((eq, i) => (
             <EntryRow key={i} onRemove={() => removeEntry(setEquipEntries, equipEntries, i)}>
@@ -1221,7 +1394,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       )}
 
       {/* ══════ STEP 6: QUALITY & MATERIALS ══════ */}
-      {step === 6 && (
+      {step === 6 && <NilReturnToggle stepKey={6} label="Quality & Materials" isNil={nilSections[6]} onToggle={handleNilToggle} />}
+      {step === 6 && !nilSections[6] && (
         <>
           <SectionCard title="Quality Tests" icon="🧪" count={testEntries.length}>
             {testEntries.map((t, i) => (
@@ -1276,7 +1450,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       )}
 
       {/* ══════ STEP 7: STRUCTURES ══════ */}
-      {step === 7 && (
+      {step === 7 && <NilReturnToggle stepKey={7} label="Structures" isNil={nilSections[7]} onToggle={handleNilToggle} />}
+      {step === 7 && !nilSections[7] && (
         <SectionCard title="Structures Progress" icon="🌉" count={structEntries.length}>
           <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
             Culverts, bridges, drainage structures, retaining walls, road furniture — anything under construction or inspected today.
@@ -1332,7 +1507,8 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
       )}
 
       {/* ══════ STEP 8: ISSUES & INSTRUCTIONS ══════ */}
-      {step === 8 && (
+      {step === 8 && <NilReturnToggle stepKey={8} label="Issues & Instructions" isNil={nilSections[8]} onToggle={handleNilToggle} />}
+      {step === 8 && !nilSections[8] && (
         <>
           <SectionCard title="Site Issues" icon="⚠️" count={issueEntries.length} color="#ef4444">
             {issueEntries.map((iss, i) => (
@@ -1432,19 +1608,35 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
             )}
           </SectionCard>
 
+          {/* Nil Sections Summary */}
+          {Object.entries(nilSections).some(([, v]) => v) && (
+            <SectionCard title="Nil Sections" icon="📋">
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                The following sections were explicitly marked as "Nothing to Report":
+              </p>
+              {nilSections[2] && <NilSummaryBadge stepLabel="Contractor Workforce" stepIcon="🔨" />}
+              {nilSections[3] && <NilSummaryBadge stepLabel="Engineer's Team" stepIcon="👷" />}
+              {nilSections[4] && <NilSummaryBadge stepLabel="Works Progress" stepIcon="⚒️" />}
+              {nilSections[5] && <NilSummaryBadge stepLabel="Equipment" stepIcon="🚜" />}
+              {nilSections[6] && <NilSummaryBadge stepLabel="Quality & Materials" stepIcon="🧪" />}
+              {nilSections[7] && <NilSummaryBadge stepLabel="Structures" stepIcon="🌉" />}
+              {nilSections[8] && <NilSummaryBadge stepLabel="Issues & Instructions" stepIcon="⚠️" />}
+            </SectionCard>
+          )}
+
           <SectionCard title="Report Summary" icon="✅">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
               {[
                 { icon: '☀️', label: 'Weather', value: form.weather },
-                { icon: '🔨', label: 'Contractor', value: `${contLabourTotal + contKpPresent}`, color: contLabourTotal > 0 ? '#10b981' : '#6b7280' },
-                { icon: '👷', label: "Engineer's Team", value: `${supLabourTotal + supKpPresent}`, color: supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
-                { icon: '⚒️', label: 'Activities', value: worksEntries.length },
-                { icon: '🚜', label: 'Equipment', value: equipEntries.length },
-                { icon: '🧪', label: 'Tests', value: testEntries.length },
-                { icon: '🌉', label: 'Structures', value: structEntries.length },
-                { icon: '📦', label: 'Materials', value: materialEntries.length },
-                { icon: '⚠️', label: 'Issues', value: issueEntries.length, color: issueEntries.length > 0 ? '#ef4444' : '#10b981' },
-                { icon: '📋', label: 'Instructions', value: instructionEntries.length },
+                { icon: '🔨', label: 'Contractor', value: nilSections[2] ? 'Nil' : `${contLabourTotal + contKpPresent}`, color: nilSections[2] ? '#86efac' : contLabourTotal > 0 ? '#10b981' : '#6b7280' },
+                { icon: '👷', label: "Engineer's Team", value: nilSections[3] ? 'Nil' : `${supLabourTotal + supKpPresent}`, color: nilSections[3] ? '#86efac' : supLabourTotal + supKpPresent > 0 ? '#059669' : '#6b7280' },
+                { icon: '⚒️', label: 'Activities', value: nilSections[4] ? 'Nil' : worksEntries.length, color: nilSections[4] ? '#86efac' : undefined },
+                { icon: '🚜', label: 'Equipment', value: nilSections[5] ? 'Nil' : equipEntries.length, color: nilSections[5] ? '#86efac' : undefined },
+                { icon: '🧪', label: 'Tests', value: nilSections[6] ? 'Nil' : testEntries.length, color: nilSections[6] ? '#86efac' : undefined },
+                { icon: '🌉', label: 'Structures', value: nilSections[7] ? 'Nil' : structEntries.length, color: nilSections[7] ? '#86efac' : undefined },
+                { icon: '📦', label: 'Materials', value: nilSections[6] ? 'Nil' : materialEntries.length, color: nilSections[6] ? '#86efac' : undefined },
+                { icon: '⚠️', label: 'Issues', value: nilSections[8] ? 'Nil' : issueEntries.length, color: nilSections[8] ? '#86efac' : issueEntries.length > 0 ? '#ef4444' : '#10b981' },
+                { icon: '📋', label: 'Instructions', value: nilSections[8] ? 'Nil' : instructionEntries.length, color: nilSections[8] ? '#86efac' : undefined },
                 { icon: '📷', label: 'Photos', value: totalPhotos, color: totalPhotos > 0 ? '#8b5cf6' : 'var(--text-muted)' },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: 'center', padding: 10, background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
