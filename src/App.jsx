@@ -38,6 +38,9 @@ import EoTTrackerPage from './pages/EoTTrackerPage';
 import MPRReconciliationPage from './pages/MPRReconciliationPage';
 import DocumentRegisterPage from './pages/DocumentRegisterPage';
 import QualityMatrixPage from './pages/QualityMatrixPage';
+import MilestoneTimelinePage from './pages/MilestoneTimelinePage';
+import FinancialForecastPage from './pages/FinancialForecastPage';
+import AlertCentrePage from './pages/AlertCentrePage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
@@ -65,6 +68,9 @@ const NAV_ITEMS = [
   { key: 'mpr', label: 'MPR Reconciliation', icon: '📊', minRole: 'resident_engineer' },
   { key: 'doc-register', label: 'Document Register', icon: '✉️', minRole: 'resident_engineer' },
   { key: 'quality-matrix', label: 'Quality Matrix', icon: '🔬', minRole: 'resident_engineer' },
+  { key: 'milestones', label: 'Contract Timeline', icon: '📍', minRole: 'resident_engineer' },
+  { key: 'financial-forecast', label: 'Financial Forecast', icon: '📈', minRole: 'project_engineer' },
+  { key: 'alert-centre', label: 'Alert Centre', icon: '🔔', minRole: 'resident_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'site-instructions', label: 'Site Instructions', icon: '📜', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
@@ -239,6 +245,9 @@ export default function App() {
       case 'mpr': return <MPRReconciliationPage {...ctx} />;
       case 'doc-register': return <DocumentRegisterPage {...ctx} />;
       case 'quality-matrix': return <QualityMatrixPage {...ctx} />;
+      case 'milestones': return <MilestoneTimelinePage {...ctx} />;
+      case 'financial-forecast': return <FinancialForecastPage {...ctx} />;
+      case 'alert-centre': return <AlertCentrePage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;
