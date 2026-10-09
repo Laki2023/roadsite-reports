@@ -33,6 +33,8 @@ import ObligationsPage from './pages/ObligationsPage';
 import ConstructionGuidePage from './pages/ConstructionGuidePage';
 import SiteInstructionsPage from './pages/SiteInstructionsPage';
 import MegaDashboard from './pages/MegaDashboard';
+import GuaranteeRegisterPage from './pages/GuaranteeRegisterPage';
+import EoTTrackerPage from './pages/EoTTrackerPage';
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
@@ -55,6 +57,8 @@ const NAV_ITEMS = [
   { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector', hideRates: 'contractor_qs' },
   { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'contractor_qs' },
   { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
+  { key: 'guarantees', label: 'Guarantee Register', icon: '🔐', minRole: 'resident_engineer' },
+  { key: 'eot', label: 'Extension of Time', icon: '⏱️', minRole: 'resident_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'site-instructions', label: 'Site Instructions', icon: '📜', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
@@ -224,6 +228,8 @@ export default function App() {
       case 'boq': return <BoQPage {...ctx} />;
       case 'taking-off': return <TakingOffPage {...ctx} />;
       case 'ipc': return <IPCPage {...ctx} />;
+      case 'guarantees': return <GuaranteeRegisterPage {...ctx} />;
+      case 'eot': return <EoTTrackerPage {...ctx} />;
       case 'staff': return <StaffPage {...ctx} />;
       case 'user-mgmt': return <UserManagement {...ctx} />;
       case 'approvals': return <ApprovalsPage {...ctx} />;

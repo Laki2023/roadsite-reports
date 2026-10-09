@@ -250,13 +250,37 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
   const totalRetention = ipcs.reduce((s, i) => s + (i.retention_amount || 0), 0);
   const progressPct = contractSum > 0 ? Math.min(100, (currentWorksValue / contractSum) * 100) : 0;
 
+  // FIDIC deadline calculations
+  function certificationDueDate(ipc) {
+    // FIDIC Cl. 14.6: Engineer certifies within 28 days of contractor's statement
+    if (ipc.certification_due_date) return ipc.certification_due_date;
+    const submitted = ipc.contractor_submitted_date || ipc.submitted_date;
+    if (!submitted) return null;
+    const d = new Date(submitted); d.setDate(d.getDate() + 28);
+    return d.toISOString().split('T')[0];
+  }
+  function paymentDueDate(ipc) {
+    // FIDIC Cl. 14.7: Employer pays within 56 days of contractor's statement
+    if (ipc.payment_due_date) return ipc.payment_due_date;
+    const submitted = ipc.contractor_submitted_date || ipc.submitted_date || ipc.created_at?.split('T')[0];
+    if (!submitted) return null;
+    const d = new Date(submitted); d.setDate(d.getDate() + 56);
+    return d.toISOString().split('T')[0];
+  }
   // Late payment — FIDIC Cl. 14.8: 56 days
   function daysOverdue(ipc) {
     if (ipc.status === 'Paid' || ipc.status === 'Draft') return 0;
-    const submitted = ipc.contractor_submitted_date || ipc.submitted_date || ipc.created_at?.split('T')[0];
-    if (!submitted) return 0;
-    const due = new Date(submitted); due.setDate(due.getDate() + 56);
-    return Math.max(0, Math.floor((new Date() - due) / 86400000));
+    const due = paymentDueDate(ipc);
+    if (!due) return 0;
+    return Math.max(0, Math.floor((new Date() - new Date(due)) / 86400000));
+  }
+  // FIDIC Cl. 14.8: Financing charges = outstanding × (base rate + 3%) per annum
+  function calcFinancingCharges(ipc) {
+    const overdue = daysOverdue(ipc);
+    if (overdue <= 0) return 0;
+    const outstanding = ipc.certified_amount || ipc.net_amount || 0;
+    const ratePercent = (ipc.financing_charges_rate || 3) + 10; // CBK base (~10%) + 3%
+    return outstanding * (ratePercent / 100) * (overdue / 365);
   }
   function daysBetween(d1, d2) { if (!d1 || !d2) return null; return Math.floor((new Date(d2) - new Date(d1)) / 86400000); }
 
@@ -297,6 +321,35 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
           {/* ══════ FINANCIAL SUMMARY TAB ══════ */}
           {tab === 'dashboard' && (
             <div>
+              {/* FIDIC Default Alert Banner */}
+              {(() => {
+                const overdueIpcs = ipcs.filter(i => daysOverdue(i) > 0);
+                const totalCharges = overdueIpcs.reduce((s, i) => s + calcFinancingCharges(i), 0);
+                if (overdueIpcs.length === 0) return null;
+                return (
+                  <div style={{
+                    padding: '14px 18px', marginBottom: 16, borderRadius: 'var(--radius)',
+                    background: '#fef2f2', border: '1px solid #fca5a5',
+                    borderLeft: '4px solid #ef4444',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 22 }}>🚨</span>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#991b1b', fontSize: 14 }}>
+                          FIDIC Cl. 14.8 — Payment Default: {overdueIpcs.length} IPC(s) overdue
+                        </div>
+                        <div style={{ fontSize: 12, color: '#991b1b' }}>
+                          Estimated financing charges accrued: {fmt(totalCharges)} (CBK base rate + 3% p.a.)
+                        </div>
+                        <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 4 }}>
+                          {overdueIpcs.map(i => `IPC ${i.ipc_no}: ${daysOverdue(i)}d overdue`).join(' • ')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Auto-Generated Financial Position */}
               <div className="card" style={{ padding: 20, marginBottom: 16 }}>
                 <h3 style={{ margin: '0 0 16px', fontSize: 15 }}>📊 Contract Financial Position <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>— auto-generated from BoQ & IPCs</span></h3>
@@ -403,6 +456,7 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
                         <th colSpan={2} style={{ textAlign: 'center', background: '#fef3c7', color: '#92400e' }}>PE Review</th>
                         <th colSpan={2} style={{ textAlign: 'center', background: '#dcfce7', color: '#166534' }}>Engineer Certify</th>
                         <th colSpan={3} style={{ textAlign: 'center', background: '#f0fdf4', color: '#15803d' }}>Payment</th>
+                        <th colSpan={2} style={{ textAlign: 'center', background: '#fff7ed', color: '#9a3412' }}>FIDIC Deadlines</th>
                         <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>Status</th>
                         <th rowSpan={2} style={{ verticalAlign: 'bottom' }}>Actions</th>
                       </tr>
@@ -412,6 +466,7 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
                         <th style={{ fontSize: 9, background: '#fef3c7' }}>By</th><th style={{ fontSize: 9, background: '#fef3c7' }}>Date</th>
                         <th style={{ fontSize: 9, background: '#dcfce7' }}>By</th><th style={{ fontSize: 9, background: '#dcfce7' }}>Date</th>
                         <th style={{ fontSize: 9, background: '#f0fdf4' }}>Amount</th><th style={{ fontSize: 9, background: '#f0fdf4' }}>Date</th><th style={{ fontSize: 9, background: '#f0fdf4' }}>Ref</th>
+                        <th style={{ fontSize: 9, background: '#fff7ed' }}>Certify By</th><th style={{ fontSize: 9, background: '#fff7ed' }}>Pay By</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -440,6 +495,14 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
                             <td className="text-mono" style={{ fontSize: 10, fontWeight: 600, color: ipc.paid_amount ? '#059669' : 'inherit' }}>{ipc.paid_amount ? fmt(ipc.paid_amount) : '—'}</td>
                             <td className="text-mono" style={{ fontSize: 10 }}>{ipc.paid_date || '—'}</td>
                             <td style={{ fontSize: 10 }}>{ipc.payment_ref || '—'}</td>
+                            {/* FIDIC Deadlines */}
+                            <td className="text-mono" style={{ fontSize: 10, color: ipc.status !== 'Paid' && !ipc.engineer_certified_date && certificationDueDate(ipc) && new Date(certificationDueDate(ipc)) < new Date() ? '#ef4444' : 'var(--text-muted)' }}>
+                              {certificationDueDate(ipc) || '—'}
+                            </td>
+                            <td className="text-mono" style={{ fontSize: 10, fontWeight: overdue > 0 ? 700 : 400, color: overdue > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                              {paymentDueDate(ipc) || '—'}
+                              {overdue > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>{fmt(calcFinancingCharges(ipc))} interest</div>}
+                            </td>
                             {/* Status */}
                             <td>
                               {statusBadge(ipc.status)}
@@ -479,7 +542,7 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
                         <td className="text-mono">{fmt(ipcs.reduce((s, i) => s + (i.net_amount || 0), 0))}</td>
                         <td colSpan={8}></td>
                         <td className="text-mono" style={{ color: '#059669' }}>{fmt(totalPaid)}</td>
-                        <td colSpan={4}></td>
+                        <td colSpan={6}></td>
                       </tr>
                     </tbody>
                   </table>
