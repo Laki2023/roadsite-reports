@@ -236,7 +236,9 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     return { name: p.name?.length > 18 ? p.name.substring(0, 18) + '...' : p.name, contractSum: cv, valueDone: vd };
   }).filter(p => p.contractSum > 0);
 
-  // S-Curve data (monthly placeholder — enhance with real monthly data later)
+  // S-Curve data — uses synthetic projection data (linear interpolation of current
+  // physical progress), not actual month-by-month report data. TODO: enhance with
+  // real monthly cumulative data from daily reports.
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const currentMonth = new Date().getMonth();
   const sCurveData = months.slice(0, currentMonth + 1).map((m, i) => {
@@ -310,6 +312,13 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         </div>
       )}
 
+      {projects.length === 0 ? (
+        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}>
+          <div style={{fontSize:48,marginBottom:12}}>📊</div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>No Projects</div>
+          <div style={{fontSize:13}}>Add projects to see dashboard data.</div>
+        </div>
+      ) : (<>
       {/* ══════ TOP KPI ROW ══════ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         <KPICard title="Active Projects" value={stats.totalProjects} icon="📊"
@@ -635,6 +644,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }

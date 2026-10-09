@@ -52,8 +52,8 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
       if (err) throw err;
       setTests(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load quality tests: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }

@@ -37,6 +37,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
   const [revisions, setRevisions] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [viewMode, setViewMode] = useState('months'); // weeks | months | quarters
@@ -56,16 +57,26 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
   }
 
   async function loadData() {
-    setLoading(true);
-    const [itemsRes, revsRes, actsRes] = await Promise.all([
-      supabase.from('programme_items').select('*').eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('programme_revisions').select('*').eq('project_id', selectedProject).order('revision_number'),
-      supabase.from('works_activities').select('id, activity_name, activity_code, category, planned_quantity, completed_quantity').eq('project_id', selectedProject).order('sort_order'),
-    ]);
-    setItems(itemsRes.data || []);
-    setRevisions(revsRes.data || []);
-    setActivities(actsRes.data || []);
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const [itemsRes, revsRes, actsRes] = await Promise.all([
+        supabase.from('programme_items').select('*').eq('project_id', selectedProject).order('sort_order'),
+        supabase.from('programme_revisions').select('*').eq('project_id', selectedProject).order('revision_number'),
+        supabase.from('works_activities').select('id, activity_name, activity_code, category, planned_quantity, completed_quantity').eq('project_id', selectedProject).order('sort_order'),
+      ]);
+      if (itemsRes.error) throw itemsRes.error;
+      if (revsRes.error) throw revsRes.error;
+      if (actsRes.error) throw actsRes.error;
+      setItems(itemsRes.data || []);
+      setRevisions(revsRes.data || []);
+      setActivities(actsRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   // ── Filter items by source view ──
@@ -374,6 +385,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
         </div>
       </div>
 
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>⏳ Loading programme data...</div>}
 
       {!loading && selectedProject && (

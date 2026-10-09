@@ -43,8 +43,8 @@ export default function ObligationsPage({ profile, showToast, selectedProject: p
       if (err) throw err;
       setObligations(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load obligations: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }

@@ -162,7 +162,7 @@ export default function EquipmentPage({ profile, showToast, selectedProject: pro
                         <td>
                           <div className="btn-group">
                             <button className="btn btn-sm btn-primary" onClick={() => setShowStatusModal(eq.id)}>Log Status</button>
-                            {canManage && <button className="btn btn-sm btn-danger" onClick={() => deleteEquipment(eq.id)}>×</button>}
+                            {canManage && <button className="btn btn-sm btn-danger" aria-label="Delete equipment" onClick={() => deleteEquipment(eq.id)}>×</button>}
                           </div>
                         </td>
                       </tr>

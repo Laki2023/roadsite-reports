@@ -493,6 +493,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
         }));
       }
     } catch (err) {
+      showToast?.('Could not fetch weather data', 'error');
     } finally {
       setMetLoading(false);
     }

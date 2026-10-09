@@ -34,6 +34,8 @@ const PROJECT_ROLES = [
 export default function AdminPanel({ profile, showToast }) {
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [tab, setTab] = useState('pending');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -47,12 +49,21 @@ export default function AdminPanel({ profile, showToast }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [usersRes, projRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('projects').select('id, name').order('name'),
-    ]);
-    setUsers(usersRes.data || []);
-    setProjects(projRes.data || []);
+    try {
+      const [usersRes, projRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('projects').select('id, name').order('name'),
+      ]);
+      if (usersRes.error) throw usersRes.error;
+      if (projRes.error) throw projRes.error;
+      setUsers(usersRes.data || []);
+      setProjects(projRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function openApproveModal(user) {
@@ -178,8 +189,11 @@ export default function AdminPanel({ profile, showToast }) {
   const admins = active.filter(u => u.role === 'super_admin');
   const nonAdmins = active.filter(u => u.role !== 'super_admin');
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
+
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div>
           <h2>Administration</h2>

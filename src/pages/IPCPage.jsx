@@ -26,27 +26,43 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
   const canManage = isPlatformAdmin || hasRole(profile?.role, 'project_engineer') ||
     canEditModule(profile?.allowed_pages, 'ipc');
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   useEffect(() => { supabase.from('projects').select('*').order('name').then(({ data }) => setProjects(data || [])); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
 
   async function loadData() {
-    const [projRes, ipcRes, itemRes, secRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', selectedProject).single(),
-      supabase.from('ipc_certificates').select(`*,
-        preparer:prepared_by(full_name),
-        certifier:certified_by(full_name),
-        re_checker:re_checked_by(full_name),
-        pe_reviewer:pe_reviewed_by(full_name),
-        eng_certifier:engineer_certified_by(full_name)
-      `).eq('project_id', selectedProject).order('ipc_no', { ascending: true }),
-      supabase.from('boq_items').select('*, section:section_id(section_no, section_title)')
-        .eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('boq_sections').select('*').eq('project_id', selectedProject).order('sort_order'),
-    ]);
-    setProjectData(projRes.data);
-    setIpcs(ipcRes.data || []);
-    setBoqItems(itemRes.data || []);
-    setBoqSections(secRes.data || []);
+    try {
+      setLoading(true);
+      setError(null);
+      const [projRes, ipcRes, itemRes, secRes] = await Promise.all([
+        supabase.from('projects').select('*').eq('id', selectedProject).single(),
+        supabase.from('ipc_certificates').select(`*,
+          preparer:prepared_by(full_name),
+          certifier:certified_by(full_name),
+          re_checker:re_checked_by(full_name),
+          pe_reviewer:pe_reviewed_by(full_name),
+          eng_certifier:engineer_certified_by(full_name)
+        `).eq('project_id', selectedProject).order('ipc_no', { ascending: true }),
+        supabase.from('boq_items').select('*, section:section_id(section_no, section_title)')
+          .eq('project_id', selectedProject).order('sort_order'),
+        supabase.from('boq_sections').select('*').eq('project_id', selectedProject).order('sort_order'),
+      ]);
+      if (projRes.error) throw projRes.error;
+      if (ipcRes.error) throw ipcRes.error;
+      if (itemRes.error) throw itemRes.error;
+      if (secRes.error) throw secRes.error;
+      setProjectData(projRes.data);
+      setIpcs(ipcRes.data || []);
+      setBoqItems(itemRes.data || []);
+      setBoqSections(secRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function generateIPC(e) {
@@ -244,8 +260,11 @@ export default function IPCPage({ profile, showToast, selectedProject: propProje
   }
   function daysBetween(d1, d2) { if (!d1 || !d2) return null; return Math.floor((new Date(d2) - new Date(d1)) / 86400000); }
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
+
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div><h2>💰 Interim Payment Certificates</h2><div className="subtitle">FIDIC Cl. 14 — Full IPC Lifecycle Tracking</div></div>
         {selectedProject && canManage && boqItems.length > 0 && (

@@ -23,12 +23,23 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
   const [form, setForm] = useState(EMPTY_PROJECT);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => { loadProjects(); }, []);
 
   async function loadProjects() {
-    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-    setProjects(data || []);
+    try {
+      setError(null);
+      const { data, error: err } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+      if (err) throw err;
+      setProjects(data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSave(e) {
@@ -108,8 +119,11 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
   const catColors = { Construction: 'accent', Rehabilitation: 'info', Maintenance: 'success' };
   const phaseColors = { Procurement: 'muted', Mobilization: 'info', Construction: 'accent', 'Defects Liability': 'warning', Completed: 'success', Suspended: 'danger' };
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
+
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div>
           <h2>Projects</h2>
@@ -134,9 +148,10 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card empty-state">
-          <div className="icon">◈</div>
-          <p>No projects found</p>
+        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}>
+          <div style={{fontSize:48,marginBottom:12}}>📋</div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>No Projects Yet</div>
+          <div style={{fontSize:13}}>Create your first project to get started.</div>
         </div>
       ) : (
         <div className="table-wrap">

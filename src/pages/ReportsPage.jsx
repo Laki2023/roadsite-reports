@@ -74,8 +74,8 @@ export default function ReportsPage({ profile, showToast, selectedProject: propP
       setReports(enriched);
       setProjects(projRes.data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load reports: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }

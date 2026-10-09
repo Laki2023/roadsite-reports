@@ -48,21 +48,35 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
   const [searchQuery, setSearchQuery] = useState('');
   const [localQty, setLocalQty] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const canManage = hasRole(profile?.role, 'resident_engineer') || profile?.is_platform_admin;
 
   useEffect(() => { supabase.from('projects').select('id, name').order('name').then(({ data }) => setProjects(data || [])); }, []);
   useEffect(() => { if (selectedProject) loadData(); }, [selectedProject]);
 
   async function loadData() {
-    const [secRes, itemRes, actRes] = await Promise.all([
-      supabase.from('boq_sections').select('*').eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('boq_items').select('*, section:section_id(section_no, section_title), activity:linked_activity_id(activity_name, activity_code)')
-        .eq('project_id', selectedProject).order('sort_order'),
-      supabase.from('works_activities').select('id, activity_name, activity_code').eq('project_id', selectedProject).order('sort_order'),
-    ]);
-    setSections(secRes.data || []);
-    setItems(itemRes.data || []);
-    setActivities(actRes.data || []);
+    try {
+      setLoading(true);
+      setError(null);
+      const [secRes, itemRes, actRes] = await Promise.all([
+        supabase.from('boq_sections').select('*').eq('project_id', selectedProject).order('sort_order'),
+        supabase.from('boq_items').select('*, section:section_id(section_no, section_title), activity:linked_activity_id(activity_name, activity_code)')
+          .eq('project_id', selectedProject).order('sort_order'),
+        supabase.from('works_activities').select('id, activity_name, activity_code').eq('project_id', selectedProject).order('sort_order'),
+      ]);
+      if (secRes.error) throw secRes.error;
+      if (itemRes.error) throw itemRes.error;
+      if (actRes.error) throw actRes.error;
+      setSections(secRes.data || []);
+      setItems(itemRes.data || []);
+      setActivities(actRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addSection(e) {
@@ -347,8 +361,11 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
 
   const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
+
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div><h2>📋 Bill of Quantities</h2><div className="subtitle">Contract items, valuation & financial progress</div></div>
         {selectedProject && canManage && (
@@ -760,12 +777,12 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
       })()}
 
       {selectedProject && items.length === 0 && (
-        <div className="card empty-state">
-          <div className="icon">📋</div>
-          <p>No BoQ items for this project</p>
-          <div className="text-sm text-muted" style={{ marginBottom: 16 }}>Start by adding sections, then import items from your contract BoQ</div>
+        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}>
+          <div style={{fontSize:48,marginBottom:12}}>📑</div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>No BoQ Items</div>
+          <div style={{fontSize:13,marginBottom:16}}>Add bill of quantity items to get started.</div>
           {canManage && (
-            <div className="btn-group">
+            <div className="btn-group" style={{justifyContent:'center'}}>
               <button className="btn btn-primary" onClick={() => setShowAddSection(true)}>+ Add Section</button>
               <button className="btn btn-secondary" onClick={() => setShowBulkImport(true)}>📥 Bulk Import</button>
             </div>
@@ -924,7 +941,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
                     confirmLabel: 'Delete',
                     variant: 'danger',
                     action: () => deleteItem(i.id),
-                  })} style={{ fontSize: 10, padding: '2px 6px' }}>×</button></td>}
+                  })} style={{ fontSize: 10, padding: '2px 6px' }} aria-label="Delete item">×</button></td>}
                 </tr>
               );
             })}

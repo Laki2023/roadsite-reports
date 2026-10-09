@@ -43,8 +43,8 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
       if (err) throw err;
       setIssues(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load issues: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
@@ -172,6 +172,12 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
 
       {!projectId ? (
         <div className="card empty-state"><div className="icon">⚠</div><p>Select a project</p></div>
+      ) : filtered.length === 0 ? (
+        <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}>
+          <div style={{fontSize:48,marginBottom:12}}>✅</div>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:4}}>No Issues Found</div>
+          <div style={{fontSize:13}}>No issues match your filters.</div>
+        </div>
       ) : (
         <div className="table-wrap">
           <table>
@@ -202,10 +208,6 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
             </tbody>
           </table>
         </div>
-      )}
-
-      {filtered.length === 0 && projectId && (
-        <div className="card empty-state mt-16"><p>No issues match your filters</p></div>
       )}
 
       {/* Modal */}

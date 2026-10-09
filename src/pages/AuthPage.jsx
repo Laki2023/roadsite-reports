@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 const TITLES = ['Mr.', 'Mrs.', 'Ms.', 'Eng.', 'Dr.', 'Prof.', 'Hon.', 'Arch.', 'QS.', 'Surv.', 'Capt.', 'Cpl.'];
@@ -59,17 +59,18 @@ export default function AuthPage({ showToast }) {
   const [resetComplete, setResetComplete] = useState(false);
 
   // Detect password reset link from URL
-  useState(() => {
+  useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes('type=recovery')) {
       setIsResetMode(true);
     }
     // Also listen for Supabase auth events
-    supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsResetMode(true);
       }
     });
+    return () => subscription?.unsubscribe();
   }, []);
 
   const finalPosition = position === '__custom__' ? customPosition : position;

@@ -29,6 +29,8 @@ export default function EmergencyPage({ profile, showToast }) {
     chainage: '', people_involved: 0, description: ''
   });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const canManage = hasRole(profile?.role, 'resident_engineer');
 
@@ -41,14 +43,24 @@ export default function EmergencyPage({ profile, showToast }) {
   }, []);
 
   async function loadAll() {
-    const [emRes, projRes] = await Promise.all([
-      supabase.from('site_emergencies')
-        .select('*, projects(name), reporter:reported_by(full_name), acknowledger:acknowledged_by(full_name), responder:response_by(full_name), resolver:resolved_by(full_name)')
-        .order('reported_at', { ascending: false }),
-      supabase.from('projects').select('id, name').order('name'),
-    ]);
-    setEmergencies(emRes.data || []);
-    setProjects(projRes.data || []);
+    try {
+      setError(null);
+      const [emRes, projRes] = await Promise.all([
+        supabase.from('site_emergencies')
+          .select('*, projects(name), reporter:reported_by(full_name), acknowledger:acknowledged_by(full_name), responder:response_by(full_name), resolver:resolved_by(full_name)')
+          .order('reported_at', { ascending: false }),
+        supabase.from('projects').select('id, name').order('name'),
+      ]);
+      if (emRes.error) throw emRes.error;
+      if (projRes.error) throw projRes.error;
+      setEmergencies(emRes.data || []);
+      setProjects(projRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function reportEmergency(e) {
@@ -98,8 +110,11 @@ export default function EmergencyPage({ profile, showToast }) {
     return { background: '#16a34a', color: '#fff' };
   };
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
+
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div>
           <h2>🚨 Site Emergencies</h2>

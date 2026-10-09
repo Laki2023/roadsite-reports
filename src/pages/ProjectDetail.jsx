@@ -25,6 +25,8 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
   const [docForm, setDocForm] = useState({ doc_type: 'Other', title: '', reference_no: '', description: '', doc_date: '', issued_by: '', status: 'Active' });
   const [dutyForm, setDutyForm] = useState({ assigned_to: '', title: '', description: '', priority: 'Medium', due_date: '' });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const isAdmin = hasRole(profile?.role, 'super_admin');
   const isSuperAdmin = profile?.is_super_admin;
@@ -37,23 +39,33 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
   }, [selectedProject]);
 
   async function loadAll() {
-    const pid = selectedProject.id;
-    const [projRes, elRes, layRes, assignRes, docRes, dutyRes, staffRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', pid).single(),
-      supabase.from('construction_elements').select('*').eq('project_id', pid).order('sort_order'),
-      supabase.from('pavement_layers').select('*').eq('project_id', pid).order('start_chainage'),
-      supabase.from('staff_assignments').select('*, profiles(full_name, designation, role)').eq('project_id', pid).eq('is_active', true),
-      supabase.from('project_documents').select('*').eq('project_id', pid).order('created_at', { ascending: false }),
-      supabase.from('project_duties').select('*, assignee:assigned_to(full_name), assigner:assigned_by(full_name)').eq('project_id', pid).order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, full_name, designation, role').neq('role', 'pending').order('full_name'),
-    ]);
-    if (projRes.data) setProject(projRes.data);
-    setElements(elRes.data || []);
-    setLayers(layRes.data || []);
-    setAssignments(assignRes.data || []);
-    setDocuments(docRes.data || []);
-    setDuties(dutyRes.data || []);
-    setStaff(staffRes.data || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const pid = selectedProject.id;
+      const [projRes, elRes, layRes, assignRes, docRes, dutyRes, staffRes] = await Promise.all([
+        supabase.from('projects').select('*').eq('id', pid).single(),
+        supabase.from('construction_elements').select('*').eq('project_id', pid).order('sort_order'),
+        supabase.from('pavement_layers').select('*').eq('project_id', pid).order('start_chainage'),
+        supabase.from('staff_assignments').select('*, profiles(full_name, designation, role)').eq('project_id', pid).eq('is_active', true),
+        supabase.from('project_documents').select('*').eq('project_id', pid).order('created_at', { ascending: false }),
+        supabase.from('project_duties').select('*, assignee:assigned_to(full_name), assigner:assigned_by(full_name)').eq('project_id', pid).order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, full_name, designation, role').neq('role', 'pending').order('full_name'),
+      ]);
+      if (projRes.error) throw projRes.error;
+      if (projRes.data) setProject(projRes.data);
+      setElements(elRes.data || []);
+      setLayers(layRes.data || []);
+      setAssignments(assignRes.data || []);
+      setDocuments(docRes.data || []);
+      setDuties(dutyRes.data || []);
+      setStaff(staffRes.data || []);
+    } catch (err) {
+      setError('Failed to load project details: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function setProjectLead(leadId) {
@@ -77,6 +89,7 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
   }
 
   async function deleteDocument(id) {
+    if (!window.confirm('Delete this document? This cannot be undone.')) return;
     await supabase.from('project_documents').delete().eq('id', id);
     showToast('Document removed');
     loadAll();
@@ -109,6 +122,8 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
     </div>
   );
 
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>&#9672;</div><div>Loading...</div></div>;
+
   const p = project;
   const totalWeight = elements.reduce((s, e) => s + (e.weight_pct || 0), 0);
   const weightedProgress = elements.reduce((s, e) => {
@@ -140,6 +155,11 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
 
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <button className="btn btn-sm btn-secondary mb-16" onClick={() => navigateTo('projects')}>← Back to Projects</button>

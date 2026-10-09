@@ -8,6 +8,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
   const [invitations, setInvitations] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
@@ -24,15 +25,24 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
 
   // ── Data Loading ──
   const loadAll = useCallback(async () => {
-    const [usersRes, projRes, invRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('role').order('full_name'),
-      supabase.from('projects').select('id, name, contract_no').order('name'),
-      supabase.from('user_invitations').select('*').order('created_at', { ascending: false }),
-    ]);
-    setUsers(usersRes.data || []);
-    setProjects(projRes.data || []);
-    setInvitations(invRes.data || []);
-    setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const [usersRes, projRes, invRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('role').order('full_name'),
+        supabase.from('projects').select('id, name, contract_no').order('name'),
+        supabase.from('user_invitations').select('*').order('created_at', { ascending: false }),
+      ]);
+      if (usersRes.error) throw usersRes.error;
+      setUsers(usersRes.data || []);
+      setProjects(projRes.data || []);
+      setInvitations(invRes.data || []);
+    } catch (err) {
+      setError('Failed to load user data: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const loadAudit = useCallback(async () => {
@@ -92,10 +102,15 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
     return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  if (loading) return <div className="page-header"><h2>Loading...</h2></div>;
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>&#9672;</div><div>Loading...</div></div>;
 
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>User Management</h2>

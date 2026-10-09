@@ -17,6 +17,7 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
   const [instructions, setInstructions] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filterProject, setFilterProject] = useState(selectedProject?.id || 'all');
   const [filterStatus, setFilterStatus] = useState('pending');
   const [actionModal, setActionModal] = useState(null); // { item, action: 'approve'|'reject'|'escalate' }
@@ -30,19 +31,29 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
   const userLevel = ROLE_LEVELS[userRole] || 0;
 
   const loadData = useCallback(async () => {
-    const [qRes, siRes, pRes] = await Promise.all([
-      supabase.from('approval_queue')
-        .select('*, project:projects(name), submitter:submitted_by(full_name), decider:decision_by(full_name)')
-        .order('created_at', { ascending: false }),
-      supabase.from('site_instructions')
-        .select('*, project:projects(name), issuer:issued_by(full_name)')
-        .order('issued_at', { ascending: false }),
-      supabase.from('projects').select('id, name').order('name'),
-    ]);
-    setQueue(qRes.data || []);
-    setInstructions(siRes.data || []);
-    setProjects(pRes.data || []);
-    setLoading(false);
+    try {
+      setError(null);
+      const [qRes, siRes, pRes] = await Promise.all([
+        supabase.from('approval_queue')
+          .select('*, project:projects(name), submitter:submitted_by(full_name), decider:decision_by(full_name)')
+          .order('created_at', { ascending: false }),
+        supabase.from('site_instructions')
+          .select('*, project:projects(name), issuer:issued_by(full_name)')
+          .order('issued_at', { ascending: false }),
+        supabase.from('projects').select('id, name').order('name'),
+      ]);
+      if (qRes.error) throw qRes.error;
+      if (siRes.error) throw siRes.error;
+      if (pRes.error) throw pRes.error;
+      setQueue(qRes.data || []);
+      setInstructions(siRes.data || []);
+      setProjects(pRes.data || []);
+    } catch (err) {
+      setError(err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -166,10 +177,11 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
     return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  if (loading) return <div className="page-header"><h2>Loading...</h2></div>;
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
 
   return (
     <div>
+      {error && <div style={{padding:'12px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,color:'#991b1b',marginBottom:16}}>Failed to load: {error}</div>}
       <div className="page-header">
         <div>
           <h2>Approvals & Instructions</h2>

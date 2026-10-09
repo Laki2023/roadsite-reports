@@ -108,14 +108,18 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
       if (err) throw err;
       setPersonnel(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load personnel: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
   }
 
   async function savePersonnel(formData) {
+    if (!formData.position_title || !formData.party) {
+      showToast?.('Name, role and organization are required', 'error');
+      return;
+    }
     const payload = { ...formData, project_id: selectedProject };
     ['replacement_for','date_mobilised','date_demobilised','replacement_consent_date'].forEach(k => {
       if (!payload[k]) payload[k] = null;

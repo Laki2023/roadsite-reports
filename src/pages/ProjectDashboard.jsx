@@ -61,8 +61,10 @@ function StatusBadge({ status }) {
   </span>;
 }
 
-export default function ProjectDashboard({ projectId, onBack, profile, navigateTo }) {
+export default function ProjectDashboard({ projectId, onBack, profile, navigateTo, showToast }) {
   const [d, setD] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showObModal, setShowObModal] = useState(false);
   const [obForm, setObForm] = useState({ obligation_type: 'Performance Guarantee', provider: '', amount: '', reference_no: '', expiry_date: '', notes: '' });
   const [obEditId, setObEditId] = useState(null);
@@ -72,41 +74,51 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
   useEffect(() => { load(); }, [projectId]);
 
   async function load() {
-    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions,obligations,claimsRes] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', projectId).single(),
-      supabase.from('boq_items').select('*').eq('project_id', projectId),
-      supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name)').eq('project_id', projectId).order('sort_order'),
-      supabase.from('equipment_register').select('*').eq('project_id', projectId),
-      supabase.from('structures').select('*').eq('project_id', projectId),
-      supabase.from('site_issues').select('*').eq('project_id', projectId),
-      supabase.from('pavement_layers').select('*').eq('project_id', projectId).order('start_chainage'),
-      supabase.from('quality_tests').select('*').eq('project_id', projectId),
-      supabase.from('ipc_certificates').select('*').eq('project_id', projectId).order('ipc_no'),
-      supabase.from('risk_register').select('*').eq('project_id', projectId),
-      supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order'),
-      supabase.from('project_materials').select('*').eq('project_id', projectId),
-      supabase.from('daily_reports').select('id, report_date, weather, rainfall_mm, max_temp_c, min_temp_c, is_working_day, non_working_reason, working_hours').eq('project_id', projectId).order('report_date'),
-      supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
-      supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
-      supabase.from('claims').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
-    ]);
-    // Latest site photos with signed URLs (best-effort — dashboard still loads if storage fails)
-    let photosWithUrls = [];
+    setLoading(true);
+    setError(null);
     try {
-      const { data: photoRows } = await supabase.from('report_photos').select('*')
-        .eq('project_id', projectId).order('created_at', { ascending: false }).limit(8);
-      photosWithUrls = await Promise.all((photoRows || []).map(async (ph) => {
-        try {
-          const { data: signed } = await supabase.storage.from('site-photos').createSignedUrl(ph.file_path, 3600);
-          return { ...ph, url: signed?.signedUrl || null };
-        } catch { return { ...ph, url: null }; }
-      }));
-    } catch { photosWithUrls = []; }
-    setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
-      issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
-      risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
-      instructions:instructions.data||[], obligations:obligations.data||[], photos:photosWithUrls,
-      claims:claimsRes.data||[] });
+      const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,risks,miles,mats,reports,instructions,obligations,claimsRes] = await Promise.all([
+        supabase.from('projects').select('*').eq('id', projectId).single(),
+        supabase.from('boq_items').select('*').eq('project_id', projectId),
+        supabase.from('works_activities').select('*, parent:parent_activity_id(activity_name)').eq('project_id', projectId).order('sort_order'),
+        supabase.from('equipment_register').select('*').eq('project_id', projectId),
+        supabase.from('structures').select('*').eq('project_id', projectId),
+        supabase.from('site_issues').select('*').eq('project_id', projectId),
+        supabase.from('pavement_layers').select('*').eq('project_id', projectId).order('start_chainage'),
+        supabase.from('quality_tests').select('*').eq('project_id', projectId),
+        supabase.from('ipc_certificates').select('*').eq('project_id', projectId).order('ipc_no'),
+        supabase.from('risk_register').select('*').eq('project_id', projectId),
+        supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order'),
+        supabase.from('project_materials').select('*').eq('project_id', projectId),
+        supabase.from('daily_reports').select('id, report_date, weather, rainfall_mm, max_temp_c, min_temp_c, is_working_day, non_working_reason, working_hours').eq('project_id', projectId).order('report_date'),
+        supabase.from('site_instructions').select('*').eq('project_id', projectId).order('issued_at', { ascending: false }),
+        supabase.from('project_obligations').select('*').eq('project_id', projectId).order('display_order'),
+        supabase.from('claims').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+      ]);
+      if (proj.error) throw proj.error;
+      // Latest site photos with signed URLs (best-effort — dashboard still loads if storage fails)
+      let photosWithUrls = [];
+      try {
+        const { data: photoRows } = await supabase.from('report_photos').select('*')
+          .eq('project_id', projectId).order('created_at', { ascending: false }).limit(8);
+        photosWithUrls = await Promise.all((photoRows || []).map(async (ph) => {
+          try {
+            const { data: signed } = await supabase.storage.from('site-photos').createSignedUrl(ph.file_path, 3600);
+            return { ...ph, url: signed?.signedUrl || null };
+          } catch { return { ...ph, url: null }; }
+        }));
+      } catch { photosWithUrls = []; }
+      setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
+        issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
+        risks:risks.data||[], miles:miles.data||[], mats:mats.data||[], reports:reports.data||[],
+        instructions:instructions.data||[], obligations:obligations.data||[], photos:photosWithUrls,
+        claims:claimsRes.data||[] });
+    } catch (err) {
+      setError('Failed to load project dashboard: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   // ── Statutory Obligations helpers ──
@@ -147,7 +159,8 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
     setObEditId(ob.id); setShowObModal(true);
   };
 
-  if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>Loading project dashboard...</div>;
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>&#9672;</div><div>Loading...</div></div>;
+  if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>No data available.</div>;
 
   const { p, boq, works, equip, structs, issues, layers, tests, ipcs, risks, miles, mats, reports, instructions, claims } = d;
 
@@ -510,6 +523,11 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
 
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       {/* ══════ HEADER ══════ */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16, flexWrap:'wrap', gap:12 }}>
         <div style={{ flex:1 }}>

@@ -42,8 +42,8 @@ export default function StaffPage({ profile, showToast }) {
       setProjects(projRes.data || []);
       setAssignments(assignRes.data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load staff data: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
@@ -71,6 +71,7 @@ export default function StaffPage({ profile, showToast }) {
   }
 
   async function removeAssignment(id) {
+    if (!window.confirm('Remove this staff assignment?')) return;
     await supabase.from('staff_assignments').update({ is_active: false }).eq('id', id);
     showToast('Assignment removed');
     loadAll();

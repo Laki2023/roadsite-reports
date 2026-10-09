@@ -41,8 +41,8 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
       if (err) throw err;
       setLayers(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load pavement layers: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
@@ -50,6 +50,10 @@ export default function PavementPage({ profile, showToast, selectedProject }) {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (form.start_chainage !== '' && form.end_chainage !== '' && parseFloat(form.end_chainage) <= parseFloat(form.start_chainage)) {
+      showToast?.('End chainage must be greater than start chainage', 'error');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {

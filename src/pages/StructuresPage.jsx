@@ -320,7 +320,7 @@ export default function StructuresPage({ profile, showToast, selectedProject: pr
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <h3>Add Structure<button onClick={() => setShowAddModal(false)}>×</button></h3>
+            <h3>Add Structure<button aria-label="Close dialog" onClick={() => setShowAddModal(false)}>×</button></h3>
             <form onSubmit={addStructure}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-16"><label>Type *</label>
@@ -372,7 +372,7 @@ export default function StructuresPage({ profile, showToast, selectedProject: pr
         <div className="modal-overlay" onClick={() => setShowProgressModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <h3>Log Stage — {selectedStructure.structure_ref} ({selectedStructure.structure_type})
-              <button onClick={() => setShowProgressModal(false)}>×</button></h3>
+              <button aria-label="Close dialog" onClick={() => setShowProgressModal(false)}>×</button></h3>
             <form onSubmit={logStageProgress}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group mb-16"><label>Stage *</label>

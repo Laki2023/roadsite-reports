@@ -21,6 +21,9 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
   const [filterBill, setFilterBill] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showHarmoniseModal, setShowHarmoniseModal] = useState(false);
+  const [harmoniseEntryId, setHarmoniseEntryId] = useState(null);
+  const [harmoniseValue, setHarmoniseValue] = useState('');
   const [myParty, setMyParty] = useState(null); // 'contractor', 'engineer', or null (RE/admin sees all)
 
   const isPlatformAdmin = profile?.is_platform_admin;
@@ -342,8 +345,9 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                               style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-hover)', cursor: 'pointer', color: 'var(--accent)' }}>Edit</button>
                             {entry.status !== 'agreed' && canHarmonise && entry.contractor_qty > 0 && entry.engineer_qty > 0 && (
                               <button onClick={() => {
-                                const qty = prompt('Enter agreed quantity:', entry.engineer_qty);
-                                if (qty !== null) harmonise(entry.id, qty);
+                                setHarmoniseEntryId(entry.id);
+                                setHarmoniseValue(String(entry.engineer_qty));
+                                setShowHarmoniseModal(true);
                               }}
                                 style={{ padding: '3px 8px', fontSize: 10, fontWeight: 600, border: 'none', borderRadius: 4, background: '#059669', cursor: 'pointer', color: '#fff' }}>Harmonise</button>
                             )}
@@ -380,6 +384,33 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
           <div style={{ fontSize: 50, marginBottom: 12 }}>📐</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Taking Off Sheet</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Select a project to view and record measurements</div>
+        </div>
+      )}
+
+      {/* ══════ HARMONISE MODAL ══════ */}
+      {showHarmoniseModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => { setShowHarmoniseModal(false); setHarmoniseEntryId(null); }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, width: '100%', maxWidth: 400 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>✅ Harmonise Measurement</h3>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Agreed quantity</label>
+              <input type="number" step="0.01" value={harmoniseValue} onChange={e => setHarmoniseValue(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', fontSize: 14, border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', fontWeight: 700 }}
+                autoFocus />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button className="btn btn-secondary" onClick={() => { setShowHarmoniseModal(false); setHarmoniseEntryId(null); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={() => {
+                if (harmoniseValue !== '') {
+                  harmonise(harmoniseEntryId, harmoniseValue);
+                }
+                setShowHarmoniseModal(false);
+                setHarmoniseEntryId(null);
+              }}>Confirm</button>
+            </div>
+          </div>
         </div>
       )}
 

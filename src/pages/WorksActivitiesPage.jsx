@@ -64,8 +64,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
       if (err) throw err;
       setEntries(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load work entries: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
@@ -80,8 +80,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
       if (err) throw err;
       setActivities(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load activities: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     }
   }
 

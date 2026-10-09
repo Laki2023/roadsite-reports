@@ -20,6 +20,7 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState(selectedProject?.id || '');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editId, setEditId] = useState(null);
@@ -43,13 +44,21 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
 
   async function loadInstructions() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('site_instructions')
-      .select('*, issuer:issued_by(full_name), approver:approved_by(full_name), escalated_user:escalated_to(full_name)')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
-    if (!error) setInstructions(data || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('site_instructions')
+        .select('*, issuer:issued_by(full_name), approver:approved_by(full_name), escalated_user:escalated_to(full_name)')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      if (fetchError) throw fetchError;
+      setInstructions(data || []);
+    } catch (err) {
+      setError('Failed to load site instructions: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -217,10 +226,16 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
         </div>
       </div>
 
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
       {!projectId ? (
         <div className="card empty-state"><p>Select a project to view site instructions.</p></div>
       ) : loading ? (
-        <div className="card empty-state"><p>Loading...</p></div>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>&#9672;</div><div>Loading...</div></div>
       ) : (
         <>
           {/* Filter tabs */}

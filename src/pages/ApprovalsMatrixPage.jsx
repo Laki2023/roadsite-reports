@@ -51,8 +51,8 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
       if (err) throw err;
       setItems(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load approvals matrix: ' + err.message);
+      showToast?.('Failed to load data', 'error');
     } finally {
       setLoading(false);
     }
@@ -92,7 +92,7 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
   }
 
   async function deleteItem(id) {
-    if (!window.confirm('Delete this approval item?')) return;
+    if (!window.confirm('Are you sure you want to delete this approval item? This cannot be undone.')) return;
     await supabase.from('approvals_matrix').delete().eq('id', id);
     loadItems();
   }

@@ -54,8 +54,8 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
       if (err) throw err;
       setClaims(data || []);
     } catch (err) {
-      console.error(err);
       setError('Failed to load claims: ' + err.message);
+      showToast?.('Failed to load claims', 'error');
     } finally {
       setLoading(false);
     }

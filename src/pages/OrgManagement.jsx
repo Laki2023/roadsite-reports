@@ -15,6 +15,7 @@ export default function OrgManagement({ profile, showToast }) {
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_ORG);
@@ -24,15 +25,24 @@ export default function OrgManagement({ profile, showToast }) {
   const isPlatformAdmin = profile.is_platform_admin === true;
 
   const loadAll = useCallback(async () => {
-    const [orgRes, userRes, projRes] = await Promise.all([
-      supabase.from('organisations').select('*').order('name'),
-      supabase.from('profiles').select('id, full_name, email, role, organisation_id, is_active').order('full_name'),
-      supabase.from('projects').select('id, name, organisation_id, category').order('name'),
-    ]);
-    setOrgs(orgRes.data || []);
-    setUsers(userRes.data || []);
-    setProjects(projRes.data || []);
-    setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const [orgRes, userRes, projRes] = await Promise.all([
+        supabase.from('organisations').select('*').order('name'),
+        supabase.from('profiles').select('id, full_name, email, role, organisation_id, is_active').order('full_name'),
+        supabase.from('projects').select('id, name, organisation_id, category').order('name'),
+      ]);
+      if (orgRes.error) throw orgRes.error;
+      setOrgs(orgRes.data || []);
+      setUsers(userRes.data || []);
+      setProjects(projRes.data || []);
+    } catch (err) {
+      setError('Failed to load organisation data: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
@@ -76,7 +86,7 @@ export default function OrgManagement({ profile, showToast }) {
   }
 
   if (!isPlatformAdmin) return <div className="page-header"><h2>Access Denied</h2><p>Platform Admin only.</p></div>;
-  if (loading) return <div className="page-header"><h2>Loading...</h2></div>;
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
 
   const orgDetail = selectedOrg ? orgs.find(o => o.id === selectedOrg) : null;
   const orgUsers = selectedOrg ? users.filter(u => u.organisation_id === selectedOrg) : [];
@@ -86,6 +96,11 @@ export default function OrgManagement({ profile, showToast }) {
 
   return (
     <div>
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>🏛 Organisation Management</h2>

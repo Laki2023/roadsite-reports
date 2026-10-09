@@ -25,8 +25,10 @@ function RAG({ status }) {
   return <span style={{ display:'inline-block', width:12, height:12, borderRadius:6, background:c, marginRight:6 }} />;
 }
 
-export default function ProjectSummary({ projectId, onBack, profile }) {
+export default function ProjectSummary({ projectId, onBack, profile, showToast }) {
   const [d, setD] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [tab, setTab] = useState('overview');
   const [showModal, setShowModal] = useState(null);
   const [modalForm, setModalForm] = useState({});
@@ -36,25 +38,35 @@ export default function ProjectSummary({ projectId, onBack, profile }) {
   useEffect(() => { load(); }, [projectId]);
 
   async function load() {
-    const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,emerg,mats,risks,miles,decisions] = await Promise.all([
-      supabase.from('projects').select('*').eq('id', projectId).single(),
-      supabase.from('boq_items').select('*').eq('project_id', projectId),
-      supabase.from('works_activities').select('*').eq('project_id', projectId).order('sort_order'),
-      supabase.from('equipment_register').select('*').eq('project_id', projectId),
-      supabase.from('structures').select('*').eq('project_id', projectId).order('chainage'),
-      supabase.from('site_issues').select('*').eq('project_id', projectId),
-      supabase.from('pavement_layers').select('*').eq('project_id', projectId).order('start_chainage'),
-      supabase.from('quality_tests').select('*').eq('project_id', projectId),
-      supabase.from('ipc_certificates').select('*').eq('project_id', projectId).order('ipc_no'),
-      supabase.from('site_emergencies').select('*').eq('project_id', projectId),
-      supabase.from('project_materials').select('*').eq('project_id', projectId),
-      supabase.from('risk_register').select('*').eq('project_id', projectId).order('created_at',{ascending:false}),
-      supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order'),
-      supabase.from('management_decisions').select('*').eq('project_id', projectId).order('created_at',{ascending:false}),
-    ]);
-    setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
-      issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
-      emerg:emerg.data||[], mats:mats.data||[], risks:risks.data||[], miles:miles.data||[], decisions:decisions.data||[] });
+    setLoading(true);
+    setError(null);
+    try {
+      const [proj,boq,works,equip,structs,issues,layers,tests,ipcs,emerg,mats,risks,miles,decisions] = await Promise.all([
+        supabase.from('projects').select('*').eq('id', projectId).single(),
+        supabase.from('boq_items').select('*').eq('project_id', projectId),
+        supabase.from('works_activities').select('*').eq('project_id', projectId).order('sort_order'),
+        supabase.from('equipment_register').select('*').eq('project_id', projectId),
+        supabase.from('structures').select('*').eq('project_id', projectId).order('chainage'),
+        supabase.from('site_issues').select('*').eq('project_id', projectId),
+        supabase.from('pavement_layers').select('*').eq('project_id', projectId).order('start_chainage'),
+        supabase.from('quality_tests').select('*').eq('project_id', projectId),
+        supabase.from('ipc_certificates').select('*').eq('project_id', projectId).order('ipc_no'),
+        supabase.from('site_emergencies').select('*').eq('project_id', projectId),
+        supabase.from('project_materials').select('*').eq('project_id', projectId),
+        supabase.from('risk_register').select('*').eq('project_id', projectId).order('created_at',{ascending:false}),
+        supabase.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order'),
+        supabase.from('management_decisions').select('*').eq('project_id', projectId).order('created_at',{ascending:false}),
+      ]);
+      if (proj.error) throw proj.error;
+      setD({ p:proj.data, boq:boq.data||[], works:works.data||[], equip:equip.data||[], structs:structs.data||[],
+        issues:issues.data||[], layers:layers.data||[], tests:tests.data||[], ipcs:ipcs.data||[],
+        emerg:emerg.data||[], mats:mats.data||[], risks:risks.data||[], miles:miles.data||[], decisions:decisions.data||[] });
+    } catch (err) {
+      setError('Failed to load project summary: ' + err.message);
+      showToast?.('Failed to load data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function addRecord(table, data) {
@@ -65,7 +77,8 @@ export default function ProjectSummary({ projectId, onBack, profile }) {
     setShowModal(null); setModalForm({}); load();
   }
 
-  if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>Loading...</div>;
+  if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>&#9672;</div><div>Loading...</div></div>;
+  if (!d) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>No data available.</div>;
 
   const { p, boq, works, equip, structs, issues, layers, tests, ipcs, emerg, mats, risks, miles, decisions } = d;
   const contractSum = boq.reduce((s,i) => s+(i.boq_amount||0),0) || p.contract_sum || 0;
@@ -128,7 +141,12 @@ export default function ProjectSummary({ projectId, onBack, profile }) {
   ];
 
   return (
-    <div>
+    <div className="fade-in">
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <button className="btn btn-sm btn-secondary mb-16" onClick={onBack}>← Back to Dashboard</button>
 
       {/* HEADER */}
