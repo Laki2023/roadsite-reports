@@ -70,10 +70,10 @@ UPDATE profiles SET role = 'measurement_engineer' WHERE role IN ('contractor_qs'
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_role_assignments') THEN
-    UPDATE project_role_assignments SET project_role = 'client' WHERE project_role IN ('director_general', 'super_admin');
-    UPDATE project_role_assignments SET project_role = 'deputy_project_engineer' WHERE project_role = 'project_officer';
-    UPDATE project_role_assignments SET project_role = 'resident_engineer' WHERE project_role = 'inspector';
-    UPDATE project_role_assignments SET project_role = 'measurement_engineer' WHERE project_role IN ('contractor_qs', 'viewer');
+    UPDATE project_role_assignments SET role = 'client' WHERE role IN ('director_general', 'super_admin');
+    UPDATE project_role_assignments SET role = 'deputy_project_engineer' WHERE role = 'project_officer';
+    UPDATE project_role_assignments SET role = 'resident_engineer' WHERE role = 'inspector';
+    UPDATE project_role_assignments SET role = 'measurement_engineer' WHERE role IN ('contractor_qs', 'viewer');
   END IF;
 END $$;
 
