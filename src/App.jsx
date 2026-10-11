@@ -43,10 +43,10 @@ import FinancialForecastPage from './pages/FinancialForecastPage';
 import AlertCentrePage from './pages/AlertCentrePage';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'contractor_qs' },
+  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
   { key: 'mega-dashboard', label: 'Portfolio Analytics', icon: '📈', minRole: 'project_engineer' },
   { section: 'Projects' },
-  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'contractor_qs' },
+  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'viewer' },
   { section: 'Field Operations' },
   { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'inspector' },
   { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'inspector' },
@@ -177,6 +177,44 @@ export default function App() {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [sidebarOpen]);
+
+  // ── SESSION INACTIVITY TIMEOUT (30 min) ──
+  useEffect(() => {
+    if (!session) return;
+    const TIMEOUT_MS = 30 * 60 * 1000;      // 30 minutes
+    const WARNING_MS = 25 * 60 * 1000;       // warn at 25 min
+    let timeoutId, warningId;
+
+    function resetTimers() {
+      clearTimeout(timeoutId);
+      clearTimeout(warningId);
+      warningId = setTimeout(() => {
+        showToast('Session expires in 5 minutes due to inactivity. Move mouse or press a key to stay logged in.', 'error');
+      }, WARNING_MS);
+      timeoutId = setTimeout(() => {
+        supabase.auth.signOut();
+        showToast('Logged out due to 30 minutes of inactivity', 'error');
+      }, TIMEOUT_MS);
+    }
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    // Throttle: only reset once per 60 seconds to avoid excessive timer churn
+    let lastReset = Date.now();
+    function throttledReset() {
+      if (Date.now() - lastReset > 60000) {
+        lastReset = Date.now();
+        resetTimers();
+      }
+    }
+    events.forEach(e => window.addEventListener(e, throttledReset, { passive: true }));
+    resetTimers();
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(warningId);
+      events.forEach(e => window.removeEventListener(e, throttledReset));
+    };
+  }, [session, showToast]);
 
   function timeAgo(dateStr) {
     if (!dateStr) return '';

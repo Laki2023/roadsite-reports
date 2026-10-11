@@ -78,17 +78,19 @@ export default function AuthPage({ showToast }) {
 
   // Password strength
   function getPasswordStrength(pwd) {
-    if (!pwd) return { level: 0, label: '', color: '' };
+    if (!pwd) return { level: 0, label: '', color: '', errors: [] };
+    const errors = [];
     let score = 0;
-    if (pwd.length >= 6) score++;
-    if (pwd.length >= 10) score++;
-    if (/[A-Z]/.test(pwd)) score++;
-    if (/[0-9]/.test(pwd)) score++;
+    if (pwd.length >= 8) score++; else errors.push('At least 8 characters');
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++; else errors.push('One uppercase letter');
+    if (/[a-z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++; else errors.push('One number');
     if (/[^A-Za-z0-9]/.test(pwd)) score++;
-    if (score <= 1) return { level: 1, label: 'Weak', color: '#ef4444' };
-    if (score <= 2) return { level: 2, label: 'Fair', color: '#f59e0b' };
-    if (score <= 3) return { level: 3, label: 'Good', color: '#0891b2' };
-    return { level: 4, label: 'Strong', color: '#059669' };
+    if (score <= 2) return { level: 1, label: 'Weak', color: '#ef4444', errors };
+    if (score <= 3) return { level: 2, label: 'Fair', color: '#f59e0b', errors };
+    if (score <= 4) return { level: 3, label: 'Good', color: '#0891b2', errors };
+    return { level: 4, label: 'Strong', color: '#059669', errors: [] };
   }
   const pwdStrength = getPasswordStrength(password);
 
@@ -117,8 +119,14 @@ export default function AuthPage({ showToast }) {
     setLoading(true);
     try {
       if (isLogin) {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: loginData, error: err } = await supabase.auth.signInWithPassword({ email, password });
         if (err) throw err;
+        // Track last login time
+        if (loginData?.user) {
+          supabase.from('profiles').update({
+            last_login_at: new Date().toISOString(),
+          }).eq('id', loginData.user.id).then(() => {});
+        }
       } else {
         const displayName = title ? `${title} ${fullName}` : fullName;
         const { data, error: err } = await supabase.auth.signUp({
@@ -316,7 +324,7 @@ export default function AuthPage({ showToast }) {
               </div>
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Enter your password" required minLength={6} />
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Enter your password" required minLength={8} />
               </div>
               <div style={{ textAlign: 'right', marginBottom: 16 }}>
                 <span onClick={() => { setShowForgotPassword(true); setResetEmail(email); setError(''); }}
@@ -389,7 +397,7 @@ export default function AuthPage({ showToast }) {
                   <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', textAlign: 'center' }}>Create your account</h2>
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', margin: '0 0 20px' }}>Step 1 of 3 — Login credentials</p>
 
-                  <form onSubmit={(e) => { e.preventDefault(); if (!fullName || !email || !password) { setError('Name, email and password are required'); return; } setError(''); setStep(2); }}>
+                  <form onSubmit={(e) => { e.preventDefault(); if (!fullName || !email || !password) { setError('Name, email and password are required'); return; } if (pwdStrength.errors.length > 0) { setError('Password needs: ' + pwdStrength.errors.join(', ')); return; } setError(''); setStep(2); }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 10, marginBottom: 14 }}>
                     <div>
                       <label style={labelStyle}>Title</label>
@@ -409,7 +417,7 @@ export default function AuthPage({ showToast }) {
                   </div>
                   <div style={{ marginBottom: 14 }}>
                     <label style={labelStyle}>Password *</label>
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Min 6 characters" required minLength={6} />
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Min 8 chars, uppercase + number" required minLength={8} />
                     {password && (
                       <div style={{ marginTop: 6 }}>
                         <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>

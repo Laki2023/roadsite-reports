@@ -214,7 +214,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
                             {u.is_active !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="text-sm">{fmtDate(u.last_login)}</td>
+                        <td className="text-sm">{fmtDate(u.last_login_at || u.last_login)}</td>
                         <td>
                           {canEdit && (
                             <div style={{ display: 'flex', gap: 6 }}>
