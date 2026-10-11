@@ -25,6 +25,11 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState(null); // project to delete
+  const [deleteStep, setDeleteStep] = useState(0); // 0=closed, 1/2/3 = confirmation steps
+  const [deleting, setDeleting] = useState(false);
+  const isPlatformAdmin = profile?.is_platform_admin === true;
 
   useEffect(() => { loadProjects(); }, []);
 
@@ -107,6 +112,57 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
     });
     setEditId(p.id);
     setShowModal(true);
+  }
+
+  function openDelete(p) {
+    setDeleteTarget(p);
+    setDeleteStep(1);
+  }
+
+  function cancelDelete() {
+    setDeleteTarget(null);
+    setDeleteStep(0);
+  }
+
+  async function confirmDelete() {
+    if (deleteStep < 3) {
+      setDeleteStep(deleteStep + 1);
+      return;
+    }
+    // Step 3 confirmed — execute delete
+    setDeleting(true);
+    try {
+      // Delete all child records first (in case CASCADE isn't set on all FKs)
+      const pid = deleteTarget.id;
+      await Promise.all([
+        supabase.from('daily_reports').delete().eq('project_id', pid),
+        supabase.from('pavement_layers').delete().eq('project_id', pid),
+        supabase.from('quality_tests').delete().eq('project_id', pid),
+        supabase.from('equipment').delete().eq('project_id', pid),
+        supabase.from('site_issues').delete().eq('project_id', pid),
+        supabase.from('boq_items').delete().eq('project_id', pid),
+        supabase.from('payment_certificates').delete().eq('project_id', pid),
+        supabase.from('structures').delete().eq('project_id', pid),
+        supabase.from('key_personnel').delete().eq('project_id', pid),
+        supabase.from('guarantees').delete().eq('project_id', pid),
+        supabase.from('eot_events').delete().eq('project_id', pid),
+        supabase.from('statutory_obligations').delete().eq('project_id', pid),
+        supabase.from('site_instructions').delete().eq('project_id', pid),
+        supabase.from('construction_elements').delete().eq('project_id', pid),
+        supabase.from('work_programmes').delete().eq('project_id', pid),
+        supabase.from('claims').delete().eq('project_id', pid),
+      ]);
+      // Now delete the project itself
+      const { error: delErr } = await supabase.from('projects').delete().eq('id', pid);
+      if (delErr) throw delErr;
+      showToast(`Project "${deleteTarget.name}" permanently deleted`, 'success');
+      cancelDelete();
+      loadProjects();
+    } catch (err) {
+      showToast(`Delete failed: ${err.message}`, 'error');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const filtered = projects.filter(p => {
@@ -216,16 +272,117 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     </div>
                   </td>
                   <td>
-                    {hasRole(profile.role, 'engineer') && (
-                      <button className="btn btn-sm btn-secondary"
-                        onClick={e => { e.stopPropagation(); openEdit(p); }}>Edit</button>
-                    )}
+                    <div style={{ display:'flex', gap:4 }}>
+                      {hasRole(profile.role, 'engineer') && (
+                        <button className="btn btn-sm btn-secondary"
+                          onClick={e => { e.stopPropagation(); openEdit(p); }}>Edit</button>
+                      )}
+                      {isPlatformAdmin && (
+                        <button className="btn btn-sm" style={{ background:'#991b1b', color:'#fff', fontSize:10 }}
+                          onClick={e => { e.stopPropagation(); openDelete(p); }}>🗑️ Delete</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal — Triple "Are you sure?" */}
+      {deleteTarget && deleteStep > 0 && (
+        <div className="modal-overlay" onClick={cancelDelete}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:480 }}>
+            <h3 style={{ color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>
+              {deleteStep === 1 && '⚠️ Delete Project'}
+              {deleteStep === 2 && '🚨 Confirm Deletion'}
+              {deleteStep === 3 && '💀 Final Warning'}
+              <button onClick={cancelDelete}>×</button>
+            </h3>
+
+            {deleteStep === 1 && (
+              <div>
+                <p style={{ margin:'12px 0', fontSize:14, lineHeight:1.6 }}>
+                  You are about to delete <strong style={{ color:'var(--accent)' }}>{deleteTarget.name}</strong>.
+                </p>
+                <p style={{ margin:'8px 0', fontSize:13, color:'var(--text-muted)' }}>
+                  This will permanently remove the project and all its data including:
+                </p>
+                <ul style={{ fontSize:12, color:'var(--text-muted)', margin:'8px 0 16px 20px', lineHeight:1.8 }}>
+                  <li>Daily reports & work activities</li>
+                  <li>Pavement layers & quality tests</li>
+                  <li>Bill of quantities & payment certificates</li>
+                  <li>Site instructions & equipment records</li>
+                  <li>All other project data</li>
+                </ul>
+                <p style={{ fontSize:14, fontWeight:700, color:'#ef4444' }}>
+                  Are you sure you want to proceed? (Step 1 of 3)
+                </p>
+              </div>
+            )}
+
+            {deleteStep === 2 && (
+              <div>
+                <div style={{ padding:'16px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, margin:'12px 0' }}>
+                  <p style={{ margin:0, fontSize:14, color:'#991b1b', fontWeight:600 }}>
+                    ⚠️ This action CANNOT be undone.
+                  </p>
+                  <p style={{ margin:'8px 0 0', fontSize:13, color:'#991b1b' }}>
+                    Project: <strong>{deleteTarget.name}</strong>
+                    {deleteTarget.contract_no && <><br/>Contract: {deleteTarget.contract_no}</>}
+                    {deleteTarget.contractor_name && <><br/>Contractor: {deleteTarget.contractor_name}</>}
+                  </p>
+                </div>
+                <p style={{ fontSize:14, fontWeight:700, color:'#ef4444' }}>
+                  Are you really sure? (Step 2 of 3)
+                </p>
+              </div>
+            )}
+
+            {deleteStep === 3 && (
+              <div>
+                <div style={{ padding:'20px', background:'linear-gradient(135deg, #1a0000, #3b0000)', border:'2px solid #ef4444', borderRadius:8, margin:'12px 0', textAlign:'center' }}>
+                  <div style={{ fontSize:36, marginBottom:8 }}>🗑️</div>
+                  <p style={{ margin:0, fontSize:16, color:'#ef4444', fontWeight:700 }}>
+                    PERMANENT DELETION
+                  </p>
+                  <p style={{ margin:'8px 0 0', fontSize:14, color:'#fca5a5' }}>
+                    "{deleteTarget.name}"
+                  </p>
+                  <p style={{ margin:'8px 0 0', fontSize:12, color:'#f87171' }}>
+                    All data will be lost forever.
+                  </p>
+                </div>
+                <p style={{ fontSize:14, fontWeight:700, color:'#ef4444' }}>
+                  Last chance — are you absolutely sure? (Step 3 of 3)
+                </p>
+              </div>
+            )}
+
+            <div className="btn-group mt-24" style={{ display:'flex', gap:8 }}>
+              <button className="btn btn-secondary" onClick={cancelDelete} disabled={deleting}>
+                Cancel
+              </button>
+              <button
+                className="btn"
+                disabled={deleting}
+                onClick={confirmDelete}
+                style={{
+                  background: deleteStep === 3 ? '#7f1d1d' : '#991b1b',
+                  color:'#fff',
+                  fontWeight:700,
+                  flex:1,
+                }}
+              >
+                {deleting ? 'Deleting...'
+                  : deleteStep === 1 ? 'Yes, Continue →'
+                  : deleteStep === 2 ? 'Yes, I\'m Sure →'
+                  : '🗑️ DELETE PERMANENTLY'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
