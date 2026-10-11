@@ -43,48 +43,48 @@ import FinancialForecastPage from './pages/FinancialForecastPage';
 import AlertCentrePage from './pages/AlertCentrePage';
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'viewer' },
-  { key: 'mega-dashboard', label: 'Portfolio Analytics', icon: '📈', minRole: 'project_engineer' },
+  { key: 'dashboard', label: 'Dashboard', icon: '📊', minRole: 'resident_engineer' },
+  { key: 'mega-dashboard', label: 'Portfolio Analytics', icon: '📈', minRole: 'engineer' },
   { section: 'Projects' },
-  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'viewer' },
+  { key: 'projects', label: 'All Projects', icon: '📁', minRole: 'measurement_engineer' },
   { section: 'Field Operations' },
-  { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'inspector' },
-  { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'inspector' },
-  { key: 'works', label: 'Work Activities', icon: '⚒️', minRole: 'inspector' },
-  { key: 'issues', label: 'Site Issues', icon: '⚠️', minRole: 'inspector' },
-  { key: 'emergency', label: 'Emergency', icon: '🚨', minRole: 'inspector' },
+  { key: 'submit-report', label: 'Submit Report', icon: '📝', minRole: 'resident_engineer' },
+  { key: 'reports', label: 'Daily Reports', icon: '📄', minRole: 'measurement_engineer' },
+  { key: 'works', label: 'Work Activities', icon: '⚒️', minRole: 'resident_engineer' },
+  { key: 'issues', label: 'Site Issues', icon: '⚠️', minRole: 'resident_engineer' },
+  { key: 'emergency', label: 'Emergency', icon: '🚨', minRole: 'resident_engineer' },
   { section: 'Engineering' },
-  { key: 'pavement', label: 'Pavement Layers', icon: '🛣️', minRole: 'resident_engineer' },
-  { key: 'quality', label: 'Quality Tests', icon: '🧪', minRole: 'inspector' },
-  { key: 'equipment', label: 'Equipment', icon: '🚜', minRole: 'inspector' },
-  { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'inspector' },
+  { key: 'pavement', label: 'Pavement Layers', icon: '🛣️', minRole: 'measurement_engineer' },
+  { key: 'quality', label: 'Quality Tests', icon: '🧪', minRole: 'measurement_engineer' },
+  { key: 'equipment', label: 'Equipment', icon: '🚜', minRole: 'resident_engineer' },
+  { key: 'structures', label: 'Structures', icon: '🌉', minRole: 'resident_engineer' },
   { key: 'programme', label: 'Programme of Works', icon: '📅', minRole: 'resident_engineer' },
   { section: 'Contract Admin' },
-  { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'inspector', hideRates: 'contractor_qs' },
-  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'contractor_qs' },
-  { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'project_engineer' },
+  { key: 'boq', label: 'Bill of Quantities', icon: '📋', minRole: 'resident_engineer' },
+  { key: 'taking-off', label: 'Taking Off Sheet', icon: '📐', minRole: 'measurement_engineer' },
+  { key: 'ipc', label: 'Payment Certificates', icon: '💰', minRole: 'resident_engineer' },
   { key: 'guarantees', label: 'Guarantee Register', icon: '🔐', minRole: 'resident_engineer' },
   { key: 'eot', label: 'Extension of Time', icon: '⏱️', minRole: 'resident_engineer' },
   { key: 'mpr', label: 'MPR Reconciliation', icon: '📊', minRole: 'resident_engineer' },
   { key: 'doc-register', label: 'Document Register', icon: '✉️', minRole: 'resident_engineer' },
   { key: 'quality-matrix', label: 'Quality Matrix', icon: '🔬', minRole: 'resident_engineer' },
   { key: 'milestones', label: 'Contract Timeline', icon: '📍', minRole: 'resident_engineer' },
-  { key: 'financial-forecast', label: 'Financial Forecast', icon: '📈', minRole: 'project_engineer' },
+  { key: 'financial-forecast', label: 'Financial Forecast', icon: '📈', minRole: 'resident_engineer' },
   { key: 'alert-centre', label: 'Alert Centre', icon: '🔔', minRole: 'resident_engineer' },
   { key: 'approvals', label: 'Approvals & Instructions', icon: '✅', minRole: 'resident_engineer' },
   { key: 'site-instructions', label: 'Site Instructions', icon: '📜', minRole: 'resident_engineer' },
   { key: 'monthly-report', label: 'Monthly Report', icon: '📋', minRole: 'resident_engineer' },
   { key: 'claims', label: 'Claims Management', icon: '⚖️', minRole: 'resident_engineer' },
-  { key: 'key-personnel', label: 'Key Personnel', icon: '👥', minRole: 'inspector' },
+  { key: 'key-personnel', label: 'Key Personnel', icon: '👥', minRole: 'resident_engineer' },
   { key: 'obligations', label: 'Statutory Obligations', icon: '🔒', minRole: 'resident_engineer' },
   { key: 'approvals-matrix', label: 'Approvals Matrix', icon: '🔐', minRole: 'resident_engineer' },
   { section: 'Knowledge Base' },
-  { key: 'construction-guide', label: 'Construction Guide', icon: '📚', minRole: 'inspector' },
+  { key: 'construction-guide', label: 'Construction Guide', icon: '📚', minRole: 'measurement_engineer' },
   { section: 'Administration' },
   { key: 'staff', label: 'Staff & Teams', icon: '👥', minRole: 'project_engineer' },
-  { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'resident_engineer' },
-  { key: 'org-mgmt', label: 'Organisations', icon: '🏛️', minRole: 'director_general' },
-  { key: 'admin', label: 'System Settings', icon: '⚙️', minRole: 'resident_engineer' },
+  { key: 'user-mgmt', label: 'User Management', icon: '🛡️', minRole: 'project_engineer' },
+  { key: 'org-mgmt', label: 'Organisations', icon: '🏛️', minRole: 'client' },
+  { key: 'admin', label: 'System Settings', icon: '⚙️', minRole: 'project_engineer' },
 ];
 
 export default function App() {
@@ -300,8 +300,8 @@ export default function App() {
       case 'org-mgmt': return <OrgManagement {...ctx} />;
       case 'admin': return <AdminPanel {...ctx} />;
       case 'emergency': return <EmergencyPage {...ctx} />;
-      case 'project-dashboard': 
-        if (profile?.role === 'contractor_qs') return <TakingOffPage {...ctx} />;
+      case 'project-dashboard':
+        if (profile?.role === 'measurement_engineer') return <TakingOffPage {...ctx} />;
         return <ProjectDashboard {...ctx} projectId={selectedProject?.id} onBack={() => { setSelectedProject(null); navigateTo('dashboard'); }} />;
       case 'project-summary': return <ProjectSummary {...ctx} />;
       default: return <Dashboard {...ctx} activeEmergencies={activeEmergencies} />;

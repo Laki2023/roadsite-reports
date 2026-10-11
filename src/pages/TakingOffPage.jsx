@@ -37,7 +37,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
     if (isPlatformAdmin) { setMyParty(null); return; }
     
     // Role-based shortcut
-    if (profile?.role === 'contractor_qs') { setMyParty('contractor'); return; }
+    if (profile?.role === 'measurement_engineer') { setMyParty('contractor'); return; }
     if (isRE) { setMyParty(null); return; }
     
     // Try to match from key_personnel

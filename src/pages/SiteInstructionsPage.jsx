@@ -125,7 +125,7 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
     const { data: candidates } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .in('role', [nextRole, 'super_admin'])
+      .in('role', [nextRole, 'client'])
       .eq('is_active', true)
       .order('role', { ascending: false });
 
@@ -165,9 +165,9 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
   }
 
   function getNextRole(currentRole) {
-    const chain = ['inspector', 'resident_engineer', 'project_engineer', 'engineer', 'super_admin'];
+    const chain = ['measurement_engineer', 'resident_engineer', 'deputy_project_engineer', 'project_engineer', 'engineer', 'client'];
     const idx = chain.indexOf(currentRole);
-    return idx >= 0 && idx < chain.length - 1 ? chain[idx + 1] : 'super_admin';
+    return idx >= 0 && idx < chain.length - 1 ? chain[idx + 1] : 'client';
   }
 
   function openEdit(si) {
@@ -193,7 +193,7 @@ export default function SiteInstructionsPage({ profile, showToast, navigateTo, s
   function canUserEscalate(si) {
     if (si.status !== 'Issued' && si.status !== 'Escalated') return false;
     if (isPlatformAdmin) return false; // platform admin approves directly
-    if (profile.role === 'super_admin') return false; // top of chain
+    if (profile.role === 'client') return false; // top of chain
     return hasRole(profile.role, 'resident_engineer');
   }
 

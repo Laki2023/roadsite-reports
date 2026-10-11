@@ -137,7 +137,7 @@ export default function IssuesPage({ profile, showToast, selectedProject: propPr
           <h2>Site Issues</h2>
           <div className="subtitle">Track and resolve project issues</div>
         </div>
-        {projectId && hasRole(profile.role, 'inspector') && (
+        {projectId && hasRole(profile.role, 'resident_engineer') && (
           <button className="btn btn-primary" onClick={() => { setForm(EMPTY_ISSUE); setEditId(null); setAssignTo(''); setShowModal(true); }}>
             + Raise Issue
           </button>

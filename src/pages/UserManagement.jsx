@@ -18,7 +18,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
   const [assignModal, setAssignModal] = useState(null);
 
   const isPlatformAdmin = profile.is_platform_admin === true;
-  const isSuperAdmin = isPlatformAdmin || profile.is_super_admin === true || profile.role === 'super_admin';
+  const isSuperAdmin = isPlatformAdmin || profile.role === 'client';
   const myRoles = isPlatformAdmin
     ? ALL_ROLES.filter(r => r !== 'pending')
     : assignableRoles(profile.role);
@@ -178,7 +178,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
                   {filtered.map(u => {
                     const isSelf = u.id === profile.id;
                     const canEdit = !isSelf && (isPlatformAdmin || ROLE_LEVELS[profile.role] > ROLE_LEVELS[u.role]);
-                    const rc = ROLE_COLORS[u.role] || ROLE_COLORS.viewer;
+                    const rc = ROLE_COLORS[u.role] || ROLE_COLORS.measurement_engineer;
                     return (
                       <tr key={u.id}>
                         <td>
@@ -343,7 +343,7 @@ export default function UserManagement({ profile, showToast, navigateTo }) {
 // ── Invite Modal ──
 function InviteModal({ projects, profile, roles, onClose, onSuccess, showToast }) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('inspector');
+  const [role, setRole] = useState('resident_engineer');
   const [selProjects, setSelProjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -373,7 +373,7 @@ function InviteModal({ projects, profile, roles, onClose, onSuccess, showToast }
           <div className="form-group mb-16">
             <label>Email Address *</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="inspector@example.com" required />
+              placeholder="user@example.com" required />
           </div>
           <div className="form-group mb-16">
             <label>Role</label>
@@ -433,7 +433,7 @@ const PAGE_MODULES = [
 
 // ── Edit User Modal ──
 function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) {
-  const [role, setRole] = useState(user.role || 'viewer');
+  const [role, setRole] = useState(user.role || 'measurement_engineer');
   const [supervisorId, setSupervisorId] = useState(user.supervisor_id || '');
   const [designation, setDesignation] = useState(user.designation || '');
   const [organisation, setOrganisation] = useState(user.organisation || '');
@@ -446,7 +446,7 @@ function EditUserModal({ user, profile, roles, onClose, onSuccess, showToast }) 
 
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, role')
-      .in('role', ['super_admin', 'engineer', 'project_engineer', 'resident_engineer'])
+      .in('role', ['client', 'engineer', 'project_engineer', 'resident_engineer'])
       .eq('is_active', true).neq('id', user.id).order('full_name')
       .then(({ data }) => setSupervisors(data || []));
     // Load position templates
@@ -664,7 +664,7 @@ function AssignProjectsModal({ user, projects, profile, roles, onClose, onSucces
     setAssignments(prev => {
       const copy = { ...prev };
       if (copy[pid]) copy[pid] = { ...copy[pid], isActive: !copy[pid].isActive };
-      else copy[pid] = { role: user.role || 'inspector', isActive: true, id: null };
+      else copy[pid] = { role: user.role || 'resident_engineer', isActive: true, id: null };
       return copy;
     });
   }
@@ -776,7 +776,7 @@ function PositionTemplatesView({ profile, roles, showToast }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
           {templates.map(t => {
-            const rc = ROLE_COLORS[t.system_role] || ROLE_COLORS.viewer;
+            const rc = ROLE_COLORS[t.system_role] || ROLE_COLORS.measurement_engineer;
             const pages = t.allowed_pages || [];
             return (
               <div key={t.id} className="card" style={{ padding: 16, borderLeft: `3px solid ${rc.border}` }}>
@@ -836,7 +836,7 @@ function PositionTemplatesView({ profile, roles, showToast }) {
 function TemplateFormModal({ template, profile, roles, onClose, onSuccess, showToast }) {
   const [displayName, setDisplayName] = useState(template?.display_name || '');
   const [description, setDescription] = useState(template?.description || '');
-  const [systemRole, setSystemRole] = useState(template?.system_role || 'project_officer');
+  const [systemRole, setSystemRole] = useState(template?.system_role || 'deputy_project_engineer');
   const [allowedPages, setAllowedPages] = useState(template?.allowed_pages || []);
   const [submitting, setSubmitting] = useState(false);
 
@@ -996,7 +996,7 @@ function ProjectAssignmentsView({ users, projects, profile, showToast, onRefresh
             <thead><tr><th>User</th><th>Global Role</th><th>Project</th><th>Project Role</th><th>Assigned</th></tr></thead>
             <tbody>
               {filtered.map(a => {
-                const rc = ROLE_COLORS[a.role] || ROLE_COLORS.viewer;
+                const rc = ROLE_COLORS[a.role] || ROLE_COLORS.measurement_engineer;
                 return (
                   <tr key={a.id}>
                     <td style={{ fontWeight: 500 }}>{a.user?.full_name || '—'}</td>

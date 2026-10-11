@@ -28,10 +28,10 @@ export default function ProjectDetail({ selectedProject, profile, navigateTo, sh
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const isAdmin = hasRole(profile?.role, 'super_admin');
-  const isSuperAdmin = profile?.is_super_admin;
+  const isAdmin = hasRole(profile?.role, 'client');
+  const isPlatformAdmin = profile?.is_platform_admin === true;
   const isProjectLead = project?.project_lead_id === profile?.id;
-  const canManage = isAdmin || isSuperAdmin || isProjectLead;
+  const canManage = isAdmin || isPlatformAdmin || isProjectLead;
 
   useEffect(() => {
     if (!selectedProject?.id) return;

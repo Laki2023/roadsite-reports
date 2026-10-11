@@ -13,19 +13,31 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /* Role hierarchy (matches user_role enum in database):
-   director_general > super_admin > engineer > project_engineer > resident_engineer > inspector > viewer > pending
-   Each level can do everything below it. */
+   client > engineer > project_engineer > deputy_project_engineer = resident_engineer > measurement_engineer > pending
+
+   FIDIC chain of command for Kenyan road projects:
+   • Client (KeNHA/KURA DG)        — monitors all projects, pays after Engineer certifies
+   • Engineer (Consulting TL)       — certifies IPCs, approves variations & EoT
+   • Project Engineer (Eng. Rep)    — reviews & recommends IPCs, manages contract admin
+   • Deputy Project Engineer        — assists PE, data entry, drafts (multiple per project)
+   • Resident Engineer              — prepares IPCs, approves tests & layers, runs the site
+   • Measurement Engineer           — takes measurements, updates quantities & chainages
+*/
 const ROLE_LEVELS = {
-  director_general: 9,
-  super_admin: 8,
-  engineer: 7,
-  project_engineer: 6,
-  project_officer: 5,
-  resident_engineer: 4,
+  client: 6,
+  engineer: 5,
+  project_engineer: 4,
+  deputy_project_engineer: 3,
+  resident_engineer: 3,
+  measurement_engineer: 2,
+  pending: 0,
+  // Legacy aliases (for backward compatibility during migration)
+  director_general: 6,
+  super_admin: 6,
+  project_officer: 3,
   inspector: 3,
   contractor_qs: 2,
-  viewer: 1,
-  pending: 0,
+  viewer: 2,
 };
 
 export { ROLE_LEVELS };
@@ -69,32 +81,40 @@ export function getModuleAccess(allowedPages, moduleKey) {
   return null;
 }
 
-export const ALL_ROLES = ['director_general', 'super_admin', 'engineer', 'project_engineer', 'project_officer', 'resident_engineer', 'inspector', 'contractor_qs', 'viewer', 'pending'];
+export const ALL_ROLES = ['client', 'engineer', 'project_engineer', 'deputy_project_engineer', 'resident_engineer', 'measurement_engineer', 'pending'];
 
 export const ROLE_LABELS = {
-  director_general: 'Director General',
-  super_admin: 'Super Admin',
+  client: 'Client',
   engineer: 'Engineer',
   project_engineer: 'Project Engineer',
-  project_officer: 'Project Officer',
+  deputy_project_engineer: 'Deputy Project Engineer',
   resident_engineer: 'Resident Engineer',
-  inspector: 'Inspector',
-  contractor_qs: "Contractor Staff",
-  viewer: 'Viewer',
+  measurement_engineer: 'Measurement Engineer',
   pending: 'Pending Approval',
+  // Legacy labels (displayed if old role still in DB during migration)
+  director_general: 'Client',
+  super_admin: 'Client',
+  project_officer: 'Deputy Project Engineer',
+  inspector: 'Resident Engineer',
+  contractor_qs: 'Measurement Engineer',
+  viewer: 'Measurement Engineer',
 };
 
 export const ROLE_COLORS = {
+  client:                  { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
+  engineer:                { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
+  project_engineer:        { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
+  deputy_project_engineer: { bg: '#e0f2fe', text: '#075985', border: '#0ea5e9' },
+  resident_engineer:       { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+  measurement_engineer:    { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
+  pending:                 { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
+  // Legacy aliases
   director_general: { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
-  super_admin: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
-  engineer:    { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
-  project_engineer: { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
+  super_admin: { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
   project_officer: { bg: '#e0f2fe', text: '#075985', border: '#0ea5e9' },
-  resident_engineer: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
-  inspector:   { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' },
+  inspector: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
   contractor_qs: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
-  viewer:      { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' },
-  pending:     { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
+  viewer: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
 };
 
 /* ══════════════════════════════════════════════════════════════
@@ -107,24 +127,24 @@ export const ROLE_COLORS = {
  * Anything above their authority must be escalated up.
  */
 export const APPROVAL_AUTHORITY = {
-  inspector: {
-    label: 'Inspector of Works',
+  measurement_engineer: {
+    label: 'Measurement Engineer',
     canApprove: [],
-    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency'],
+    canSubmit: ['measurement', 'taking_off'],
     canIssue: [],
     escalateTo: 'resident_engineer',
   },
   resident_engineer: {
     label: 'Resident Engineer',
     canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer', 'minor_works_change'],
-    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction', 'ipc'],
     canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice'],
     escalateTo: 'project_engineer',
   },
-  project_officer: {
-    label: 'Project Officer',
+  deputy_project_engineer: {
+    label: 'Deputy Project Engineer',
     canApprove: ['daily_report', 'quality_test', 'material_approval', 'pavement_layer'],
-    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction'],
+    canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction', 'ipc'],
     canIssue: ['site_instruction', 'noncompliance_notice'],
     escalateTo: 'project_engineer',
   },
@@ -144,11 +164,11 @@ export const APPROVAL_AUTHORITY = {
     canSubmit: ['daily_report', 'quality_test', 'site_issue', 'emergency', 'site_instruction', 'ipc', 'eot_determination', 'final_payment'],
     canIssue: ['site_instruction', 'noncompliance_notice', 'defect_notice', 'variation_order_minor',
                'engineer_instruction', 'variation_order', 'taking_over_certificate', 'payment_certificate'],
-    escalateTo: 'super_admin',
+    escalateTo: 'client',
   },
-  super_admin: {
-    label: 'Employer (DG)',
-    canApprove: ['*'], // everything
+  client: {
+    label: 'Client (Employer)',
+    canApprove: ['*'], // sees everything — payment is outside the system
     canSubmit: ['*'],
     canIssue: ['*'],
     escalateTo: null, // top of chain
@@ -195,8 +215,8 @@ export function canIssueItem(userRole, itemType, isPlatformAdmin = false) {
 }
 
 /**
- * Get the full escalation chain from a given role up to super_admin.
- * e.g. getEscalationChain('inspector') → ['resident_engineer', 'project_engineer', 'engineer', 'super_admin']
+ * Get the full escalation chain from a given role up to client.
+ * e.g. getEscalationChain('measurement_engineer') → ['resident_engineer', 'project_engineer', 'engineer', 'client']
  */
 export function getEscalationChain(fromRole) {
   const chain = [];

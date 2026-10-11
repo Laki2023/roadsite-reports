@@ -114,7 +114,7 @@ export default function OrgManagement({ profile, showToast }) {
         {orgs.map(org => {
           const orgU = users.filter(u => u.organisation_id === org.id);
           const orgP = projects.filter(p => p.organisation_id === org.id);
-          const dg = orgU.find(u => u.role === 'director_general');
+          const dg = orgU.find(u => u.role === 'client');
           const typeInfo = ORG_TYPES.find(t => t.key === org.org_type) || ORG_TYPES[3];
           const isSelected = selectedOrg === org.id;
 
@@ -174,7 +174,7 @@ export default function OrgManagement({ profile, showToast }) {
               </div>
               <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                 {orgUsers.map(u => {
-                  const rc = ROLE_COLORS[u.role] || ROLE_COLORS.viewer;
+                  const rc = ROLE_COLORS[u.role] || ROLE_COLORS.measurement_engineer;
                   return (
                     <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
                       <div>

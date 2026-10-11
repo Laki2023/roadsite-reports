@@ -40,7 +40,7 @@ export default function CITAssessment({ claim, projectId, profile, showToast, on
   const isPlatformAdmin = profile?.is_platform_admin === true;
   const isEngineer = isPlatformAdmin || hasRole(profile?.role, 'engineer');
   const canDetermine = isEngineer;
-  const canEdit = isPlatformAdmin || (ROLE_LEVELS[profile?.role] || 0) >= (ROLE_LEVELS['project_officer'] || 0);
+  const canEdit = isPlatformAdmin || (ROLE_LEVELS[profile?.role] || 0) >= (ROLE_LEVELS['deputy_project_engineer'] || 0);
 
   useEffect(() => { loadAssessment(); }, [claim.id]);
 

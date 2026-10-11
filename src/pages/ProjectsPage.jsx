@@ -239,7 +239,7 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                 return (
                 <tr key={p.id} style={{ cursor: 'pointer' }}
                   onClick={() => {
-                    if (profile?.role === 'contractor_qs') {
+                    if (profile?.role === 'measurement_engineer') {
                       navigateTo('taking-off', p);
                     } else {
                       navigateTo('project-dashboard', p);

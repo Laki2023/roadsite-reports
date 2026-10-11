@@ -331,7 +331,7 @@ export async function createClaimFromTrigger(trigger, projectId, profileId) {
  * RE → PE → Engineer → Super Admin
  */
 export async function sendClaimNotifications(claim, projectId, notifType) {
-  const roleChain = ['resident_engineer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
+  const roleChain = ['measurement_engineer', 'resident_engineer', 'deputy_project_engineer', 'project_engineer', 'engineer', 'client'];
 
   // Get users assigned to this project with relevant roles
   const { data: assignments } = await supabase

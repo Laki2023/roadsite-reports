@@ -246,7 +246,7 @@ function ApprovalForm({ initial, onSave, onCancel }) {
       </div>
       <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', marginBottom: 8, borderBottom: '1px solid var(--border)', paddingBottom: 4 }}>Authority Limits (KES) — leave blank for "Engineer's decision"</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-        <div><label style={ls}>Inspector</label><input type="number" value={form.inspector_limit || ''} onChange={e => set('inspector_limit', e.target.value)} style={fs} /></div>
+        <div><label style={ls}>Meas. Eng.</label><input type="number" value={form.inspector_limit || ''} onChange={e => set('inspector_limit', e.target.value)} style={fs} /></div>
         <div><label style={ls}>RE</label><input type="number" value={form.re_limit || ''} onChange={e => set('re_limit', e.target.value)} style={fs} /></div>
         <div><label style={ls}>PE</label><input type="number" value={form.pe_limit || ''} onChange={e => set('pe_limit', e.target.value)} style={fs} /></div>
         <div><label style={ls}>Engineer</label><input type="number" value={form.engineer_limit || ''} onChange={e => set('engineer_limit', e.target.value)} style={fs} /></div>

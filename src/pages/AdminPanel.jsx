@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase, ROLE_LABELS, ROLE_LEVELS, hasRole, assignableRoles } from '../lib/supabase';
 import { ConfirmDialog } from '../components/SharedUI';
 
-const ROLES = ['pending', 'viewer', 'contractor_qs', 'inspector', 'resident_engineer', 'project_officer', 'project_engineer', 'engineer', 'super_admin', 'director_general'];
+const ROLES = ['pending', 'measurement_engineer', 'resident_engineer', 'deputy_project_engineer', 'project_engineer', 'engineer', 'client'];
 
 const PAGE_MODULES = [
   { key: 'submit-report', label: 'Submit Report', icon: '📝' },
@@ -40,9 +40,9 @@ export default function AdminPanel({ profile, showToast }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
   const [approveModal, setApproveModal] = useState(null);
-  const [approveForm, setApproveForm] = useState({ role: 'inspector', designation: '', project_id: '', project_role: 'Inspector' });
+  const [approveForm, setApproveForm] = useState({ role: 'resident_engineer', designation: '', project_id: '', project_role: 'Resident Engineer' });
 
-  const isSuperAdmin = profile.is_platform_admin === true || profile.is_super_admin === true;
+  const isSuperAdmin = profile.is_platform_admin === true || profile.role === 'client';
   const isRE = hasRole(profile.role, 'resident_engineer');
   const canApprove = isSuperAdmin || isRE; // RE can approve their team
 
@@ -69,20 +69,19 @@ export default function AdminPanel({ profile, showToast }) {
   function openApproveModal(user) {
     setApproveModal(user);
     // Auto-suggest role and pages based on user's party
-    const autoRole = user.party === 'contractor' || user.party === 'subcontractor' ? 'contractor_qs' :
-                     user.party === 'engineer_rep' ? 'inspector' :
+    const autoRole = user.party === 'engineer_rep' ? 'resident_engineer' :
                      user.party === 'engineer' ? 'project_engineer' :
-                     user.party === 'client' || user.party === 'project_manager' ? 'engineer' : 'inspector';
-    
-    // Default pages by party
-    const contractorPages = ['taking-off'];
-    const inspectorPages = ['submit-report', 'reports', 'works', 'issues', 'quality', 'equipment', 'key-personnel', 'taking-off'];
-    const rePages = [...inspectorPages, 'emergency', 'pavement', 'structures', 'programme', 'boq', 'approvals', 'monthly-report', 'claims', 'approvals-matrix'];
-    const engineerPages = [...rePages, 'ipc', 'staff', 'user-mgmt'];
-    
-    const autoPages = (user.party === 'contractor' || user.party === 'subcontractor') ? contractorPages :
-                      user.party === 'engineer_rep' ? inspectorPages :
-                      (user.party === 'engineer' || user.party === 'project_manager') ? engineerPages : rePages;
+                     user.party === 'client' || user.party === 'project_manager' ? 'engineer' : 'measurement_engineer';
+
+    // Default pages by role
+    const measurementPages = ['reports', 'pavement', 'quality', 'taking-off', 'construction-guide'];
+    const rePages = ['submit-report', 'reports', 'works', 'issues', 'emergency', 'pavement', 'quality', 'equipment', 'structures', 'programme',
+                     'boq', 'taking-off', 'ipc', 'approvals', 'site-instructions', 'monthly-report', 'claims', 'key-personnel', 'approvals-matrix',
+                     'guarantees', 'eot', 'mpr', 'doc-register', 'quality-matrix', 'milestones', 'financial-forecast', 'alert-centre', 'obligations', 'construction-guide'];
+    const engineerPages = [...rePages, 'staff', 'user-mgmt'];
+
+    const autoPages = user.party === 'engineer_rep' ? rePages :
+                      (user.party === 'engineer' || user.party === 'project_manager') ? engineerPages : measurementPages;
 
     setApproveForm({
       role: autoRole,
@@ -141,8 +140,8 @@ export default function AdminPanel({ profile, showToast }) {
 
   async function updateRole(userId, newRole) {
     const targetUser = users.find(u => u.id === userId);
-    if ((newRole === 'super_admin' || targetUser?.role === 'super_admin') && !isSuperAdmin) {
-      showToast('Only a Super Admin can manage Super Admin roles', 'error');
+    if ((newRole === 'client' || targetUser?.role === 'client') && !isSuperAdmin) {
+      showToast('Only a Client or Platform Admin can manage Client roles', 'error');
       return;
     }
     const updates = { role: newRole };
@@ -157,18 +156,18 @@ export default function AdminPanel({ profile, showToast }) {
 
   async function toggleSuperAdmin(userId, currentValue) {
     if (!isSuperAdmin) return;
-    const { error } = await supabase.from('profiles').update({ is_super_admin: !currentValue }).eq('id', userId);
+    const { error } = await supabase.from('profiles').update({ is_platform_admin: !currentValue }).eq('id', userId);
     if (error) { showToast(error.message, 'error'); }
-    else { showToast(!currentValue ? 'Super Admin access granted' : 'Super Admin access revoked'); loadAll(); }
+    else { showToast(!currentValue ? 'Platform Admin access granted' : 'Platform Admin access revoked'); loadAll(); }
   }
 
   async function deleteUser(userId) {
     if (!isSuperAdmin) return;
     const targetUser = users.find(u => u.id === userId);
-    if (targetUser?.is_super_admin) { showToast('Cannot delete a Super Admin', 'error'); return; }
+    if (targetUser?.role === 'client') { showToast('Cannot delete a Client user', 'error'); return; }
     const { error } = await supabase.from('profiles').update({
       role: 'pending', designation: null, reports_to: null,
-      can_approve_reports: false, is_super_admin: false,
+      can_approve_reports: false,
     }).eq('id', userId);
     if (error) { showToast(error.message, 'error'); }
     else { showToast('User removed'); setConfirmDelete(null); loadAll(); }
@@ -186,8 +185,8 @@ export default function AdminPanel({ profile, showToast }) {
 
   const pending = users.filter(u => u.role === 'pending');
   const active = users.filter(u => u.role !== 'pending');
-  const admins = active.filter(u => u.role === 'super_admin');
-  const nonAdmins = active.filter(u => u.role !== 'super_admin');
+  const admins = active.filter(u => u.role === 'client' || u.role === 'engineer');
+  const nonAdmins = active.filter(u => u.role !== 'client' && u.role !== 'engineer');
 
   if (loading) return <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 20px',color:'var(--text-muted)'}}><div style={{fontSize:28,marginBottom:12}}>◈</div><div>Loading...</div></div>;
 
@@ -198,7 +197,7 @@ export default function AdminPanel({ profile, showToast }) {
         <div>
           <h2>Administration</h2>
           <div className="subtitle">
-            {profile.is_platform_admin ? '🔑 Platform Admin — Full system control' : isSuperAdmin ? '🔑 Super Admin — Agency control' : 'Manage users and roles'}
+            {profile.is_platform_admin ? '🔑 Platform Admin — Full system control' : profile.role === 'client' ? '🔑 Client — Organisation oversight' : 'Manage users and roles'}
           </div>
         </div>
       </div>
@@ -254,8 +253,8 @@ export default function AdminPanel({ profile, showToast }) {
                   <button className="btn btn-success" onClick={() => openApproveModal(u)}>
                     Review & Approve
                   </button>
-                  <button className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'inspector')}>
-                    Quick Approve (Inspector)
+                  <button className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'measurement_engineer')}>
+                    Quick Approve (Measurement Eng.)
                   </button>
                 </div>
               </div>
@@ -277,7 +276,7 @@ export default function AdminPanel({ profile, showToast }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Super</th><th>Make Project Admin</th><th>Actions</th></tr>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Admin</th><th>Make Project Admin</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {admins.map(u => (
@@ -289,10 +288,10 @@ export default function AdminPanel({ profile, showToast }) {
                     <td className="text-sm">{u.email}</td>
                     <td><span className="badge badge-accent">{ROLE_LABELS[u.role]}</span></td>
                     <td>
-                      {u.is_super_admin ? (
-                        <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑 Super</span>
+                      {u.is_platform_admin ? (
+                        <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑 Platform</span>
                       ) : (
-                        <button className="btn btn-sm btn-secondary" onClick={() => toggleSuperAdmin(u.id, false)}>Grant Super</button>
+                        <span className="badge badge-accent">{ROLE_LABELS[u.role]}</span>
                       )}
                     </td>
                     <td>
@@ -305,22 +304,13 @@ export default function AdminPanel({ profile, showToast }) {
                     <td>
                       {u.id !== profile.id && (
                         <div className="btn-group">
-                          {u.is_super_admin && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => setConfirmAction({
-                              title: 'Revoke Super Admin?',
-                              message: `Are you sure you want to revoke Super Admin access for ${u.full_name}?`,
-                              confirmLabel: 'Revoke',
-                              variant: 'danger',
-                              action: () => toggleSuperAdmin(u.id, true),
-                            })}>Revoke Super</button>
-                          )}
                           <button className="btn btn-sm" style={{ background: '#dc2626', color: '#fff' }}
                             onClick={() => setConfirmAction({
                               title: 'Demote User?',
-                              message: `Are you sure you want to demote ${u.full_name} to Viewer? They will lose all current privileges.`,
+                              message: `Are you sure you want to demote ${u.full_name} to Measurement Engineer? They will lose current privileges.`,
                               confirmLabel: 'Demote',
                               variant: 'danger',
-                              action: () => updateRole(u.id, 'viewer'),
+                              action: () => updateRole(u.id, 'measurement_engineer'),
                             })}>Demote</button>
                           <button className="btn btn-sm btn-danger" onClick={() => setConfirmAction({
                               title: 'Remove User?',
@@ -339,14 +329,14 @@ export default function AdminPanel({ profile, showToast }) {
           </div>
 
           <div className="card" style={{ marginTop: 24 }}>
-            <div className="card-header"><h3>Promote User to Super Admin</h3></div>
+            <div className="card-header"><h3>Promote User to Engineer</h3></div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {nonAdmins.map(u => (
-                <button key={u.id} className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'super_admin')}>
+                <button key={u.id} className="btn btn-sm btn-secondary" onClick={() => updateRole(u.id, 'engineer')}>
                   {u.full_name} ({ROLE_LABELS[u.role]})
                 </button>
               ))}
-              {nonAdmins.length === 0 && <span className="text-muted text-sm">All users are Super Admins</span>}
+              {nonAdmins.length === 0 && <span className="text-muted text-sm">No users to promote</span>}
             </div>
           </div>
         </div>
@@ -382,7 +372,7 @@ export default function AdminPanel({ profile, showToast }) {
                   <td className="text-sm">{u.designation || '—'}</td>
                   <td><span className="badge badge-accent">{ROLE_LABELS[u.role]}</span></td>
                   {isSuperAdmin && (
-                    <td>{u.is_super_admin && <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑</span>}</td>
+                    <td>{u.is_platform_admin && <span className="badge" style={{ background: '#b45309', color: '#fff' }}>🔑</span>}</td>
                   )}
                   <td>
                     <select value={u.role} onChange={e => updateRole(u.id, e.target.value)}
@@ -421,13 +411,14 @@ export default function AdminPanel({ profile, showToast }) {
           <div><span className="text-muted">Total Users:</span> {users.length}</div>
           <div><span className="text-muted">Active:</span> {active.length}</div>
           <div><span className="text-muted">Admins:</span> {admins.length}</div>
-          <div><span className="text-muted">Super Admins:</span> {users.filter(u => u.is_super_admin).length}</div>
+          <div><span className="text-muted">Platform Admins:</span> {users.filter(u => u.is_platform_admin).length}</div>
           <div><span className="text-muted">Pending:</span> {pending.length}</div>
         </div>
         <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', fontSize: 12 }}>
-          <strong>Role Hierarchy:</strong> Director General → Super Admin → Engineer → Project Engineer → Resident Engineer → Inspector → Viewer → Pending
-          <br /><strong>FIDIC Roles:</strong> Employer (DG) → Director → The Engineer → Engineer's Rep → RE → Inspector of Works
-          <br /><span className="text-muted">DG has organisation-wide oversight. Super Admins manage project portfolios. Engineers manage contracts.</span>
+          <strong>Role Hierarchy:</strong> Client → Engineer → Project Engineer → Deputy PE / RE → Measurement Engineer → Pending
+          <br /><strong>FIDIC Chain:</strong> Employer (Client) → The Engineer → Engineer's Rep (PE) → RE → Measurement Team
+          <br /><strong>IPC Flow:</strong> Measurement Eng. measures → RE prepares → PE reviews → Engineer certifies → Client pays
+          <br /><span className="text-muted">Client has organisation-wide oversight. Engineer certifies payments. PE manages contract admin. RE runs the site.</span>
         </div>
       </div>
 
@@ -468,10 +459,9 @@ export default function AdminPanel({ profile, showToast }) {
                   <select value={approveForm.party || approveModal.party || ''} onChange={e => {
                     const p = e.target.value;
                     setApproveForm({ ...approveForm, party: p,
-                      role: p === 'contractor' || p === 'subcontractor' ? 'contractor_qs' :
-                            p === 'engineer_rep' ? 'inspector' :
+                      role: p === 'engineer_rep' ? 'resident_engineer' :
                             p === 'engineer' ? 'project_engineer' :
-                            p === 'client' || p === 'project_manager' ? 'engineer' : approveForm.role
+                            p === 'client' || p === 'project_manager' ? 'engineer' : 'measurement_engineer'
                     });
                   }}>
                     <option value="">— Select party —</option>
@@ -479,8 +469,7 @@ export default function AdminPanel({ profile, showToast }) {
                     <option value="engineer">📐 Engineer (Consulting Firm)</option>
                     <option value="project_manager">👔 Project Manager</option>
                     <option value="engineer_rep">👷 Engineer's Representative</option>
-                    <option value="contractor">🔨 Contractor</option>
-                    <option value="subcontractor">🔧 Subcontractor</option>
+                    <option value="contractor">🔨 Contractor (external)</option>
                   </select>
                 </div>
                 <div className="form-group mb-16">

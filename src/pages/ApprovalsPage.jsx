@@ -204,7 +204,7 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
           <h3 style={{ marginBottom: 12 }}>⏳ Awaiting Your Action</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {myQueue.slice(0, 5).map(q => {
-              const rc = ROLE_COLORS[q.current_approver_role] || ROLE_COLORS.viewer;
+              const rc = ROLE_COLORS[q.current_approver_role] || ROLE_COLORS.measurement_engineer;
               return (
                 <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)' }}>
@@ -285,7 +285,7 @@ export default function ApprovalsPage({ profile, showToast, navigateTo, selected
                 <thead><tr><th>Item</th><th>Project</th><th>Type</th><th>Submitted By</th><th>Current Level</th><th>Priority</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filteredQueue.map(q => {
-                    const rc = ROLE_COLORS[q.current_approver_role] || ROLE_COLORS.viewer;
+                    const rc = ROLE_COLORS[q.current_approver_role] || ROLE_COLORS.measurement_engineer;
                     const { allowed } = canApproveItem(userRole, q.item_type, isPlatformAdmin);
                     const canAct = q.status === 'pending' && (isPlatformAdmin || allowed);
                     return (

@@ -33,7 +33,7 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
 
   // Access control
   const isPlatformAdmin = profile?.is_platform_admin === true;
-  const canSeeCIT = isPlatformAdmin || (ROLE_LEVELS[profile?.role] || 0) >= (ROLE_LEVELS['project_officer'] || 0);
+  const canSeeCIT = isPlatformAdmin || (ROLE_LEVELS[profile?.role] || 0) >= (ROLE_LEVELS['deputy_project_engineer'] || 0);
 
   useEffect(() => { loadProjects(); loadClauses(); loadNotifications(); }, []);
   useEffect(() => { if (selectedProject) loadClaims(); }, [selectedProject]);

@@ -155,14 +155,14 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
     </div>
   );
 
-  // Contractor's QS gets a limited view — just their assigned projects + link to Taking Off Sheet
-  if (profile?.role === 'contractor_qs') {
+  // Measurement Engineer gets a focused view — their assigned projects + link to Taking Off Sheet
+  if (profile?.role === 'measurement_engineer') {
     return (
       <div className="fade-in">
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🔨</div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Contractor Portal</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Submit your measurements for assigned projects</p>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>📏</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Measurement Portal</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Update measurements and quantities for assigned projects</p>
         </div>
 
         {projects.length === 0 ? (

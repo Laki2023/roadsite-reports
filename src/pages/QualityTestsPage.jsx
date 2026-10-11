@@ -198,7 +198,7 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
           <h2>Quality Tests</h2>
           <div className="subtitle">Testing matrix against Kenya RDM specifications</div>
         </div>
-        {projectId && hasRole(profile.role, 'inspector') && (
+        {projectId && hasRole(profile.role, 'resident_engineer') && (
           <button className="btn btn-primary" onClick={() => { setForm(EMPTY_TEST); setEditId(null); setShowModal(true); }}>
             + Record Test
           </button>
@@ -299,7 +299,7 @@ export default function QualityTestsPage({ profile, showToast, selectedProject }
                     <td>{statusBadge(t.result_status)}</td>
                     <td className="text-sm">{t.tested_by_profile?.full_name || '—'}</td>
                     <td>
-                      {hasRole(profile.role, 'inspector') && (
+                      {hasRole(profile.role, 'resident_engineer') && (
                         <button className="btn btn-sm btn-secondary" onClick={() => openEdit(t)}>Edit</button>
                       )}
                     </td>
