@@ -4,6 +4,7 @@
    Kenya red earth, concrete neutrals
    ═══════════════════════════════════════════ */
 
+/* ─── Dark theme (default) ─── */
 :root {
   --bg-body: #0f1419;
   --bg-surface: #1a2332;
@@ -33,6 +34,105 @@
   --font-body: 'Inter', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --transition: 150ms ease;
+  --modal-overlay: rgba(0,0,0,0.7);
+  --sidebar-overlay: rgba(0,0,0,0.6);
+  --scrollbar-thumb: var(--border);
+  --scrollbar-thumb-hover: var(--text-muted);
+}
+
+/* ─── Explicit dark mode ─── */
+:root[data-theme="dark"] {
+  --bg-body: #0f1419;
+  --bg-surface: #1a2332;
+  --bg-card: #1e293b;
+  --bg-input: #0f172a;
+  --bg-hover: #253347;
+  --border: #2d3d50;
+  --border-focus: #e87b35;
+  --text-primary: #e8ecf1;
+  --text-secondary: #8899aa;
+  --text-muted: #7a8a9b;
+  --accent: #e87b35;
+  --accent-hover: #f09050;
+  --accent-dim: rgba(232,123,53,0.12);
+  --success: #22c55e;
+  --success-dim: rgba(34,197,94,0.12);
+  --warning: #eab308;
+  --warning-dim: rgba(234,179,8,0.12);
+  --danger: #ef4444;
+  --danger-dim: rgba(239,68,68,0.12);
+  --info: #3b82f6;
+  --info-dim: rgba(59,130,246,0.12);
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+  --modal-overlay: rgba(0,0,0,0.7);
+  --sidebar-overlay: rgba(0,0,0,0.6);
+  --scrollbar-thumb: var(--border);
+  --scrollbar-thumb-hover: var(--text-muted);
+}
+
+/* ─── Explicit light mode ─── */
+:root[data-theme="light"] {
+  --bg-body: #f0f2f5;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #f7f8fa;
+  --bg-hover: #e8ecf1;
+  --border: #d1d9e0;
+  --border-focus: #e87b35;
+  --text-primary: #1a2332;
+  --text-secondary: #4b5c6b;
+  --text-muted: #6b7b8d;
+  --accent: #d86e2c;
+  --accent-hover: #c5612a;
+  --accent-dim: rgba(216,110,44,0.10);
+  --success: #16a34a;
+  --success-dim: rgba(22,163,74,0.10);
+  --warning: #ca8a04;
+  --warning-dim: rgba(202,138,4,0.10);
+  --danger: #dc2626;
+  --danger-dim: rgba(220,38,38,0.10);
+  --info: #2563eb;
+  --info-dim: rgba(37,99,235,0.10);
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+  --modal-overlay: rgba(0,0,0,0.4);
+  --sidebar-overlay: rgba(0,0,0,0.3);
+  --scrollbar-thumb: #c1c9d2;
+  --scrollbar-thumb-hover: #9aa5b0;
+}
+
+/* ─── System: light preference (no data-theme set) ─── */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg-body: #f0f2f5;
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
+    --bg-input: #f7f8fa;
+    --bg-hover: #e8ecf1;
+    --border: #d1d9e0;
+    --border-focus: #e87b35;
+    --text-primary: #1a2332;
+    --text-secondary: #4b5c6b;
+    --text-muted: #6b7b8d;
+    --accent: #d86e2c;
+    --accent-hover: #c5612a;
+    --accent-dim: rgba(216,110,44,0.10);
+    --success: #16a34a;
+    --success-dim: rgba(22,163,74,0.10);
+    --warning: #ca8a04;
+    --warning-dim: rgba(202,138,4,0.10);
+    --danger: #dc2626;
+    --danger-dim: rgba(220,38,38,0.10);
+    --info: #2563eb;
+    --info-dim: rgba(37,99,235,0.10);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+    --modal-overlay: rgba(0,0,0,0.4);
+    --sidebar-overlay: rgba(0,0,0,0.3);
+    --scrollbar-thumb: #c1c9d2;
+    --scrollbar-thumb-hover: #9aa5b0;
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -139,7 +239,7 @@ html { scroll-behavior: smooth; }
 .sidebar-overlay {
   display: none;
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
+  background: var(--sidebar-overlay);
   z-index: 99;
 }
 
@@ -294,7 +394,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 textarea { resize: vertical; min-height: 80px; }
-select option { background: var(--bg-card); }
+select option { background: var(--bg-card); color: var(--text-primary); }
 
 /* ─── Buttons ─── */
 .btn {
@@ -389,7 +489,7 @@ select option { background: var(--bg-card); }
 /* ─── Modal ─── */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: var(--modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -632,8 +732,8 @@ a:hover { text-decoration: underline; }
 /* ─── Custom scrollbar ─── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ─── Print styles ─── */
 @media print {

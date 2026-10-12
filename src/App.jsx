@@ -29,6 +29,7 @@ import KeyPersonnelPage from './pages/KeyPersonnelPage';
 import ApprovalsMatrixPage from './pages/ApprovalsMatrixPage';
 import TakingOffPage from './pages/TakingOffPage';
 import ErrorBoundary from './components/ErrorBoundary';
+import ThemeToggle from './components/ThemeToggle';
 import ObligationsPage from './pages/ObligationsPage';
 import ConstructionGuidePage from './pages/ConstructionGuidePage';
 import SiteInstructionsPage from './pages/SiteInstructionsPage';
@@ -409,6 +410,9 @@ export default function App() {
               <div className="user-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.full_name}</div>
               <div className="user-role">{profile.is_platform_admin ? '🔒 Platform Admin' : (ROLE_LABELS[profile.role] || profile.role)}</div>
             </div>
+          </div>
+          <div className="mt-16">
+            <ThemeToggle />
           </div>
           <button className="btn btn-secondary btn-sm mt-16" style={{ width: '100%', justifyContent: 'center' }}
             onClick={() => supabase.auth.signOut()}>
