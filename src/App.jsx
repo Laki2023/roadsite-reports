@@ -353,11 +353,11 @@ export default function App() {
 
         {/* Project Context Banner */}
         {selectedProject && page !== 'projects' && (
-          <div style={{ padding: '8px 12px', margin: '0 12px 8px', background: 'rgba(232,123,53,0.15)',
-            borderRadius: 'var(--radius)', borderLeft: '3px solid #e87b35', cursor: 'pointer' }}
+          <div style={{ padding: '8px 12px', margin: '0 12px 8px', background: 'rgba(59,130,246,0.12)',
+            borderRadius: 'var(--radius)', borderLeft: '3px solid #3b82f6', cursor: 'pointer' }}
             onClick={() => navigateTo('project-dashboard', selectedProject)}>
-            <div style={{ fontSize: 10, color: '#e87b35', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Project<span onClick={(e) => { e.stopPropagation(); setSelectedProject(null); navigateTo('dashboard'); }} style={{ float: 'right', cursor: 'pointer', fontSize: 12, opacity: 0.8 }}>✕</span></div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Project<span onClick={(e) => { e.stopPropagation(); setSelectedProject(null); navigateTo('dashboard'); }} style={{ float: 'right', cursor: 'pointer', fontSize: 12, opacity: 0.8 }}>✕</span></div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedProject.name || 'Selected Project'}
             </div>
           </div>
@@ -391,7 +391,7 @@ export default function App() {
                 <span style={{ flex: 1 }}>{item.label}</span>
                 {badge && (
                   <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    background: item.key === 'emergency' ? '#ef4444' : '#e87b35', color: '#fff',
+                    background: item.key === 'emergency' ? '#ef4444' : '#3b82f6', color: '#fff',
                     fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 9999, minWidth: 16, textAlign: 'center' }}>
                     {badge}
                   </span>
@@ -402,7 +402,7 @@ export default function App() {
         </nav>
         <div className="sidebar-user">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e87b35', color: '#fff',
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#3b82f6', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
               {profile.full_name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
             </div>
@@ -414,7 +414,8 @@ export default function App() {
           <div className="mt-16">
             <ThemeToggle />
           </div>
-          <button className="btn btn-secondary btn-sm mt-16" style={{ width: '100%', justifyContent: 'center' }}
+          <button className="btn btn-sm mt-16" style={{ width: '100%', justifyContent: 'center',
+            background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}
             onClick={() => supabase.auth.signOut()}>
             Sign Out
           </button>

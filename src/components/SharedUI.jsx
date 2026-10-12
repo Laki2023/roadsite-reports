@@ -5,7 +5,7 @@ import React from 'react';
    Extracted from Dashboard & ProjectDashboard to eliminate duplication.
    ══════════════════════════════════════════════════════════════ */
 
-export const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
+export const COLORS = ['#3b82f6','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#6366f1'];
 
 // ── Format helpers ──
 export const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
@@ -61,7 +61,7 @@ export function KPICard({ title, value, subtitle, icon, trend, trendLabel, color
   const trendColor = trend > 0 ? '#10b981' : trend < 0 ? '#ef4444' : '#6b7280';
   return (
     <div className="card" onClick={onClick}
-      style={{ padding: '16px 18px', cursor: onClick ? 'pointer' : 'default', borderTop: `3px solid ${borderColor || '#e87b35'}`,
+      style={{ padding: '16px 18px', cursor: onClick ? 'pointer' : 'default', borderTop: `3px solid ${borderColor || '#3b82f6'}`,
         transition: 'transform 0.15s', position: 'relative', overflow: 'hidden' }}
       onMouseEnter={e => onClick && (e.currentTarget.style.transform = 'translateY(-2px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = '')}>
@@ -84,7 +84,7 @@ export function KPICard({ title, value, subtitle, icon, trend, trendLabel, color
 }
 
 // ── Progress Row / Progress Bar ──
-export function ProgressRow({ label, value, max = 100, color = '#e87b35' }) {
+export function ProgressRow({ label, value, max = 100, color = '#3b82f6' }) {
   const p = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   return (
     <div style={{ marginBottom: 10 }}>

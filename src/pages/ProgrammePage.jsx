@@ -6,11 +6,11 @@ const CATEGORY_COLORS = {
   preliminary: '#6366f1', mobilisation: '#8b5cf6', earthworks: '#b45309',
   pavement: '#059669', drainage: '#0284c7', structures: '#dc2626',
   road_furniture: '#7c3aed', environmental: '#16a34a', demobilisation: '#64748b',
-  construction: '#e87b35', rehabilitation: '#0ea5e9', maintenance: '#f59e0b', other: '#94a3b8',
+  construction: '#2563eb', rehabilitation: '#0ea5e9', maintenance: '#f59e0b', other: '#94a3b8',
 };
 
 const STATUS_COLORS = {
-  not_started: '#64748b', in_progress: '#e87b35', completed: '#059669',
+  not_started: '#64748b', in_progress: '#2563eb', completed: '#059669',
   on_hold: '#f59e0b', cancelled: '#dc2626',
 };
 
@@ -378,7 +378,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
             <button key={v.key} onClick={() => setSourceView(v.key)} style={{
               padding: '5px 10px', fontSize: 10, fontWeight: 700, border: '1px solid var(--border)',
               borderRadius: 4, cursor: 'pointer',
-              background: sourceView === v.key ? (v.key === 'engineer' ? '#059669' : v.key === 'contractor' ? '#e87b35' : '#6366f1') : 'var(--bg-card)',
+              background: sourceView === v.key ? (v.key === 'engineer' ? '#059669' : v.key === 'contractor' ? '#f59e0b' : '#6366f1') : 'var(--bg-card)',
               color: sourceView === v.key ? '#fff' : 'var(--text-muted)',
             }}>{v.label}{v.count !== null ? ` (${v.count})` : ''}</button>
           ))}
@@ -393,7 +393,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
           {/* KPI Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 14 }}>
             {[
-              { icon: '📊', label: 'Overall Progress', value: `${stats.weightedProgress}%`, color: '#e87b35' },
+              { icon: '📊', label: 'Overall Progress', value: `${stats.weightedProgress}%`, color: '#3b82f6' },
               { icon: '✅', label: 'Completed', value: stats.completed, color: '#059669' },
               { icon: '🔄', label: 'In Progress', value: stats.inProgress, color: '#0284c7' },
               { icon: '⏳', label: 'Not Started', value: stats.notStarted, color: '#64748b' },
@@ -441,7 +441,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
                         }}>
                           <div style={{ paddingLeft: (item.indent_level || 0) * 12 }}>
                             <div style={{ fontWeight: item.is_summary ? 800 : 500, fontSize: item.is_summary ? 11 : 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-                              {sourceView === 'compare' && <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: item.source_type === 'contractor' ? '#e87b35' : '#059669' }} />}
+                              {sourceView === 'compare' && <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: item.source_type === 'contractor' ? '#f59e0b' : '#059669' }} />}
                               {item.is_milestone ? '◆ ' : ''}{item.item_name}
                             </div>
                             {item.item_code && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{item.item_code}</div>}
@@ -585,7 +585,7 @@ export default function ProgrammePage({ profile, showToast, selectedProject: con
             <span>◆ Milestone</span>
             {sourceView === 'compare' && <>
               <span>● <span style={{ color: '#059669' }}>Engineer</span></span>
-              <span>● <span style={{ color: '#e87b35' }}>Contractor</span></span>
+              <span>● <span style={{ color: '#f59e0b' }}>Contractor</span></span>
             </>}
           </div>
         </>

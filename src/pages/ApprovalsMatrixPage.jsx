@@ -3,7 +3,7 @@ import { supabase, hasRole } from '../lib/supabase';
 import { LoadingSpinner } from '../components/SharedUI';
 
 const CATEGORIES = { financial: '💰', technical: '🔧', contractual: '📜', quality: '🧪', safety: '🦺', environmental: '🌿', general: '📋' };
-const CAT_COLORS = { financial: '#059669', technical: '#0284c7', contractual: '#8b5cf6', quality: '#e87b35', safety: '#dc2626', environmental: '#16a34a', general: '#64748b' };
+const CAT_COLORS = { financial: '#059669', technical: '#0284c7', contractual: '#8b5cf6', quality: '#0891b2', safety: '#dc2626', environmental: '#16a34a', general: '#64748b' };
 
 const STANDARD_ITEMS = [
   { approval_item: 'IPC Certification', category: 'financial', fidic_clause: 'Cl. 14.6', re_limit: 5000000, pe_limit: 20000000, engineer_limit: null, response_days: 28 },
@@ -187,7 +187,7 @@ export default function ApprovalsMatrixPage({ profile, showToast, selectedProjec
                         <td style={{ padding: '6px 8px', textAlign: 'center', fontSize: 10, background: item.inspector_limit ? '#059669' + '15' : 'transparent' }}>{fmtLimit(item.inspector_limit)}</td>
                         <td style={{ padding: '6px 8px', textAlign: 'center', fontSize: 10, background: item.re_limit ? '#0284c7' + '15' : 'transparent' }}>{fmtLimit(item.re_limit)}</td>
                         <td style={{ padding: '6px 8px', textAlign: 'center', fontSize: 10, background: item.pe_limit ? '#8b5cf6' + '15' : 'transparent' }}>{fmtLimit(item.pe_limit)}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'center', fontSize: 10, background: item.engineer_limit ? '#e87b35' + '15' : 'transparent' }}>{fmtLimit(item.engineer_limit)}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center', fontSize: 10, background: item.engineer_limit ? '#3b82f6' + '15' : 'transparent' }}>{fmtLimit(item.engineer_limit)}</td>
                         <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700 }}>{item.response_days}d</td>
                         <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
                           <button onClick={() => { setEditItem(item); setShowEditor(true); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12 }}>✏️</button>

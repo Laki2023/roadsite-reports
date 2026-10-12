@@ -7,10 +7,10 @@ import CITAssessment from '../components/CITAssessment';
 const TYPE_LABELS = { eot: '⏱️ EOT', cost: '💰 Cost', eot_and_cost: '⏱️💰 EOT & Cost', interest: '🏦 Interest', variation: '🔄 Variation', force_majeure: '🌪️ Force Majeure' };
 const STATUS_COLORS = {
   detected: '#f59e0b', notified: '#6366f1', under_preparation: '#0284c7', submitted: '#8b5cf6',
-  under_review: '#e87b35', additional_info: '#f59e0b', partially_approved: '#059669',
+  under_review: '#f59e0b', additional_info: '#f59e0b', partially_approved: '#059669',
   approved: '#059669', rejected: '#dc2626', withdrawn: '#94a3b8', time_barred: '#dc2626',
 };
-const PRIORITY_COLORS = { low: '#64748b', medium: '#f59e0b', high: '#e87b35', critical: '#dc2626' };
+const PRIORITY_COLORS = { low: '#64748b', medium: '#f59e0b', high: '#f59e0b', critical: '#dc2626' };
 
 export default function ClaimsPage({ profile, showToast, selectedProject: contextProject }) {
   const [projects, setProjects] = useState([]);
@@ -204,7 +204,7 @@ export default function ClaimsPage({ profile, showToast, selectedProject: contex
           {/* KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 14 }}>
             {[
-              { icon: '📋', label: 'Total Claims', value: stats.total, color: '#e87b35' },
+              { icon: '📋', label: 'Total Claims', value: stats.total, color: '#3b82f6' },
               { icon: '🔄', label: 'Active', value: stats.active, color: '#0284c7' },
               { icon: '⏱️', label: 'EOT Claimed', value: `${stats.totalEOT}d`, color: '#6366f1' },
               { icon: '💰', label: 'Cost Claimed', value: `KES ${(stats.totalCost / 1000000).toFixed(1)}M`, color: '#059669' },

@@ -8,7 +8,7 @@ const PARTY_OPTIONS = [
   { value: 'engineer', label: 'Engineer (Consulting Firm)', icon: '📐', desc: 'Supervision consultant', color: '#6366f1' },
   { value: 'project_manager', label: 'Project Manager', icon: '👔', desc: 'PM overseeing the project', color: '#0891b2' },
   { value: 'engineer_rep', label: "Engineer's Representative", icon: '👷', desc: 'RE & site supervision team', color: '#059669' },
-  { value: 'contractor', label: 'Contractor', icon: '🔨', desc: 'Main contractor', color: '#e87b35' },
+  { value: 'contractor', label: 'Contractor', icon: '🔨', desc: 'Main contractor', color: '#f59e0b' },
   { value: 'subcontractor', label: 'Subcontractor', icon: '🔧', desc: 'Nominated or domestic sub', color: '#8b5cf6' },
 ];
 
@@ -304,7 +304,7 @@ export default function AuthPage({ showToast }) {
 
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, position: 'relative', overflow: 'hidden' }}>
           {/* Top accent */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #3b82f6, #059669, #e87b35)' }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #2563eb, #3b82f6, #059669)' }} />
 
           {error && (
             <div style={{ background: '#ef444415', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: 12, marginBottom: 16, border: '1px solid #ef444430' }}>{error}</div>

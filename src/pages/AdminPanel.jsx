@@ -364,8 +364,8 @@ export default function AdminPanel({ profile, showToast }) {
                   <td className="text-sm">{u.email}</td>
                   <td>{u.party ? (
                     <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600,
-                      background: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b3520' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
-                      color: u.party === 'contractor' || u.party === 'subcontractor' ? '#e87b35' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
+                      background: u.party === 'contractor' || u.party === 'subcontractor' ? '#f59e0b20' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
+                      color: u.party === 'contractor' || u.party === 'subcontractor' ? '#f59e0b' : u.party === 'engineer' || u.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
                       {u.party === 'contractor' ? '🔨' : u.party === 'engineer' ? '📐' : u.party === 'engineer_rep' ? '👷' : u.party === 'client' ? '🏛️' : '🔧'} {u.party}
                     </span>
                   ) : <span className="text-muted">—</span>}</td>
@@ -435,8 +435,8 @@ export default function AdminPanel({ profile, showToast }) {
                 <div><span className="text-muted">Designation:</span> {approveModal.designation || '—'}</div>
                 <div><span className="text-muted">Party:</span> {approveModal.party ? (
                   <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                    background: approveModal.party === 'contractor' ? '#e87b3520' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
-                    color: approveModal.party === 'contractor' ? '#e87b35' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
+                    background: approveModal.party === 'contractor' ? '#f59e0b20' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#05966920' : '#3b82f620',
+                    color: approveModal.party === 'contractor' ? '#f59e0b' : approveModal.party === 'engineer' || approveModal.party === 'engineer_rep' ? '#059669' : '#3b82f6' }}>
                     {approveModal.party}
                   </span>
                 ) : '—'}</div>

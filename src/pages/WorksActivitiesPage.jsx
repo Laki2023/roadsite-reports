@@ -264,7 +264,7 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                         {/* Status indicator */}
                         <div style={{
                           width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                          background: act.status === 'Completed' ? '#10b981' : act.status === 'In Progress' ? '#e87b35' : '#6b7280',
+                          background: act.status === 'Completed' ? '#10b981' : act.status === 'In Progress' ? '#3b82f6' : '#6b7280',
                         }} />
 
                         {/* Activity info */}
@@ -288,12 +288,12 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                         <div style={{ width: 140, flexShrink: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3, color: 'var(--text-muted)' }}>
                             <span>{(act.completed_quantity || 0).toFixed(2)} / {(act.planned_quantity || 0).toFixed(2)} {act.unit || 'Km'}</span>
-                            <span style={{ fontWeight: 700, color: pct >= 80 ? '#10b981' : pct >= 40 ? '#e87b35' : '#ef4444' }}>{pct}%</span>
+                            <span style={{ fontWeight: 700, color: pct >= 80 ? '#10b981' : pct >= 40 ? '#3b82f6' : '#ef4444' }}>{pct}%</span>
                           </div>
                           <div style={{ height: 6, background: 'var(--bg-hover)', borderRadius: 3, overflow: 'hidden' }}>
                             <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.3s',
                               width: `${pct}%`,
-                              background: pct >= 80 ? '#10b981' : pct >= 40 ? '#e87b35' : '#ef4444',
+                              background: pct >= 80 ? '#10b981' : pct >= 40 ? '#3b82f6' : '#ef4444',
                             }} />
                           </div>
                         </div>
@@ -335,8 +335,8 @@ export default function WorksActivitiesPage({ profile, showToast, selectedProjec
                                     </span>
                                     <span style={{
                                       fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 600, textAlign: 'center',
-                                      background: e.daily_report_id ? '#6366f120' : '#e87b3520',
-                                      color: e.daily_report_id ? '#6366f1' : '#e87b35',
+                                      background: e.daily_report_id ? '#6366f120' : '#3b82f620',
+                                      color: e.daily_report_id ? '#6366f1' : '#3b82f6',
                                     }}>
                                       {e.daily_report_id ? 'Report' : 'Manual'}
                                     </span>

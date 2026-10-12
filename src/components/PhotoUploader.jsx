@@ -188,7 +188,7 @@ export default function PhotoUploader({
             padding: compact ? '12px 8px' : '20px',
             textAlign: 'center',
             cursor: 'pointer',
-            background: dragOver ? 'rgba(232,123,53,0.08)' : 'transparent',
+            background: dragOver ? 'rgba(59,130,246,0.08)' : 'transparent',
             transition: 'all 0.2s',
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}

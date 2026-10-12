@@ -266,7 +266,7 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${timePct}%`, borderRadius: 3,
-                          background: timePct >= 80 ? '#10b981' : timePct >= 40 ? '#e87b35' : '#3b82f6' }} />
+                          background: timePct >= 80 ? '#10b981' : timePct >= 40 ? '#3b82f6' : '#3b82f6' }} />
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 600, minWidth: 28, color: 'var(--text-muted)' }}>{timePct}%</span>
                     </div>

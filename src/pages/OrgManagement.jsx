@@ -121,11 +121,11 @@ export default function OrgManagement({ profile, showToast }) {
           return (
             <div key={org.id} className="card" onClick={() => setSelectedOrg(isSelected ? null : org.id)}
               style={{ padding: 0, cursor: 'pointer', transition: 'all 0.2s', overflow: 'hidden',
-                border: isSelected ? '2px solid #e87b35' : undefined,
+                border: isSelected ? '2px solid #3b82f6' : undefined,
                 opacity: org.is_active ? 1 : 0.6 }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = ''; }}>
-              <div style={{ height: 4, background: org.is_active ? (org.org_type === 'agency' ? '#e87b35' : org.org_type === 'consultant' ? '#2563eb' : org.org_type === 'contractor' ? '#10b981' : '#6b7280') : '#9ca3af' }} />
+              <div style={{ height: 4, background: org.is_active ? (org.org_type === 'agency' ? '#3b82f6' : org.org_type === 'consultant' ? '#2563eb' : org.org_type === 'contractor' ? '#10b981' : '#6b7280') : '#9ca3af' }} />
               <div style={{ padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>

@@ -101,20 +101,20 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_COLORS = {
-  client:                  { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
-  engineer:                { bg: 'rgba(59,130,246,0.12)',  text: '#60a5fa', border: '#3b82f6' },
-  project_engineer:        { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8', border: '#6366f1' },
+  client:                  { bg: 'rgba(37,99,235,0.12)',   text: '#3b82f6', border: '#2563eb' },
+  engineer:                { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8', border: '#6366f1' },
+  project_engineer:        { bg: 'rgba(139,92,246,0.12)',  text: '#a78bfa', border: '#8b5cf6' },
   deputy_project_engineer: { bg: 'rgba(245,158,11,0.12)',  text: '#fbbf24', border: '#f59e0b' },
   resident_engineer:       { bg: 'rgba(16,185,129,0.12)',  text: '#34d399', border: '#10b981' },
-  measurement_engineer:    { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
+  measurement_engineer:    { bg: 'rgba(6,182,212,0.12)',   text: '#22d3ee', border: '#06b6d4' },
   pending:                 { bg: 'rgba(107,114,128,0.12)', text: '#9ca3af', border: '#6b7280' },
   // Legacy aliases
-  director_general: { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
-  super_admin:      { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
+  director_general: { bg: 'rgba(37,99,235,0.12)',   text: '#3b82f6', border: '#2563eb' },
+  super_admin:      { bg: 'rgba(37,99,235,0.12)',   text: '#3b82f6', border: '#2563eb' },
   project_officer:  { bg: 'rgba(245,158,11,0.12)',  text: '#fbbf24', border: '#f59e0b' },
   inspector:        { bg: 'rgba(16,185,129,0.12)',  text: '#34d399', border: '#10b981' },
-  contractor_qs:    { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
-  viewer:           { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
+  contractor_qs:    { bg: 'rgba(6,182,212,0.12)',   text: '#22d3ee', border: '#06b6d4' },
+  viewer:           { bg: 'rgba(6,182,212,0.12)',   text: '#22d3ee', border: '#06b6d4' },
 };
 
 /* ══════════════════════════════════════════════════════════════

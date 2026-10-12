@@ -475,7 +475,7 @@ export default function BoQPage({ profile, showToast, selectedProject: propProje
       )}
 
       {selectedProject && items.length > 0 && (() => {
-        const BILL_COLORS = ['#3b82f6', '#059669', '#e87b35', '#8b5cf6', '#ec4899', '#0891b2', '#f59e0b', '#6366f1', '#ef4444', '#14b8a6',
+        const BILL_COLORS = ['#3b82f6', '#059669', '#3b82f6', '#8b5cf6', '#ec4899', '#0891b2', '#f59e0b', '#6366f1', '#ef4444', '#14b8a6',
           '#a855f7', '#f97316', '#06b6d4', '#84cc16', '#e11d48', '#7c3aed', '#10b981', '#f43f5e', '#0ea5e9', '#d946ef'];
         
         // Chart data

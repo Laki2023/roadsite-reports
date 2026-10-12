@@ -256,8 +256,8 @@ export default function StructuresPage({ profile, showToast, selectedProject: pr
                       return (
                         <div key={stage} style={{
                           display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                          background: done ? 'rgba(22,163,74,0.08)' : inProg ? 'rgba(232,123,53,0.08)' : failed ? 'rgba(220,38,38,0.08)' : 'transparent',
-                          borderLeft: `3px solid ${done ? '#16a34a' : inProg ? '#e87b35' : failed ? '#dc2626' : 'var(--border)'}`,
+                          background: done ? 'rgba(22,163,74,0.08)' : inProg ? 'rgba(59,130,246,0.08)' : failed ? 'rgba(220,38,38,0.08)' : 'transparent',
+                          borderLeft: `3px solid ${done ? '#16a34a' : inProg ? '#3b82f6' : failed ? '#dc2626' : 'var(--border)'}`,
                           borderRadius: '0 var(--radius) var(--radius) 0',
                         }}>
                           <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>

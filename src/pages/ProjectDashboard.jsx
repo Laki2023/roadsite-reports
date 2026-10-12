@@ -26,7 +26,7 @@ function ScoreRing({ value, size=80, stroke=7, color, label, sublabel, grade }) 
   );
 }
 
-function ProgressBar({ label, value, max=100, color='#e87b35', showPct=true }) {
+function ProgressBar({ label, value, max=100, color='#3b82f6', showPct=true }) {
   const p = max>0 ? Math.min((value/max)*100,100) : 0;
   return (
     <div style={{ marginBottom:8 }}>
@@ -757,7 +757,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         <div className="card" style={{ padding:12, borderTop:'3px solid #d97706' }}>
           <KPI title="Cost Performance" value={`${finPct}%`} subtitle={fmtB(valueDone)} small />
         </div>
-        <div className="card" style={{ padding:12, borderTop:'3px solid #e87b35' }}>
+        <div className="card" style={{ padding:12, borderTop:'3px solid #3b82f6' }}>
           <KPI title="Contract Value" value={fmtB(contractSum)} subtitle={`${fmtB(balance)} remaining`} small />
         </div>
         {roadLen > 0 && (
@@ -857,7 +857,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
               <AreaChart data={sCurve} margin={{ left:0, right:8, top:5 }}>
                 <defs>
                   <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6b7280" stopOpacity={0.2}/><stop offset="100%" stopColor="#6b7280" stopOpacity={0.02}/></linearGradient>
-                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e87b35" stopOpacity={0.3}/><stop offset="100%" stopColor="#e87b35" stopOpacity={0.02}/></linearGradient>
+                  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02}/></linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
                 <XAxis dataKey="month" tick={{ fontSize:10, fill:'var(--text-muted)' }} />
@@ -865,7 +865,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:12 }} formatter={v=>v+'%'} />
                 <Legend wrapperStyle={{ fontSize:11 }} />
                 <Area type="monotone" dataKey="planned" stroke="#6b7280" strokeWidth={2} fill="url(#gP)" name="Planned" dot={false} />
-                <Area type="monotone" dataKey="actual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gA)" name="Actual" dot={{ r:3 }} />
+                <Area type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gA)" name="Actual" dot={{ r:3 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -1128,7 +1128,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 <span style={{ padding:'4px 10px', borderRadius:9999, background:'#10b98118', color:'#10b981', fontWeight:600 }}>
                   {layersComplete} completed
                 </span>
-                <span style={{ padding:'4px 10px', borderRadius:9999, background:'#e87b3518', color:'#e87b35', fontWeight:600 }}>
+                <span style={{ padding:'4px 10px', borderRadius:9999, background:'#3b82f618', color:'#3b82f6', fontWeight:600 }}>
                   Avg: {avgProgress}%
                 </span>
               </div>
@@ -1157,7 +1157,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                         <td style={{ textAlign:'center', padding:'6px', color:'var(--text-muted)' }}>{r.unit}</td>
                         <td className="text-mono" style={{ textAlign:'right', padding:'6px' }}>{r.planned > 0 ? Number(r.planned).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) : '—'}</td>
                         <td className="text-mono" style={{ textAlign:'right', padding:'6px', fontWeight:700,
-                          color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.done > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                          color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#3b82f6' : r.done > 0 ? '#ef4444' : 'var(--text-muted)' }}>
                           {r.done > 0 ? Number(r.done).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
                         </td>
                         <td className="text-mono" style={{ textAlign:'right', padding:'6px', color:'var(--text-muted)' }}>
@@ -1167,17 +1167,17 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                             <div style={{ width:70, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
                               <div style={{ height:'100%', width:`${r.pctDisplay}%`, borderRadius:3,
-                                background: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.pctDisplay > 0 ? '#ef4444' : 'transparent' }} />
+                                background: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#3b82f6' : r.pctDisplay > 0 ? '#ef4444' : 'transparent' }} />
                             </div>
                             <span style={{ fontSize:10, fontWeight:600, minWidth:28,
-                              color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#e87b35' : r.pctDisplay > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                              color: r.pctDisplay >= 80 ? '#10b981' : r.pctDisplay >= 40 ? '#3b82f6' : r.pctDisplay > 0 ? '#ef4444' : 'var(--text-muted)' }}>
                               {r.pctDisplay > 0 ? r.pctDisplay + '%' : ''}
                             </span>
                           </div>
                         </td>
                         <td style={{ textAlign:'center', padding:'6px' }}>
                           {(() => {
-                            const sc = r.layerStatus === 'Completed' ? '#10b981' : r.layerStatus === 'In Progress' ? '#e87b35' : '#6b7280';
+                            const sc = r.layerStatus === 'Completed' ? '#10b981' : r.layerStatus === 'In Progress' ? '#3b82f6' : '#6b7280';
                             return <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:9999, fontSize:9, fontWeight:700,
                               background:sc+'18', color:sc, border:`1px solid ${sc}35`, whiteSpace:'nowrap' }}>{r.layerStatus}</span>;
                           })()}
@@ -1430,10 +1430,10 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                           <div style={{ height:'100%', borderRadius:3, transition:'width 0.8s ease',
                             width:`${a.pct}%`,
                             background: a.isLive ? 'linear-gradient(90deg, #10b981, #34d399)'
-                              : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : a.pct > 0 ? '#ef4444' : '#374151' }} />
+                              : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#3b82f6' : a.pct > 0 ? '#ef4444' : '#374151' }} />
                         </div>
                         <span style={{ fontSize:11, fontWeight:700, width:32, textAlign:'right',
-                          color: a.overMeasured ? '#ef4444' : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : '#ef4444' }}
+                          color: a.overMeasured ? '#ef4444' : a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#3b82f6' : '#ef4444' }}
                           title={a.overMeasured ? `Over-measured: recorded ${a.rawPct}% of planned quantity — check chainage entries` : ''}>
                           {a.overMeasured ? '⚠100%' : `${a.pct}%`}</span>
                       </div>
@@ -1497,7 +1497,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 }} />
               <Legend wrapperStyle={{ fontSize:10 }} />
               <Bar dataKey="reports" fill="#3b82f6" name="Daily Reports" radius={[3,3,0,0]} />
-              <Bar dataKey="activities" fill="#e87b35" name="Activities Progressed" radius={[3,3,0,0]} />
+              <Bar dataKey="activities" fill="#3b82f6" name="Activities Progressed" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
 
@@ -1641,7 +1641,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           <ResponsiveContainer width="100%" height={230}>
             <AreaChart data={combinedProgress} margin={{ left:0, right:8, top:5 }}>
               <defs>
-                <linearGradient id="gPhy" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#e87b35" stopOpacity={0.2}/><stop offset="100%" stopColor="#e87b35" stopOpacity={0.02}/></linearGradient>
+                <linearGradient id="gPhy" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="100%" stopColor="#3b82f6" stopOpacity={0.02}/></linearGradient>
                 <linearGradient id="gFin" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563eb" stopOpacity={0.2}/><stop offset="100%" stopColor="#2563eb" stopOpacity={0.02}/></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
@@ -1650,12 +1650,12 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
               <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} formatter={v=>v+'%'} />
               <Legend wrapperStyle={{ fontSize:10 }} />
               <Area type="monotone" dataKey="physPlanned" stroke="#6b7280" strokeWidth={1.5} fill="none" name="Physical Planned" dot={false} strokeDasharray="4 3" />
-              <Area type="monotone" dataKey="physActual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gPhy)" name="Physical Actual" dot={{ r:3 }} />
+              <Area type="monotone" dataKey="physActual" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gPhy)" name="Physical Actual" dot={{ r:3 }} />
               <Area type="monotone" dataKey="finActual" stroke="#2563eb" strokeWidth={2.5} fill="url(#gFin)" name="Financial Actual" dot={{ r:3 }} />
             </AreaChart>
           </ResponsiveContainer>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginTop:6, padding:'0 8px' }}>
-            <span style={{ color:'#e87b35' }}>Physical: <strong>{physPct}%</strong></span>
+            <span style={{ color:'#3b82f6' }}>Physical: <strong>{physPct}%</strong></span>
             <span style={{ color:'#2563eb' }}>Financial: <strong>{finPct}%</strong></span>
             <span style={{ color: Math.abs(physPct-finPct)<=10?'#10b981':'#ef4444', fontWeight:700 }}>
               Gap: {physPct > finPct ? '+' : ''}{physPct - finPct}%
@@ -1937,21 +1937,21 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                     {shown.map((r, i) => (
                       <tr key={r.id || i} style={{ borderBottom:'1px solid var(--border)', background: r.is_key_equipment && r.gap > 0 ? '#ef444408' : 'transparent' }}>
                         <td style={{ padding:'6px', fontWeight: r.is_key_equipment ? 700 : 500 }}>
-                          {r.is_key_equipment && <span style={{ color:'#e87b35', marginRight:4, fontSize:10 }} title="Key equipment">★</span>}
+                          {r.is_key_equipment && <span style={{ color:'#3b82f6', marginRight:4, fontSize:10 }} title="Key equipment">★</span>}
                           {r.equipment_name || '—'}
                         </td>
                         <td style={{ padding:'6px', color:'var(--text-muted)', fontSize:11 }}>{r.equipment_type || '—'}</td>
                         <td className="text-mono" style={{ textAlign:'center', padding:'6px' }}>{r.req}</td>
-                        <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontWeight:700, color: r.on >= r.req && r.req > 0 ? '#10b981' : r.on > 0 ? '#e87b35' : 'var(--text-muted)' }}>{r.on}</td>
+                        <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontWeight:700, color: r.on >= r.req && r.req > 0 ? '#10b981' : r.on > 0 ? '#3b82f6' : 'var(--text-muted)' }}>{r.on}</td>
                         <td className="text-mono" style={{ textAlign:'center', padding:'6px', fontWeight:700, color: r.gap > 0 ? '#ef4444' : '#10b981' }}>{r.gap > 0 ? r.gap : '—'}</td>
                         <td style={{ padding:'6px' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                             <div style={{ width:80, height:6, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
                               <div style={{ height:'100%', width:`${Math.min(r.util, 100)}%`, borderRadius:3,
-                                background: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#e87b35' : r.util > 0 ? '#ef4444' : 'transparent' }} />
+                                background: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#3b82f6' : r.util > 0 ? '#ef4444' : 'transparent' }} />
                             </div>
                             <span style={{ fontSize:10, fontWeight:600, minWidth:30,
-                              color: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#e87b35' : r.util > 0 ? '#ef4444' : 'var(--text-muted)' }}>{r.req > 0 ? r.util + '%' : ''}</span>
+                              color: r.util >= 100 ? '#10b981' : r.util >= 50 ? '#3b82f6' : r.util > 0 ? '#ef4444' : 'var(--text-muted)' }}>{r.req > 0 ? r.util + '%' : ''}</span>
                           </div>
                         </td>
                       </tr>
@@ -2057,7 +2057,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 {/* Main timeline bar */}
                 <div style={{ position:'absolute', left:20, right:20, top:42, height:4, background:'var(--border)', borderRadius:2 }}>
                   {/* Progress fill to today */}
-                  <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${todayPos}%`, background:'linear-gradient(90deg, #e87b35, #f59e0b)', borderRadius:2 }} />
+                  <div style={{ position:'absolute', left:0, top:0, height:'100%', width:`${todayPos}%`, background:'linear-gradient(90deg, #3b82f6, #f59e0b)', borderRadius:2 }} />
                 </div>
                 {/* Today marker */}
                 <div style={{ position:'absolute', left:`calc(${todayPos}% + 10px)`, top:28, transform:'translateX(-50%)', zIndex:5 }}>
@@ -2825,10 +2825,10 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           const TYPE_LABELS = { eot:'⏱️ EOT', cost:'💰 Cost', eot_and_cost:'⏱️💰 EOT & Cost', interest:'🏦 Interest', variation:'🔄 Variation', force_majeure:'🌪️ Force Majeure' };
           const STATUS_COLORS = {
             detected:'#f59e0b', notified:'#6366f1', under_preparation:'#0284c7', submitted:'#8b5cf6',
-            under_review:'#e87b35', additional_info:'#f59e0b', partially_approved:'#059669',
+            under_review:'#f59e0b', additional_info:'#f59e0b', partially_approved:'#059669',
             approved:'#059669', rejected:'#dc2626', withdrawn:'#94a3b8', time_barred:'#dc2626',
           };
-          const PRIORITY_COLORS = { low:'#64748b', medium:'#f59e0b', high:'#e87b35', critical:'#dc2626' };
+          const PRIORITY_COLORS = { low:'#64748b', medium:'#f59e0b', high:'#f59e0b', critical:'#dc2626' };
           // Pipeline stages
           const PIPELINE = ['detected','notified','under_preparation','submitted','under_review','additional_info','partially_approved','approved','rejected','withdrawn','time_barred'];
           const PIPELINE_LABELS = { detected:'Detected', notified:'Notified', under_preparation:'Preparing', submitted:'Submitted', under_review:'Under Review', additional_info:'Add. Info', partially_approved:'Partial', approved:'Approved', rejected:'Rejected', withdrawn:'Withdrawn', time_barred:'Time-barred' };

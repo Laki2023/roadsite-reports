@@ -1095,7 +1095,7 @@ export default function SubmitReport({ profile, showToast, navigateTo, selectedP
                     <span style={{ color: '#3b82f6', fontWeight: 600 }}>🔗 {linkedAct.is_component ? linkedAct.activity_name + ' (→ ' + (parentAct?.activity_name || '') + ')' : 'Linked to register'}</span>
                     <span>Planned: <b>{linkedAct.planned_quantity || 0} {unit}</b></span>
                     <span>Done: <b>{Number(linkedAct.completed_quantity || 0).toFixed(2)} {unit}</b></span>
-                    {remaining != null && <span style={{ color: remaining > 0 ? '#e87b35' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
+                    {remaining != null && <span style={{ color: remaining > 0 ? '#3b82f6' : '#10b981', fontWeight: 600 }}>Remaining: {Number(remaining).toFixed(2)} {unit}</span>}
                     {lastEntry && <span style={{ width: '100%', color: 'var(--text-muted)' }}>📍 Last: Ch {fmtChainage(lastEntry.start_chainage)} → {fmtChainage(lastEntry.end_chainage)} ({lastEntry.side}) on {lastEntry.work_date} — enter <b>today\'s new section</b> only</span>}
                   </div>
                 )}

@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase, hasRole } from '../lib/supabase';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-const COLORS = ['#e87b35','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2'];
+const COLORS = ['#3b82f6','#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2'];
 const fmt = (n) => n != null ? 'KES ' + Number(n).toLocaleString() : '—';
 const fmtB = (n) => { if (!n) return '—'; if (n >= 1e9) return 'KES ' + (n/1e9).toFixed(2) + 'B'; if (n >= 1e6) return 'KES ' + (n/1e6).toFixed(1) + 'M'; return fmt(n); };
 
-function Ring({ pct, size=70, color='#e87b35', label }) {
+function Ring({ pct, size=70, color='#3b82f6', label }) {
   const r = (size-8)/2, c = 2*Math.PI*r, o = c - (pct/100)*c;
   return (<div style={{ position:'relative', width:size, height:size, display:'inline-block' }}>
     <svg width={size} height={size} style={{ transform:'rotate(-90deg)' }}>
@@ -190,7 +190,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
       <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:8, marginBottom:16 }}>
         {[
           { l:'Physical', v:`${finPct.toFixed(0)}%`, s:behind?'Behind':'On Track', c:behind?'#dc2626':'#16a34a' },
-          { l:'Financial', v:fmtB(valueDone), s:`of ${fmtB(contractSum)}`, c:'#e87b35' },
+          { l:'Financial', v:fmtB(valueDone), s:`of ${fmtB(contractSum)}`, c:'#3b82f6' },
           { l:'Time', v:`${timePct.toFixed(0)}%`, s:`${Math.round(remaining)}d left`, c:behind?'#dc2626':'#2563eb' },
           { l:'Quality', v:`${qPct.toFixed(0)}%`, s:`${testPass}/${tests.length}`, c:qPct>=80?'#16a34a':'#dc2626' },
           { l:'Equipment', v:`${eqPct.toFixed(0)}%`, s:`${eqOn}/${eqReq}`, c:eqPct>=80?'#16a34a':'#d97706' },
@@ -206,7 +206,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
 
       {/* PROGRESS RINGS */}
       <div style={{ display:'flex', justifyContent:'space-around', padding:'12px 0', marginBottom:16, background:'var(--bg-card)', borderRadius:'var(--radius)', border:'1px solid var(--border)' }}>
-        <Ring pct={finPct} color="#e87b35" label="Financial" />
+        <Ring pct={finPct} color="#3b82f6" label="Financial" />
         <Ring pct={worksPct} color="#2563eb" label="Works" />
         <Ring pct={timePct} color={behind?'#dc2626':'#16a34a'} label="Schedule" />
         <Ring pct={eqPct} color="#7c3aed" label="Equipment" />
@@ -248,7 +248,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
                   <YAxis tick={{ fontSize:9, fill:'var(--text-muted)' }} />
                   <Tooltip contentStyle={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }} />
                   <Bar dataKey="total" fill="#4b5563" name="Total" radius={[2,2,0,0]} />
-                  <Bar dataKey="done" fill="#e87b35" name="Done" radius={[2,2,0,0]} />
+                  <Bar dataKey="done" fill="#3b82f6" name="Done" radius={[2,2,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -292,7 +292,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
             <h3 style={{ fontSize:13, marginBottom:8 }}>Project Impact</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:8, textAlign:'center' }}>
               {[
-                { v:roadLen.toFixed(1), l:'km of Road', c:'#e87b35' },
+                { v:roadLen.toFixed(1), l:'km of Road', c:'#3b82f6' },
                 { v:structs.length, l:'Structures', c:'#2563eb' },
                 { v:equip.length, l:'Equipment', c:'#16a34a' },
                 { v:tests.length, l:'Quality Tests', c:'#7c3aed' },

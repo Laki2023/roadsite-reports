@@ -28,9 +28,9 @@ export default function ThemeToggle() {
       display: 'flex',
       gap: 2,
       padding: '2px',
-      background: 'var(--bg-input)',
+      background: 'rgba(255,255,255,0.06)',
       borderRadius: 'var(--radius)',
-      border: '1px solid var(--border)',
+      border: '1px solid rgba(255,255,255,0.1)',
     }}>
       {OPTIONS.map(opt => {
         const isActive = current === opt.value;
@@ -50,8 +50,8 @@ export default function ThemeToggle() {
               padding: '5px 6px',
               border: 'none',
               borderRadius: 'calc(var(--radius) - 2px)',
-              background: isActive ? 'var(--accent-dim)' : 'transparent',
-              color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+              background: isActive ? 'var(--sidebar-active-bg)' : 'transparent',
+              color: isActive ? 'var(--sidebar-active-text)' : 'var(--sidebar-text)',
               fontSize: 11,
               fontWeight: isActive ? 600 : 500,
               cursor: 'pointer',

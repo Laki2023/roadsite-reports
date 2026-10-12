@@ -233,7 +233,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
           <button key={t.key} onClick={() => setView(t.key)}
             style={{
               padding: '8px 16px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
-              background: view === t.key ? '#e87b35' : 'transparent',
+              background: view === t.key ? '#3b82f6' : 'transparent',
               color: view === t.key ? '#fff' : 'var(--text-muted)',
               borderRadius: '8px 8px 0 0', transition: 'all 0.2s', whiteSpace: 'nowrap',
             }}>
@@ -250,7 +250,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
             <KPICard title="Portfolio Health" value={portfolio.avgHealth + '%'} icon="❤️"
               borderColor={getHealthGrade(portfolio.avgHealth).color}
               color={getHealthGrade(portfolio.avgHealth).color} />
-            <KPICard title="Avg Physical" value={portfolio.avgPhysical + '%'} icon="📈" borderColor="#e87b35" />
+            <KPICard title="Avg Physical" value={portfolio.avgPhysical + '%'} icon="📈" borderColor="#3b82f6" />
             <KPICard title="Avg Financial" value={portfolio.avgFinancial + '%'} icon="💰" borderColor="#2563eb" />
             <KPICard title="Quality Score" value={portfolio.avgQuality + '%'} icon="🧪"
               borderColor={portfolio.avgQuality >= 80 ? '#10b981' : '#f59e0b'} />
@@ -327,7 +327,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => fmt(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="contract" fill="#4b5563" name="Contract Sum" radius={[3,3,0,0]} />
-                <Bar dataKey="done" fill="#e87b35" name="Value Done" radius={[3,3,0,0]} />
+                <Bar dataKey="done" fill="#3b82f6" name="Value Done" radius={[3,3,0,0]} />
                 <Bar dataKey="certified" fill="#2563eb" name="Certified" radius={[3,3,0,0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -384,7 +384,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
                     financial: p.financialProgress, physical: p.physicalProgress,
                     name: p.name, size: Math.max(p.contractSum / 1e6, 10),
                     fill: p.health.color
-                  }))} fill="#e87b35">
+                  }))} fill="#3b82f6">
                     {filtered.map((p, i) => (
                       <Cell key={p.id} fill={p.health.color} />
                     ))}
@@ -427,7 +427,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <div style={{ width: 40, height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${p.physicalProgress}%`, background: '#e87b35', borderRadius: 3 }} />
+                            <div style={{ height: '100%', width: `${p.physicalProgress}%`, background: '#3b82f6', borderRadius: 3 }} />
                           </div>
                           <span style={{ fontWeight: 600 }}>{p.physicalProgress}%</span>
                         </div>
@@ -477,7 +477,7 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
             <KPICard title="Total Contract Value" value={fmtB(portfolio.totalContract)} icon="📋" borderColor="#4b5563" />
             <KPICard title="Total Value Done" value={fmtB(portfolio.totalValueDone)}
               subtitle={`${pct(portfolio.totalValueDone, portfolio.totalContract)}% of contracts`}
-              icon="📈" borderColor="#e87b35" />
+              icon="📈" borderColor="#3b82f6" />
             <KPICard title="Total Certified" value={fmtB(portfolio.totalCertified)} icon="✅" borderColor="#2563eb" />
             <KPICard title="Total Paid" value={fmtB(portfolio.totalPaid)}
               subtitle={portfolio.retention > 0 ? `${fmtB(portfolio.retention)} retention held` : 'No retention'}
@@ -518,14 +518,14 @@ export default function MegaDashboard({ profile, navigateTo, showToast }) {
                 <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
                   <div style={{ height: '100%', width: `${pct(p.totalPaid, p.contractSum)}%`, background: '#10b981', position: 'absolute' }} />
                   <div style={{ height: '100%', width: `${pct(p.totalCertified, p.contractSum)}%`, background: '#2563eb40', position: 'absolute' }} />
-                  <div style={{ height: '100%', width: `${p.financialProgress}%`, background: '#e87b3530', position: 'absolute' }} />
+                  <div style={{ height: '100%', width: `${p.financialProgress}%`, background: '#3b82f630', position: 'absolute' }} />
                 </div>
               </div>
             ))}
             <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 10, color: 'var(--text-muted)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#10b981', borderRadius: 2 }} /> Paid</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#2563eb40', borderRadius: 2 }} /> Certified</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#e87b3530', borderRadius: 2 }} /> Value Done</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#3b82f630', borderRadius: 2 }} /> Value Done</span>
             </div>
           </div>
         </div>

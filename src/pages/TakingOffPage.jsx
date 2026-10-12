@@ -208,8 +208,8 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
              myParty === 'contractor' ? 'Contractor measurement — Engineer quantities hidden' :
              'Engineer measurement — Contractor quantities hidden'}
             <span style={{ marginLeft: 8, padding: '2px 10px', borderRadius: 12, fontSize: 10, fontWeight: 600,
-              background: myParty === 'contractor' ? '#e87b3520' : myParty === 'engineer' ? '#05966920' : '#3b82f620',
-              color: myParty === 'contractor' ? '#e87b35' : myParty === 'engineer' ? '#059669' : '#3b82f6' }}>
+              background: myParty === 'contractor' ? '#f59e0b20' : myParty === 'engineer' ? '#05966920' : '#3b82f620',
+              color: myParty === 'contractor' ? '#f59e0b' : myParty === 'engineer' ? '#059669' : '#3b82f6' }}>
               {myLabel}
             </span>
           </p>
@@ -257,8 +257,8 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
           {/* ══════ Quantity Comparison ══════ */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: '#e87b35', fontWeight: 600 }}>🔨 Contractor total</div>
-              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#e87b35', marginTop: 6 }}>{fmt(stats.totalContractor)}</div>
+              <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>🔨 Contractor total</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#f59e0b', marginTop: 6 }}>{fmt(stats.totalContractor)}</div>
             </div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>👷 Engineer total</div>
@@ -266,7 +266,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
             </div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 600 }}>✅ Agreed total</div>
-              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#3b82f6', marginTop: 6 }}>{fmt(stats.totalAgreed)}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'monospace', color: '#f59e0b', marginTop: 6 }}>{fmt(stats.totalAgreed)}</div>
             </div>
           </div>
 
@@ -319,7 +319,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                           {entry.side !== 'Both' && <span style={{ color: 'var(--text-muted)' }}> ({entry.side})</span>}
                         </td>
                         {canSeeContractor && (
-                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#e87b35' }}>
+                          <td style={{ padding: '10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#f59e0b' }}>
                             {entry.contractor_qty > 0 ? fmt(entry.contractor_qty) : <span style={{ color: 'var(--text-muted)' }}>pending</span>}
                           </td>
                         )}
@@ -480,11 +480,11 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
               <div style={{ display: 'grid', gridTemplateColumns: canHarmonise ? '1fr 1fr 1fr' : '1fr', gap: 10 }}>
                 {canSeeContractor && (
                   <div>
-                    <label style={{ ...ls, color: '#e87b35' }}>🔨 Contractor qty</label>
+                    <label style={{ ...ls, color: '#f59e0b' }}>🔨 Contractor qty</label>
                     <input type="number" step="0.01" value={form.contractor_qty}
                       onChange={e => set('contractor_qty', e.target.value)}
                       disabled={myParty === 'engineer'}
-                      style={{ ...fs, borderColor: '#e87b35', fontWeight: 600, opacity: myParty === 'engineer' ? 0.5 : 1 }} placeholder="0" />
+                      style={{ ...fs, borderColor: '#f59e0b', fontWeight: 600, opacity: myParty === 'engineer' ? 0.5 : 1 }} placeholder="0" />
                     <textarea placeholder="Contractor notes..." value={form.contractor_notes || ''} onChange={e => set('contractor_notes', e.target.value)}
                       disabled={myParty === 'engineer'}
                       style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11, opacity: myParty === 'engineer' ? 0.5 : 1 }} />
@@ -506,7 +506,7 @@ export default function TakingOffPage({ profile, showToast, selectedProject: pro
                   <div>
                     <label style={{ ...ls, color: '#3b82f6' }}>✅ Agreed qty (RE only)</label>
                     <input type="number" step="0.01" value={form.agreed_qty} onChange={e => set('agreed_qty', e.target.value)}
-                      style={{ ...fs, borderColor: '#3b82f6', fontWeight: 700 }} placeholder="—" />
+                      style={{ ...fs, borderColor: '#f59e0b', fontWeight: 700 }} placeholder="—" />
                     <textarea placeholder="RE harmonisation notes..." value={form.re_notes || ''} onChange={e => set('re_notes', e.target.value)}
                       style={{ ...fs, marginTop: 6, height: 50, resize: 'vertical', fontSize: 11 }} />
                   </div>

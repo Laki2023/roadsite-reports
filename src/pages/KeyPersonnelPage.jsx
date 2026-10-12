@@ -15,7 +15,7 @@ const PARTY_COLORS = {
   engineer: '#6366f1',
   project_manager: '#0891b2',
   engineer_rep: '#059669',
-  contractor: '#e87b35',
+  contractor: '#f59e0b',
   subcontractor: '#8b5cf6',
 };
 const STATUS_COLORS = { active: '#059669', replaced: '#6366f1', demobilised: '#64748b', absent: '#dc2626' };
@@ -261,7 +261,7 @@ export default function KeyPersonnelPage({ profile, showToast, selectedProject: 
         <>
           {/* KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 8, marginBottom: 14 }}>
-            <KPI icon="👥" label="Total" value={stats.total} color="#e87b35" />
+            <KPI icon="👥" label="Total" value={stats.total} color="#3b82f6" />
             <KPI icon="🏛️" label="Client" value={stats.byParty.client || 0} color={PARTY_COLORS.client} />
             <KPI icon="📐" label="Engineer" value={stats.byParty.engineer || 0} color={PARTY_COLORS.engineer} />
             <KPI icon="👔" label="Project Mgr" value={stats.byParty.project_manager || 0} color={PARTY_COLORS.project_manager} />

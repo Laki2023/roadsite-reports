@@ -147,7 +147,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
 
   if (loading) return (
     <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
-      <div style={{ width: 40, height: 40, border: '3px solid var(--border)', borderTopColor: '#e87b35',
+      <div style={{ width: 40, height: 40, border: '3px solid var(--border)', borderTopColor: '#3b82f6',
         borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <div style={{ fontSize: 14, fontWeight: 500 }}>Loading dashboard...</div>
@@ -175,15 +175,15 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
               <div key={p.id} onClick={() => navigateTo('taking-off')}
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, cursor: 'pointer',
                   transition: 'all 0.3s', position: 'relative', overflow: 'hidden' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px #e87b3520'; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px #3b82f620'; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #e87b35, #f59e0b)' }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #3b82f6, #f59e0b)' }} />
                 <div style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                   {p.road_name || ''} {p.county ? `· ${p.county}` : ''} {p.contract_no ? `· ${p.contract_no}` : ''}
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                  <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#e87b3520', color: '#e87b35' }}>📐 Open Taking Off Sheet →</span>
+                  <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: '#3b82f620', color: '#3b82f6' }}>📐 Open Taking Off Sheet →</span>
                 </div>
               </div>
             ))}
@@ -322,7 +322,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
       {/* ══════ TOP KPI ROW ══════ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         <KPICard title="Active Projects" value={stats.totalProjects} icon="📊"
-          borderColor="#e87b35" onClick={() => navigateTo('projects')} />
+          borderColor="#3b82f6" onClick={() => navigateTo('projects')} />
         <KPICard title="Physical Progress" value={`${stats.physicalProgress}%`}
           trend={stats.variance} trendLabel="vs schedule" icon="📈"
           borderColor={stats.variance >= 0 ? '#10b981' : '#ef4444'}
@@ -399,8 +399,8 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                   <stop offset="100%" stopColor="#6b7280" stopOpacity={0.05} />
                 </linearGradient>
                 <linearGradient id="gradActual" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#e87b35" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#e87b35" stopOpacity={0.05} />
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
@@ -410,7 +410,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                 formatter={v => v + '%'} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Area type="monotone" dataKey="planned" stroke="#6b7280" strokeWidth={2} fill="url(#gradPlanned)" name="Planned" dot={false} />
-              <Area type="monotone" dataKey="actual" stroke="#e87b35" strokeWidth={2.5} fill="url(#gradActual)" name="Actual" dot={{ r: 3 }} />
+              <Area type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradActual)" name="Actual" dot={{ r: 3 }} />
             </AreaChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, padding: '0 8px' }}>
@@ -428,7 +428,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
           <div style={{ maxHeight: 280, overflowY: 'auto' }}>
             {activityProgress.length > 0 ? activityProgress.map((a, i) => (
               <ProgressRow key={i} label={a.name} value={a.pct}
-                color={a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#e87b35' : '#ef4444'} />
+                color={a.pct >= 80 ? '#10b981' : a.pct >= 40 ? '#3b82f6' : '#ef4444'} />
             )) : (
               <div className="text-sm text-muted" style={{ textAlign: 'center', padding: 40 }}>No activities data yet</div>
             )}
@@ -450,7 +450,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                 <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={v => fmt(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="contractSum" fill="#4b5563" name="Contract Sum" radius={[3,3,0,0]} />
-                <Bar dataKey="valueDone" fill="#e87b35" name="Value Done" radius={[3,3,0,0]} />
+                <Bar dataKey="valueDone" fill="#3b82f6" name="Value Done" radius={[3,3,0,0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <div className="text-sm text-muted" style={{ textAlign: 'center', padding: 60 }}>No financial data yet</div>}
@@ -578,7 +578,7 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                     <span className="text-muted">Physical</span><span style={{ fontWeight: 600 }}>{pp}%</span>
                   </div>
                   <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pp}%`, background: '#e87b35', borderRadius: 2 }} />
+                    <div style={{ height: '100%', width: `${pp}%`, background: '#3b82f6', borderRadius: 2 }} />
                   </div>
                 </div>
                 <div>

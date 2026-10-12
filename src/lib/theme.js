@@ -20,7 +20,7 @@ export function getStoredTheme() {
   } catch (_) {
     // localStorage may be unavailable
   }
-  return 'system';
+  return 'light';
 }
 
 /**
