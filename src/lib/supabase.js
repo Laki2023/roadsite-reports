@@ -101,20 +101,20 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_COLORS = {
-  client:                  { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
-  engineer:                { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
-  project_engineer:        { bg: '#cffafe', text: '#155e75', border: '#06b6d4' },
-  deputy_project_engineer: { bg: '#e0f2fe', text: '#075985', border: '#0ea5e9' },
-  resident_engineer:       { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
-  measurement_engineer:    { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
-  pending:                 { bg: '#fef2f2', text: '#991b1b', border: '#fca5a5' },
+  client:                  { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
+  engineer:                { bg: 'rgba(59,130,246,0.12)',  text: '#60a5fa', border: '#3b82f6' },
+  project_engineer:        { bg: 'rgba(99,102,241,0.12)',  text: '#818cf8', border: '#6366f1' },
+  deputy_project_engineer: { bg: 'rgba(245,158,11,0.12)',  text: '#fbbf24', border: '#f59e0b' },
+  resident_engineer:       { bg: 'rgba(16,185,129,0.12)',  text: '#34d399', border: '#10b981' },
+  measurement_engineer:    { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
+  pending:                 { bg: 'rgba(107,114,128,0.12)', text: '#9ca3af', border: '#6b7280' },
   // Legacy aliases
-  director_general: { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
-  super_admin: { bg: '#fdf2f8', text: '#9d174d', border: '#ec4899' },
-  project_officer: { bg: '#e0f2fe', text: '#075985', border: '#0ea5e9' },
-  inspector: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
-  contractor_qs: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
-  viewer: { bg: '#fed7aa', text: '#9a3412', border: '#f97316' },
+  director_general: { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
+  super_admin:      { bg: 'rgba(236,72,153,0.12)',  text: '#f472b6', border: '#ec4899' },
+  project_officer:  { bg: 'rgba(245,158,11,0.12)',  text: '#fbbf24', border: '#f59e0b' },
+  inspector:        { bg: 'rgba(16,185,129,0.12)',  text: '#34d399', border: '#10b981' },
+  contractor_qs:    { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
+  viewer:           { bg: 'rgba(20,184,166,0.12)',  text: '#2dd4bf', border: '#14b8a6' },
 };
 
 /* ══════════════════════════════════════════════════════════════
