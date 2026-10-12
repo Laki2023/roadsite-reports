@@ -234,10 +234,10 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                 const endDt = p.revised_completion_date || p.original_completion_date || p.end_date;
                 const elapsed = startDt ? Math.max(0, (Date.now() - new Date(startDt)) / 86400000) : 0;
                 const total = startDt && endDt ? Math.max(1, (new Date(endDt) - new Date(startDt)) / 86400000) : 1;
-                const timePct = Math.min(100, Math.round(elapsed / total * 100));
+                const timePct = Math.round(elapsed / total * 100);
 
                 return (
-                <tr key={p.id} style={{ cursor: 'pointer' }}
+                <tr key={p.id} style={{ cursor: 'pointer', verticalAlign: 'middle' }}
                   onClick={() => {
                     if (profile?.role === 'measurement_engineer') {
                       navigateTo('taking-off', p);
@@ -263,23 +263,62 @@ export default function ProjectsPage({ profile, showToast, navigateTo }) {
                     )}
                   </td>
                   <td style={{ width: 100 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${timePct}%`, borderRadius: 3,
-                          background: timePct >= 80 ? '#10b981' : timePct >= 40 ? '#3b82f6' : '#3b82f6' }} />
-                      </div>
-                      <span style={{ fontSize: 10, fontWeight: 600, minWidth: 28, color: 'var(--text-muted)' }}>{timePct}%</span>
-                    </div>
+                    {(() => {
+                      // Schedule-aware progress bar color
+                      let barColor;
+                      if (!startDt || elapsed === 0) {
+                        barColor = '#3b82f6'; // blue — not started or no date
+                      } else if (timePct < 30) {
+                        barColor = '#f59e0b'; // amber — early stage
+                      } else if (timePct < 60) {
+                        barColor = '#f59e0b'; // amber — mid stage
+                      } else if (timePct < 90) {
+                        barColor = '#10b981'; // green — on track
+                      } else if (timePct <= 100) {
+                        barColor = '#10b981'; // green — nearing completion
+                      } else {
+                        barColor = '#ef4444'; // red — overdue (>100% time elapsed)
+                      }
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.min(timePct, 100)}%`, borderRadius: 3,
+                              background: barColor }} />
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 600, minWidth: 28, color: timePct > 100 ? '#ef4444' : 'var(--text-muted)' }}>{timePct}%</span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>
                     <div style={{ display:'flex', gap:4 }}>
                       {hasRole(profile.role, 'engineer') && (
-                        <button className="btn btn-sm btn-secondary"
+                        <button className="btn btn-sm"
+                          style={{
+                            background: 'transparent',
+                            color: 'var(--text-muted)',
+                            border: '1px solid var(--border)',
+                            fontSize: 11,
+                            padding: '2px 10px',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#3b82f6'; e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = 'rgba(59,130,246,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'transparent'; }}
                           onClick={e => { e.stopPropagation(); openEdit(p); }}>Edit</button>
                       )}
                       {isPlatformAdmin && (
-                        <button className="btn btn-sm" style={{ background:'#991b1b', color:'#fff', fontSize:10 }}
-                          onClick={e => { e.stopPropagation(); openDelete(p); }}>🗑️ Delete</button>
+                        <button className="btn btn-sm"
+                          style={{
+                            background: 'transparent',
+                            color: 'var(--text-muted)',
+                            border: '1px solid var(--border)',
+                            fontSize: 11,
+                            padding: '2px 10px',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'transparent'; }}
+                          onClick={e => { e.stopPropagation(); openDelete(p); }}>Delete</button>
                       )}
                     </div>
                   </td>
