@@ -329,11 +329,12 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
           color={stats.variance >= 0 ? '#10b981' : '#ef4444'} />
         <KPICard title="Financial Progress" value={`${stats.financialProgress}%`}
           subtitle={`${fmtB(stats.totalValueDone)} of ${fmtB(stats.totalContract)}`}
-          icon="💰" borderColor="#2563eb" />
-        <KPICard title="Time Elapsed" value={`${stats.timePerformance}%`}
-          subtitle={scheduleStatus} icon="⏱"
-          borderColor={scheduleStatus === 'On Track' ? '#10b981' : '#f59e0b'}
-          color={scheduleStatus === 'On Track' ? '#10b981' : scheduleStatus === 'Behind' ? '#f59e0b' : '#ef4444'} />
+          icon="💰" borderColor={(() => { if (stats.financialProgress === 0) return '#2563eb'; const r = stats.physicalProgress > 0 ? stats.financialProgress / stats.physicalProgress : (stats.financialProgress > 10 ? 2 : 1); if (r > 1.4) return '#ef4444'; if (r > 1.15) return '#f59e0b'; return '#2563eb'; })()}
+          color={(() => { if (stats.financialProgress === 0) return undefined; const r = stats.physicalProgress > 0 ? stats.financialProgress / stats.physicalProgress : (stats.financialProgress > 10 ? 2 : 1); if (r > 1.4) return '#ef4444'; if (r > 1.15) return '#f59e0b'; return undefined; })()} />
+        <KPICard title="Schedule" value={`${stats.timePerformance}% Time Elapsed`}
+          subtitle={`${stats.physicalProgress}% Physical Progress · Variance: ${stats.variance > 0 ? '+' : ''}${stats.variance}%`} icon="⏱"
+          borderColor={(() => { if (stats.timePerformance === 0) return '#3b82f6'; const r = stats.physicalProgress / stats.timePerformance; if (stats.timePerformance > 70 && stats.physicalProgress < 20) return '#ef4444'; if (r < 0.5) return '#ef4444'; if (r < 0.8) return '#f59e0b'; return '#10b981'; })()}
+          color={(() => { if (stats.timePerformance === 0) return '#3b82f6'; const r = stats.physicalProgress / stats.timePerformance; if (stats.timePerformance > 70 && stats.physicalProgress < 20) return '#ef4444'; if (r < 0.5) return '#ef4444'; if (r < 0.8) return '#f59e0b'; return '#10b981'; })()} />
         <KPICard title="Open Issues" value={stats.openIssues}
           subtitle={stats.criticalIssues > 0 ? `${stats.criticalIssues} critical` : 'All manageable'}
           icon="⚠" borderColor={stats.openIssues > 0 ? '#ef4444' : '#10b981'}
@@ -346,23 +347,23 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
         <div className="card" style={{ padding: 16, textAlign: 'center' }}>
           <ScoreRing value={stats.healthScore} size={80} color={health.color} />
           <div style={{ fontSize: 13, fontWeight: 700, marginTop: 8, color: health.color }}>{health.grade}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Project Health</div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary, #94a3b8)' }}>Project Health</div>
           <StatusBadge status={health.label} />
         </div>
         <div className="card" style={{ padding: 16, textAlign: 'center' }}>
           <ScoreRing value={stats.qualityScore} size={80} />
           <div style={{ fontSize: 13, fontWeight: 700, marginTop: 8 }}>Quality Score</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{stats.testsPassed}/{stats.testsTotal} tests passed</div>
+          <div style={{ fontSize: 10, color: 'var(--text-secondary, #94a3b8)' }}>{stats.testsPassed}/{stats.testsTotal} tests passed</div>
         </div>
         <div className="card" style={{ padding: 16, textAlign: 'center' }}>
           <ScoreRing value={stats.equipUtil} size={80} />
           <div style={{ fontSize: 13, fontWeight: 700, marginTop: 8 }}>Equipment Util.</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{stats.totalEquipOnSite}/{stats.totalEquipReq} on site</div>
+          <div style={{ fontSize: 10, color: 'var(--text-secondary, #94a3b8)' }}>{stats.totalEquipOnSite}/{stats.totalEquipReq} on site</div>
         </div>
         <div className="card" style={{ padding: 16, textAlign: 'center' }}>
           <div style={{ fontSize: 32, fontWeight: 800, color: '#2563eb' }}>{fmtB(stats.totalCertified)}</div>
           <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>Certified</div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fmtB(stats.totalPaid)} paid</div>
+          <div style={{ fontSize: 10, color: 'var(--text-secondary, #94a3b8)' }}>{fmtB(stats.totalPaid)} paid</div>
         </div>
       </div>
 
@@ -563,8 +564,8 @@ export default function Dashboard({ profile, navigateTo, activeEmergencies = [] 
                     <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Financial</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{elapsed}%</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Time</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: elapsed === 0 ? undefined : (elapsed > 70 && pp < 20) ? '#ef4444' : (pp / elapsed) < 0.5 ? '#ef4444' : (pp / elapsed) < 0.8 ? '#f59e0b' : undefined }}>{elapsed}%</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-secondary, #94a3b8)' }}>Schedule</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: projIssues > 0 ? '#ef4444' : '#10b981' }}>{projIssues}</div>

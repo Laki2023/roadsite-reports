@@ -191,7 +191,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
         {[
           { l:'Physical', v:`${finPct.toFixed(0)}%`, s:behind?'Behind':'On Track', c:behind?'#dc2626':'#16a34a' },
           { l:'Financial', v:fmtB(valueDone), s:`of ${fmtB(contractSum)}`, c:'#3b82f6' },
-          { l:'Time', v:`${timePct.toFixed(0)}%`, s:`${Math.round(remaining)}d left`, c:behind?'#dc2626':'#2563eb' },
+          { l:'Schedule', v:`${timePct.toFixed(0)}%`, s:`${Math.round(remaining)}d remaining`, c: timePct === 0 ? '#3b82f6' : (timePct > 70 && finPct < 20) ? '#dc2626' : (finPct / timePct) < 0.5 ? '#dc2626' : (finPct / timePct) < 0.8 ? '#d97706' : '#16a34a' },
           { l:'Quality', v:`${qPct.toFixed(0)}%`, s:`${testPass}/${tests.length}`, c:qPct>=80?'#16a34a':'#dc2626' },
           { l:'Equipment', v:`${eqPct.toFixed(0)}%`, s:`${eqOn}/${eqReq}`, c:eqPct>=80?'#16a34a':'#d97706' },
           { l:'Risks', v:openRisks.length, s:`${critRisks.length} critical`, c:critRisks.length>0?'#dc2626':'#16a34a' },
@@ -208,7 +208,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
       <div style={{ display:'flex', justifyContent:'space-around', padding:'12px 0', marginBottom:16, background:'var(--bg-card)', borderRadius:'var(--radius)', border:'1px solid var(--border)' }}>
         <Ring pct={finPct} color="#3b82f6" label="Financial" />
         <Ring pct={worksPct} color="#2563eb" label="Works" />
-        <Ring pct={timePct} color={behind?'#dc2626':'#16a34a'} label="Schedule" />
+        <Ring pct={timePct} color={timePct === 0 ? '#3b82f6' : (timePct > 70 && finPct < 20) ? '#dc2626' : (finPct / timePct) < 0.5 ? '#dc2626' : (finPct / timePct) < 0.8 ? '#d97706' : '#16a34a'} label="Schedule" />
         <Ring pct={eqPct} color="#7c3aed" label="Equipment" />
         <Ring pct={strPct} color="#0891b2" label="Structures" />
         <Ring pct={qPct} color={qPct>=80?'#16a34a':'#dc2626'} label="Quality" />
@@ -231,7 +231,7 @@ export default function ProjectSummary({ projectId, onBack, profile, showToast }
                 <div style={{ position:'absolute', left:0, top:0, bottom:0, width:`${timePct}%`, background:'rgba(107,114,128,0.3)', borderRadius:11 }} />
                 <div style={{ position:'absolute', left:0, top:0, bottom:0, width:`${Math.min(100,finPct)}%`, background:behind?'rgba(220,38,38,0.6)':'rgba(22,163,74,0.6)', borderRadius:11 }} />
                 <span style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', fontSize:9, fontWeight:700, color:'#fff' }}>
-                  {behind ? `⚠ Physical ${finPct.toFixed(0)}% vs Time ${timePct.toFixed(0)}%` : `On Track — ${finPct.toFixed(0)}%`}
+                  {behind ? `⚠ ${finPct.toFixed(0)}% complete vs ${timePct.toFixed(0)}% time elapsed` : `On Track — ${finPct.toFixed(0)}%`}
                 </span>
               </div>
               <span style={{ fontSize:10, minWidth:70, textAlign:'right' }}>{p.original_completion_date||'—'}</span>

@@ -4,6 +4,26 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
   AreaChart, Area, CartesianGrid, Legend } from 'recharts';
 import { COLORS, fmt, fmtB, pct, daysBetween } from '../components/SharedUI';
 
+// ── Schedule Health Color Logic ──
+// Returns color based on ratio of physical progress to time elapsed
+function getScheduleHealthColor(physProgress, timeElapsedPct) {
+  if (timeElapsedPct === 0) return '#3b82f6'; // neutral blue
+  const ratio = physProgress / timeElapsedPct;
+  if (timeElapsedPct > 70 && physProgress < 20) return '#ef4444'; // red/danger
+  if (ratio < 0.5) return '#ef4444'; // red/danger
+  if (ratio < 0.8) return '#f59e0b'; // amber/warning
+  return '#10b981'; // green/on track
+}
+
+// Returns color for budget health (is spending proportional to work done?)
+function getBudgetHealthColor(finProgress, physProgress) {
+  if (finProgress === 0) return '#3b82f6'; // neutral
+  const spendRatio = physProgress > 0 ? finProgress / physProgress : (finProgress > 10 ? 2 : 1);
+  if (spendRatio > 1.4) return '#ef4444'; // spending way more than work done
+  if (spendRatio > 1.15) return '#f59e0b'; // mild overspend vs work
+  return '#10b981'; // spending in line with work
+}
+
 function ScoreRing({ value, size=80, stroke=7, color, label, sublabel, grade }) {
   const r=(size-stroke)/2, c=2*Math.PI*r, p=Math.min(value,100)/100*c;
   const auto = color||(value>=80?'#10b981':value>=60?'#f59e0b':'#ef4444');
@@ -21,7 +41,7 @@ function ScoreRing({ value, size=80, stroke=7, color, label, sublabel, grade }) 
         </div>
       </div>
       {label && <div style={{ fontSize:11, fontWeight:700, marginTop:6, color:auto }}>{label}</div>}
-      {sublabel && <div style={{ fontSize:10, color:'var(--text-muted)' }}>{sublabel}</div>}
+      {sublabel && <div style={{ fontSize:10, color:'var(--text-secondary, #94a3b8)' }}>{sublabel}</div>}
     </div>
   );
 }
@@ -46,8 +66,8 @@ function KPI({ title, value, subtitle, color, icon, small }) {
     <div style={{ textAlign:'center', padding:small?'8px':'12px' }}>
       {icon && <div style={{ fontSize:20, marginBottom:4, opacity:0.7 }}>{icon}</div>}
       <div style={{ fontSize:small?18:24, fontWeight:800, color:color||'var(--text)' }}>{value}</div>
-      <div style={{ fontSize:11, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em', marginTop:2 }}>{title}</div>
-      {subtitle && <div style={{ fontSize:10, color:'var(--text-muted)', marginTop:1 }}>{subtitle}</div>}
+      <div style={{ fontSize:11, fontWeight:600, color:'var(--text-secondary, #94a3b8)', textTransform:'uppercase', letterSpacing:'0.04em', marginTop:2 }}>{title}</div>
+      {subtitle && <div style={{ fontSize:10, color:'var(--text-secondary, #94a3b8)', marginTop:1 }}>{subtitle}</div>}
     </div>
   );
 }
@@ -551,10 +571,10 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
         <div style={{ background:'linear-gradient(135deg, #1e293b 0%, #334155 100%)', padding:'16px 20px', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:0, color:'#fff' }}>
           {[
             { label:'Contract Sum', value: fmtB(contractSum), sub: hasRevisions ? `Original: ${fmtB(originalContractSum)}` : null, icon:'💰' },
-            { label:'Certified to Date', value: fmtB(certified), sub: `${pct(certified, contractSum)}% of contract`, icon:'📜', color: certified > 0 ? '#4ade80' : '#94a3b8' },
+            { label:'Certified to Date', value: fmtB(certified), sub: `${pct(certified, contractSum)}% of contract`, icon:'📜', color: (() => { const c = getBudgetHealthColor(pct(certified, contractSum), physPct); return c === '#10b981' ? '#4ade80' : c === '#f59e0b' ? '#fbbf24' : c === '#ef4444' ? '#f87171' : '#60a5fa'; })() },
             { label:'Amount Paid', value: fmtB(paid), sub: certified > 0 ? `${pct(paid, certified)}% of certified` : '—', icon:'🏦', color: paid > 0 ? '#4ade80' : '#94a3b8' },
             { label:'Physical Progress', value: `${physPct}%`, sub: `${variance > 0 ? '+' : ''}${variance}% vs time`, icon:'🔨', color: variance >= 0 ? '#4ade80' : variance > -10 ? '#fbbf24' : '#f87171' },
-            { label:'Time Elapsed', value: `${timePct}%`, sub: `${remainingDays > 0 ? remainingDays + ' days left' : Math.abs(totalDays - elapsedDays) + ' days overrun'}`, icon:'⏱️', color: remainingDays > 0 ? '#4ade80' : '#f87171' },
+            { label:'Time Elapsed', value: `${timePct}%`, sub: `${remainingDays > 0 ? remainingDays + ' days remaining' : Math.abs(totalDays - elapsedDays) + ' days overrun'}${(physPct / (timePct || 1)) < 0.8 && timePct > 0 ? ` · ${physPct}% complete vs ${timePct}% elapsed` : ''}`, icon:'⏱️', color: (() => { const c = getScheduleHealthColor(physPct, timePct); return c === '#10b981' ? '#4ade80' : c === '#f59e0b' ? '#fbbf24' : c === '#ef4444' ? '#f87171' : '#60a5fa'; })() },
             { label:'Completion Date', value: endDt ? new Date(endDt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—', sub: totalEOT > 0 ? `EOT: ${totalEOT} days` : 'No EOT', icon:'📅' },
           ].map((item, i) => (
             <div key={i} style={{ padding:'8px 14px', borderRight: i < 5 ? '1px solid #ffffff15' : 'none', textAlign:'center' }}>
@@ -576,10 +596,10 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           </div>
           <div style={{ flex:1 }}>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#94a3b8', marginBottom:3 }}>
-              <span>Time Elapsed</span><span style={{ fontWeight:700, color:'#60a5fa' }}>{timePct}%</span>
+              <span>Time Elapsed</span><span style={{ fontWeight:700, color: getScheduleHealthColor(physPct, timePct) === '#10b981' ? '#4ade80' : getScheduleHealthColor(physPct, timePct) === '#f59e0b' ? '#fbbf24' : getScheduleHealthColor(physPct, timePct) === '#ef4444' ? '#f87171' : '#60a5fa' }}>{timePct}%</span>
             </div>
             <div style={{ height:6, background:'#1e293b', borderRadius:3, overflow:'hidden' }}>
-              <div style={{ height:'100%', width:`${Math.min(timePct,100)}%`, background:'#60a5fa', borderRadius:3, transition:'width 1s ease' }} />
+              <div style={{ height:'100%', width:`${Math.min(timePct,100)}%`, background: getScheduleHealthColor(physPct, timePct) === '#10b981' ? '#4ade80' : getScheduleHealthColor(physPct, timePct) === '#f59e0b' ? '#fbbf24' : getScheduleHealthColor(physPct, timePct) === '#ef4444' ? '#f87171' : '#60a5fa', borderRadius:3, transition:'width 1s ease' }} />
             </div>
           </div>
           <div style={{ flex:1 }}>
@@ -630,7 +650,7 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
                 ['Original Contract Sum', p.original_contract_sum ? `KES ${Number(p.original_contract_sum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : (contractSum > 0 ? `KES ${Number(contractSum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—')],
                 ['Revised Contract Sum', p.revised_contract_sum ? `KES ${Number(p.revised_contract_sum).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A'],
                 ['Addendums', p.addendums || 'None'],
-                ['Time Elapsed', `${elapsedMonths} months (${timePct}%)`],
+                ['Schedule Progress', `${elapsedMonths} months elapsed (${timePct}%) · ${physPct}% physical progress · Variance: ${variance > 0 ? '+' : ''}${variance}%`],
                 ['County(ies)', p.county || '—'],
                 ['Sub-County(ies)', p.sub_county || '—'],
                 ['Constituency(ies)', p.constituency || '—'],
@@ -751,11 +771,17 @@ export default function ProjectDashboard({ projectId, onBack, profile, navigateT
           <KPI title="Physical Progress" value={`${physPct}%`} color={variance>=0?'#10b981':'#ef4444'}
             subtitle={`${variance>0?'+':''}${variance}% vs schedule`} small />
         </div>
-        <div className="card" style={{ padding:12, borderTop:'3px solid #2563eb' }}>
-          <KPI title="Time Performance" value={`${timePct}%`} subtitle={`${remainingDays} days remaining`} small />
+        <div className="card" style={{ padding:12, borderTop:`3px solid ${getScheduleHealthColor(physPct, timePct)}` }}>
+          <KPI title="Schedule" value={`${timePct}%`} color={getScheduleHealthColor(physPct, timePct)}
+            subtitle={`${remainingDays} days remaining · Variance: ${variance > 0 ? '+' : ''}${variance}%`} small />
+          {(physPct / (timePct || 1)) < 0.8 && timePct > 0 && (
+            <div style={{ fontSize:10, color: getScheduleHealthColor(physPct, timePct), marginTop:2, textAlign:'center' }}>
+              {physPct}% complete vs {timePct}% time elapsed
+            </div>
+          )}
         </div>
-        <div className="card" style={{ padding:12, borderTop:'3px solid #d97706' }}>
-          <KPI title="Cost Performance" value={`${finPct}%`} subtitle={fmtB(valueDone)} small />
+        <div className="card" style={{ padding:12, borderTop:`3px solid ${getBudgetHealthColor(finPct, physPct)}` }}>
+          <KPI title="Cost Performance" value={`${finPct}%`} color={getBudgetHealthColor(finPct, physPct)} subtitle={fmtB(valueDone)} small />
         </div>
         <div className="card" style={{ padding:12, borderTop:'3px solid #3b82f6' }}>
           <KPI title="Contract Value" value={fmtB(contractSum)} subtitle={`${fmtB(balance)} remaining`} small />

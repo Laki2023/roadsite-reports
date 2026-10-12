@@ -42,6 +42,7 @@
   --sidebar-text-hover: #e2e8f0;
   --sidebar-active-bg: rgba(59,130,246,0.12);
   --sidebar-active-text: #60a5fa;
+  --dark-panel-text-muted: #94a3b8;  /* lighter muted text for dark navy panels */
   --scrollbar-thumb: #334155;
   --scrollbar-thumb-hover: #64748b;
 }
@@ -79,6 +80,7 @@
   --sidebar-text-hover: #e2e8f0;
   --sidebar-active-bg: rgba(59,130,246,0.12);
   --sidebar-active-text: #60a5fa;
+  --dark-panel-text-muted: #94a3b8;
   --scrollbar-thumb: #334155;
   --scrollbar-thumb-hover: #64748b;
 }
@@ -116,6 +118,7 @@
   --sidebar-text-hover: #e2e8f0;
   --sidebar-active-bg: rgba(59,130,246,0.15);
   --sidebar-active-text: #60a5fa;
+  --dark-panel-text-muted: #94a3b8;
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-thumb-hover: #94a3b8;
 }
@@ -154,6 +157,7 @@
     --sidebar-text-hover: #e2e8f0;
     --sidebar-active-bg: rgba(59,130,246,0.15);
     --sidebar-active-text: #60a5fa;
+    --dark-panel-text-muted: #94a3b8;
     --scrollbar-thumb: #cbd5e1;
     --scrollbar-thumb-hover: #94a3b8;
   }
@@ -349,6 +353,10 @@ html { scroll-behavior: smooth; }
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 2px;
+}
+/* Ensure muted text on dark navy panels (gradient headers, sidebar KPIs) meets contrast */
+.dark-panel-muted {
+  color: var(--dark-panel-text-muted) !important;
 }
 
 /* ─── Tables ─── */

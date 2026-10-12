@@ -47,11 +47,11 @@ export function ScoreRing({ value, max = 100, size = 72, stroke = 6, color, labe
         </svg>
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
           <div style={{ fontSize: size * 0.22, fontWeight: 800, color: autoColor }}>{value}</div>
-          {max !== 100 && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>/{max}</div>}
+          {max !== 100 && <div style={{ fontSize: 8, color: 'var(--text-secondary, #94a3b8)' }}>/{max}</div>}
         </div>
       </div>
       {label && <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>{label}</div>}
-      {sublabel && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sublabel}</div>}
+      {sublabel && <div style={{ fontSize: 10, color: 'var(--text-secondary, #94a3b8)' }}>{sublabel}</div>}
     </div>
   );
 }
@@ -67,16 +67,16 @@ export function KPICard({ title, value, subtitle, icon, trend, trendLabel, color
       onMouseLeave={e => (e.currentTarget.style.transform = '')}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
           <div style={{ fontSize: 26, fontWeight: 800, color: color || 'var(--text)', marginTop: 4 }}>{value}</div>
-          {subtitle && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>}
+          {subtitle && <div style={{ fontSize: 11, color: 'var(--text-secondary, #94a3b8)', marginTop: 2 }}>{subtitle}</div>}
         </div>
         {icon && <div style={{ fontSize: 28, opacity: 0.15, position: 'absolute', right: 14, top: 14 }}>{icon}</div>}
       </div>
       {trend != null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11 }}>
           <span style={{ color: trendColor, fontWeight: 700 }}>{trend > 0 ? '▲' : trend < 0 ? '▼' : '●'} {Math.abs(trend)}%</span>
-          {trendLabel && <span style={{ color: 'var(--text-muted)' }}>{trendLabel}</span>}
+          {trendLabel && <span style={{ color: 'var(--text-secondary, #94a3b8)' }}>{trendLabel}</span>}
         </div>
       )}
     </div>
